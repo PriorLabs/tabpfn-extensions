@@ -69,7 +69,7 @@ class AbstractValidationUtils(ABC, BaseEstimator):
         self._start_time: int = 0
         self.classes_: np.ndarray | None = None
         self._repeats_seed = [
-            int(self._rng.randint(0, 2**32)) for _ in range(self.n_repeats)
+            int(self._rng.randint(0, 2**32,dtype=np.int64)) for _ in range(self.n_repeats)
         ]
         self._estimators = estimators.copy()  # internal copy for early stopping.
         self.validation_method = validation_method

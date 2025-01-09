@@ -87,8 +87,8 @@ class TunedTabPFNBase(BaseEstimator):
         rng = check_random_state(self.random_state)
 
         # Set random seeds for reproducibility
-        torch.manual_seed(rng.randint(0, 2**32 - 1))
-        np.random.seed(rng.randint(0, 2**32 - 1))
+        torch.manual_seed(rng.randint(0, 2**32 - 1,dtype=np.int64))
+        np.random.seed(rng.randint(0, 2**32 - 1,dtype=np.int64))
 
         # Fit transformers
         X = self._cat_encoder.fit_transform(X)
@@ -100,7 +100,7 @@ class TunedTabPFNBase(BaseEstimator):
             X,
             y,
             test_size=self.n_validation_size,
-            random_state=rng.randint(0, 2**32 - 1),
+            random_state=rng.randint(0, 2**32 - 1,dtype=np.int64),
             stratify=y if task_type == "multiclass" else None,
         )
 
@@ -121,7 +121,7 @@ class TunedTabPFNBase(BaseEstimator):
             }
             model_params["inference_config"] = inference_config
             model_params["device"] = self.device
-            model_params["random_state"] = rng.randint(0, 2**32 - 1)
+            model_params["random_state"] = rng.randint(0, 2**32 - 1,dtype=np.int64)
 
             # Handle special parameters
             n_ensemble_repeats = model_params.pop("n_ensemble_repeats", None)
@@ -198,12 +198,12 @@ class TunedTabPFNBase(BaseEstimator):
             if task_type in ["binary", "multiclass"]:
                 self.best_model_ = TabPFNClassifier(
                     device=self.device,
-                    random_state=rng.randint(0, 2**32 - 1),
+                    random_state=rng.randint(0, 2**32 - 1,dtype=np.int64),
                 )
             else:
                 self.best_model_ = TabPFNRegressor(
                     device=self.device,
-                    random_state=rng.randint(0, 2**32 - 1),
+                    random_state=rng.randint(0, 2**32 - 1,dtype=np.int64),
                 )
             self.best_model_.fit(X, y)
 
