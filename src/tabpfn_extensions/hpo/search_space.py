@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from hyperopt import hp
 from pathlib import Path
-from tabpfn_extensions import PreprocessorConfig
 
 
 def enumerate_preprocess_transforms():
@@ -47,13 +46,13 @@ def enumerate_preprocess_transforms():
                     for global_transformer_name in [None, "svd"]:
                         transforms += [
                             [
-                                PreprocessorConfig(
-                                    name=name,
-                                    global_transformer_name=global_transformer_name,
-                                    subsample_features=subsample_features,
-                                    categorical_name=categorical_name,
-                                    append_original=append_original,
-                                )
+                                {
+                                    "name": name,
+                                    "global_transformer_name": global_transformer_name,
+                                    "subsample_features": subsample_features,
+                                    "categorical_name": categorical_name,
+                                    "append_original": append_original,
+                                }
                                 for name in names
                             ],
                         ]
