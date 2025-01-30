@@ -172,9 +172,9 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
         # Initialize attributes that should only be set in fit
         self.n_classes_ = 0
         self.classes_ = []
-        self.decision_tree = None
-        self.leaf_nodes = []
-        self.leaf_train_data = {}
+        self._decision_tree = None
+        self._leaf_nodes = []
+        self._leaf_train_data = {}
         self.label_encoder_ = LabelEncoder()
 
         if self.tree_seed is None:
@@ -255,12 +255,12 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
             self.post_fit()
 
         (
-            self.X,
-            self.y,
-            self.train_X,
-            self.train_X_preprocessed,
-            self.train_y,
-            self.train_sample_weight,
+            self._X,
+            self._y,
+            self._train_X,
+            self._train_X_preprocessed,
+            self._train_y,
+            self._train_sample_weight,
         ) = (
             X,
             y,
@@ -271,10 +271,10 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
         )
         if self.adaptive_tree:
             (
-                self.valid_X,
-                self.valid_X_preprocessed,
-                self.valid_y,
-                self.valid_sample_weight,
+                self._valid_X,
+                self._valid_X_preprocessed,
+                self._valid_y,
+                self._valid_sample_weight,
             ) = (
                 valid_X,
                 valid_X_preprocessed,
@@ -282,26 +282,26 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
                 valid_sample_weight,
             )
 
-        self.todo_post_fit = True
+        self._todo_post_fit = True
 
     def fit_leafs(self, train_X, train_y):
-        self.leaf_train_data = {}
+        self._leaf_train_data = {}
 
         # Get leaf nodes of each datapoint in bootstrap sample
-        self.leaf_nodes, bootstrap_X, bootstrap_y = self.apply_tree_train(
+        self._leaf_nodes, bootstrap_X, bootstrap_y = self.apply_tree_train(
             train_X,
             train_y,
         )
         if self.verbose:
             print(
-                f"Estimators: {self.leaf_nodes.shape[2]}, Nodes per estimator: {self.leaf_nodes.shape[1]}",
+                f"Estimators: {self._leaf_nodes.shape[2]}, Nodes per estimator: {self._leaf_nodes.shape[1]}",
             )
 
         # Store train data point for each leaf
-        for estimator_id in range(self.leaf_nodes.shape[2]):
-            self.leaf_train_data[estimator_id] = {}
-            for leaf_id in range(self.leaf_nodes.shape[1]):
-                indices = np.argwhere(self.leaf_nodes[:, leaf_id, estimator_id]).ravel()
+        for estimator_id in range(self._leaf_nodes.shape[2]):
+            self._leaf_train_data[estimator_id] = {}
+            for leaf_id in range(self._leaf_nodes.shape[1]):
+                indices = np.argwhere(self._leaf_nodes[:, leaf_id, estimator_id]).ravel()
                 X_train_samples = np.take(train_X, indices, axis=0)
                 y_train_samples = np.array(np.take(train_y, indices, axis=0)).ravel()
 
@@ -310,7 +310,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
                         f"Leaf: {leaf_id} Shape: {X_train_samples.shape} / {train_X.shape}",
                     )
 
-                self.leaf_train_data[estimator_id][leaf_id] = (
+                self._leaf_train_data[estimator_id][leaf_id] = (
                     X_train_samples,
                     y_train_samples,
                 )
@@ -357,22 +357,22 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
         # TODO: This is a bit of a hack, but it is the only way to stop the fitting at a time budget
         #    We should probably refactor this to a more elegant solution where we move more logic to fit
 
-        if self.todo_post_fit:
-            self.todo_post_fit = False
+        if self._todo_post_fit:
+            self._todo_post_fit = False
             if self.adaptive_tree:
                 if self.verbose:
                     print(
-                        f"Starting tree leaf validation train {self.train_X.shape} valid {self.valid_X.shape}",
+                        f"Starting tree leaf validation train {self._train_X.shape} valid {self._valid_X.shape}",
                     )
                 # Pre-fits the leafs of the tree
-                self.fit_leafs(self.train_X, self.train_y)
+                self.fit_leafs(self._train_X, self._train_y)
                 self.predict_(
-                    self.valid_X,
-                    self.valid_y.values.ravel(),
+                    self._valid_X,
+                    self._valid_y.values.ravel(),
                     check_input=False,
                 )
 
-            self.fit_leafs(self.X, self.y)
+            self.fit_leafs(self._X, self._y)
 
         #### END OF FITTING #####
 
@@ -427,7 +427,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
                 ).ravel()
 
                 # Fetch the train samples that are in the node
-                X_train_samples, y_train_samples = self.leaf_train_data[estimator_id][
+                X_train_samples, y_train_samples = self._leaf_train_data[estimator_id][
                     leaf_id
                 ]
 
