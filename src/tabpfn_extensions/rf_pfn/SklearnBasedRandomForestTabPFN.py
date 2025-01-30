@@ -51,11 +51,10 @@ class RandomForestTabPFNBase:
         """
         self.categorical_features = categorical_features
 
-    def fit(self, X, y, sample_weight=None):
+    def fit(self, X, y):
         """Fits RandomForestTabPFN
         :param X: Feature training data
         :param y: Label training data
-        :param sample_weight: Weights of each sample
         :return: None.
         """
         self.estimator = self.init_base_estimator()
