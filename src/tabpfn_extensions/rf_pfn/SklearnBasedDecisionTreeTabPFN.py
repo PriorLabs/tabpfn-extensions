@@ -12,6 +12,7 @@ from sklearn.base import ClassifierMixin, RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.tree import BaseDecisionTree, DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions import TabPFNRegressor, TabPFNClassifier
 
@@ -357,9 +358,10 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
         :param check_input:
         :return: Probabilities of each class
         """
+        check_is_fitted(self)
+
         # TODO: This is a bit of a hack, but it is the only way to stop the fitting at a time budget
         #    We should probably refactor this to a more elegant solution where we move more logic to fit
-
         if self._todo_post_fit:
             self._todo_post_fit = False
             if self.adaptive_tree:
