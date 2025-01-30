@@ -44,7 +44,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
         verbose=False,
         show_progress=False,
         fit_nodes=True,
-        tree_seed=0,
+        tree_seed=None,
         adaptive_tree=True,
         adaptive_tree_min_train_samples=50,
         adaptive_tree_max_train_samples=2000,
@@ -177,7 +177,10 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
         self.leaf_train_data = {}
         self.label_encoder_ = LabelEncoder()
 
-        self.tree_seed = random.randint(1, 10000)
+        if self.tree_seed is None:
+            self.tree_seed_ = random.randint(1, 10000)
+        else:
+            self.tree_seed_ = self.tree_seed
 
         if check_input:
             pass
@@ -728,7 +731,7 @@ class DecisionTreeTabPFNClassifier(ClassifierMixin, DecisionTreeTabPFNBase):
         if len(classes) > 1:
             original_random_state = self.tabpfn.random_state
             try:
-                self.tabpfn.random_state = leaf_id + self.tree_seed
+                self.tabpfn.random_state = leaf_id + self.tree_seed_
                 self.tabpfn.fit(X_train_samples, y_train_samples)
                 y_eval_prob[indices[:, None], classes] = self.tabpfn.predict_proba(
                     X[indices],
@@ -882,7 +885,7 @@ class DecisionTreeTabPFNRegressor(RegressorMixin, DecisionTreeTabPFNBase):
     def predict_leaf_(self, X_train_samples, y_train_samples, leaf_id, X, indices):
         original_random_state = self.tabpfn.random_state
         try:
-            self.tabpfn.random_state = leaf_id + self.tree_seed
+            self.tabpfn.random_state = leaf_id + self.tree_seed_
             self.tabpfn.fit(X_train_samples, y_train_samples)
             y_eval_prob = np.zeros((X.shape[0],))
             y_eval_prob[indices] = self.tabpfn.predict(X[indices])
