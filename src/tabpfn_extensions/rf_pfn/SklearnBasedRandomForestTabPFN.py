@@ -13,6 +13,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.ensemble._base import _partition_estimators
 from sklearn.utils.validation import (
     check_is_fitted,
+    check_array,
 )
 
 from .SklearnBasedDecisionTreeTabPFN import (
@@ -57,6 +58,9 @@ class RandomForestTabPFNBase:
         :param y: Label training data
         :return: None.
         """
+        # Add explicit sparse matrix check
+        X = check_array(X, accept_sparse=False)
+
         self.estimator = self.init_base_estimator()
         self.estimator.set_categorical_features(self.categorical_features)
 
@@ -176,6 +180,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
         tags.input_tags.allow_nan = True
+        tags.input_tags.sparse = False
         tags.estimator_type = "classifier"
         return tags
 
@@ -313,6 +318,7 @@ class RandomForestTabPFNRegressor(RandomForestTabPFNBase, RandomForestRegressor)
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
         tags.input_tags.allow_nan = True
+        tags.input_tags.sparse = False
         tags.estimator_type = "regressor"
         return tags
 
