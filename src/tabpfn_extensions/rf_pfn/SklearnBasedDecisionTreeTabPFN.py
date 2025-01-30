@@ -344,8 +344,9 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
     def preprocess_data_for_tree(self, X):
         if torch.is_tensor(X):
             X = X.cpu().numpy()
-        X[np.isnan(X)] = 0.0
-        return X
+        X_copy = np.array(X, copy=True)  # Create a writeable copy
+        X_copy[np.isnan(X_copy)] = 0.0
+        return X_copy
 
     def predict_(self, X, y=None, check_input=True):
         """Predicts X
