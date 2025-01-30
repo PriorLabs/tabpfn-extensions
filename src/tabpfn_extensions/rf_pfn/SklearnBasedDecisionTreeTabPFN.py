@@ -116,8 +116,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
         self.ccp_alpha = ccp_alpha
         self.monotonic_cst = monotonic_cst
         self.tabpfn = tabpfn
-        if self.tabpfn:
-            self.tabpfn.random_state = None  # Make sure that TabPFN is not seeded
         self.min_samples_split = min_samples_split
         self.max_features = max_features
         self.random_state = random_state
