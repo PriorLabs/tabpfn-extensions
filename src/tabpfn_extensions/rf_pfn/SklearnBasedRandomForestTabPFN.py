@@ -45,13 +45,6 @@ class RandomForestTabPFNBase:
     def get_n_estimators(self, X):
         return self.n_estimators
 
-    def set_categorical_features(self, categorical_features):
-        """Sets categorical features
-        :param categorical_features: Categorical features
-        :return: None.
-        """
-        self.categorical_features = categorical_features
-
     def fit(self, X, y):
         """Fits RandomForestTabPFN
         :param X: Feature training data
@@ -59,12 +52,11 @@ class RandomForestTabPFNBase:
         :return: None.
         """
         # Add explicit sparse matrix check
-        X = check_array(X, accept_sparse=False)
+        X = check_array(X, accept_sparse=False, force_all_finite=False)
 
         self.estimator = self.init_base_estimator()
         self.estimator.set_categorical_features(self.categorical_features)
 
-        self.X = X
         self.n_estimators = self.get_n_estimators(X)
 
         time.time()

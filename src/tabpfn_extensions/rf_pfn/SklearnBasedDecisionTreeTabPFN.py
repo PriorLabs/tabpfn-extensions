@@ -150,11 +150,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree):
         """
         self.categorical_features = categorical_features
 
-    def fit(self, X, y, sample_weight=None, check_input=True):
-        # Add return self to enable method chaining
-        self._fit(X, y, sample_weight, check_input=check_input)
-        return self
-
     def _fit(
         self,
         X,
