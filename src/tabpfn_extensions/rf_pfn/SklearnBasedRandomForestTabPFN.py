@@ -45,14 +45,21 @@ class RandomForestTabPFNBase:
     def get_n_estimators(self, X):
         return self.n_estimators
 
-    def fit(self, X, y):
+    def fit(self, X, y, sample_weight=None):
         """Fits RandomForestTabPFN
         :param X: Feature training data
         :param y: Label training data
+        :param sample_weight: Weights of each sample
         :return: None.
         """
         # Add explicit sparse matrix check
         X = check_array(X, accept_sparse=False, force_all_finite=False)
+
+        if sample_weight is not None:
+            logger.warning(
+                "sample_weight is only used for the random forest part of the model, "
+                "not for TabPFN. This might lead to unexpected behavior."
+            )
 
         self.estimator = self.init_base_estimator()
         self.estimator.set_categorical_features(self.categorical_features)
@@ -68,7 +75,7 @@ class RandomForestTabPFNBase:
                     X = X.numpy()
                 if torch.is_tensor(y):
                     y = y.numpy()
-                super().fit(X, y)
+                super().fit(X, y, sample_weight=sample_weight)
             except TypeError as e:
                 print("Error in fit with data", X, y)
                 raise e
@@ -146,6 +153,12 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
             ccp_alpha=ccp_alpha,
             max_samples=max_samples,
         )
+
+        if class_weight is not None:
+            logger.warning(
+                "class_weight is only used for the random forest part of the model, "
+                "not for TabPFN. This might lead to unexpected behavior."
+            )
 
         self.tabpfn = tabpfn
 
