@@ -12,7 +12,7 @@ dependencies = [
     "scikit-learn>=1.2.0,<1.7",
     "scipy>=1.7.3,<2",
     "tabpfn>=2.0.6",
-    "numpy>=1.21.0,<2",
+    "numpy>=1.21.0,<3",
 ]
 
 requires-python = ">=3.9"
