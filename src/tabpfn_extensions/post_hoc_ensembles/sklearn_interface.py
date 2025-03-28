@@ -14,6 +14,7 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
+from tabpfn_extensions.simulator import simulate_first
 
 from .pfn_phe import (
     AutoPostHocEnsemblePredictor,
@@ -90,6 +91,7 @@ class AutoTabPFNClassifier(ClassifierMixin, BaseEstimator):
         tags.estimator_type = "classifier"
         return tags
 
+    @simulate_first
     def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
         X, y = validate_data(
             self,
@@ -268,6 +270,7 @@ class AutoTabPFNRegressor(RegressorMixin, BaseEstimator):
         tags.estimator_type = "regressor"
         return tags
 
+    @simulate_first
     def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
         # Validate input data
 
