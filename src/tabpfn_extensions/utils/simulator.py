@@ -46,8 +46,29 @@ def increment_mock_time(seconds: float):
     set_mock_time(get_mock_time() + seconds)
 
 
+def mock_fit_local(self, X, y, config=None):
+    self.X_train = X
+    self.y_train = y
+    return("mock_id")
+
+
 def mock_fit(cls, X, y, config=None):
     return("mock_id")
+
+
+def mock_predict_local(self, X_test):
+    return mock_predict_proba_local(self, X_test, from_classifier_predict=True)
+
+
+def mock_predict_proba_local(self, X_test, from_classifier_predict=False):
+    task = "classification" if self.__class__.__name__ == "TabPFNClassifier" else "regression"
+    config = {"n_estimators": self.n_estimators}
+    params = {}
+    if task == "classification":
+        params["output_type"] = "preds" if from_classifier_predict else "probas"
+    else:
+        params["output_type"] = "mean"
+    return mock_predict(self, X_test, task, "dummy", self.X_train, self.y_train, config, params)
 
 
 def mock_predict(
@@ -75,7 +96,7 @@ def mock_predict(
         num_features=X_test.shape[1],
         task=task,
         tabpfn_config=config,
-        latency_offset=CLIENT_COST_ESTIMATION_LATENCY_OFFSET,  # To slightly overestimate (safer)
+        latency_offset=0 if USE_TABPFN_LOCAL else CLIENT_COST_ESTIMATION_LATENCY_OFFSET,  # To slightly overestimate (safer)
     )
     increment_mock_time(duration)
 
@@ -128,16 +149,18 @@ def mock_mode():
     original_levels = {logger: logger.level for logger in loggers}
 
     if USE_TABPFN_LOCAL:
-        from tabpfn.classifier import TabPFNClassifier
-        from tabpfn.regressor import TabPFNRegressor
+        from tabpfn import TabPFNClassifier
+        from tabpfn import TabPFNRegressor
         original_fit_classification = getattr(TabPFNClassifier, "fit")
         original_fit_regressor = getattr(TabPFNRegressor, "fit")
         original_predict_classification = getattr(TabPFNClassifier, "predict")
+        original_predict_proba_classification = getattr(TabPFNClassifier, "predict_proba")
         original_predict_regressor = getattr(TabPFNRegressor, "predict")
-        setattr(TabPFNClassifier, "fit", classmethod(mock_fit))
-        setattr(TabPFNClassifier, "predict", classmethod(mock_predict))
-        setattr(TabPFNRegressor, "fit", classmethod(mock_fit))
-        setattr(TabPFNRegressor, "predict", classmethod(mock_predict))
+        setattr(TabPFNClassifier, "fit", mock_fit_local)
+        setattr(TabPFNClassifier, "predict", mock_predict_local)
+        setattr(TabPFNClassifier, "predict_proba", mock_predict_proba_local)
+        setattr(TabPFNRegressor, "fit", mock_fit_local)
+        setattr(TabPFNRegressor, "predict", mock_predict_proba_local)
     else:
         from tabpfn_client.service_wrapper import InferenceClient
         original_fit = getattr(InferenceClient, "fit")
@@ -161,6 +184,7 @@ def mock_mode():
                     from tabpfn.regressor import TabPFNRegressor
                     setattr(TabPFNClassifier, "fit", original_fit_classification)
                     setattr(TabPFNClassifier, "predict", original_predict_classification)
+                    setattr(TabPFNClassifier, "predict_proba", original_predict_proba_classification)
                     setattr(TabPFNRegressor, "fit", original_fit_regressor)
                     setattr(TabPFNRegressor, "predict", original_predict_regressor)
                 else:
