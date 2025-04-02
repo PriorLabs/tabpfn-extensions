@@ -120,7 +120,8 @@ def mock_mode():
     Context manager that enables mock mode in the current thread.
     """
     set_mock_cost(0.0)
-    set_mock_time(time.time())
+    start_time = time.time()
+    set_mock_time(start_time)
 
     # Store original logging levels for all loggers
     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
@@ -128,7 +129,16 @@ def mock_mode():
     original_levels = {logger: logger.level for logger in loggers}
 
     if USE_TABPFN_LOCAL:
-        pass
+        from tabpfn.classifier import TabPFNClassifier
+        from tabpfn.regressor import TabPFNRegressor
+        original_fit_classification = getattr(TabPFNClassifier, "fit")
+        original_fit_regressor = getattr(TabPFNRegressor, "fit")
+        original_predict_classification = getattr(TabPFNClassifier, "predict")
+        original_predict_regressor = getattr(TabPFNRegressor, "predict")
+        setattr(TabPFNClassifier, "fit", classmethod(mock_fit))
+        setattr(TabPFNClassifier, "predict", classmethod(mock_predict))
+        setattr(TabPFNRegressor, "fit", classmethod(mock_fit))
+        setattr(TabPFNRegressor, "predict", classmethod(mock_predict))
     else:
         from tabpfn_client.service_wrapper import InferenceClient
         original_fit = getattr(InferenceClient, "fit")
@@ -145,10 +155,15 @@ def mock_mode():
 
         with mock.patch("time.time", side_effect=get_mock_time):
             try:
-                yield lambda: get_mock_cost()
+                yield lambda: (get_mock_time() - start_time, get_mock_cost())
             finally:
                 if USE_TABPFN_LOCAL:
-                    pass
+                    from tabpfn.classifier import TabPFNClassifier
+                    from tabpfn.regressor import TabPFNRegressor
+                    setattr(TabPFNClassifier, "fit", original_fit_classification)
+                    setattr(TabPFNClassifier, "predict", original_predict_classification)
+                    setattr(TabPFNRegressor, "fit", original_fit_regressor)
+                    setattr(TabPFNRegressor, "predict", original_predict_regressor)
                 else:
                     from tabpfn_client.service_wrapper import InferenceClient
                     setattr(InferenceClient, "fit", original_fit)
@@ -168,9 +183,9 @@ def simulate_first(func):
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        with mock_mode() as get_mock_cost:
+        with mock_mode() as get_simulation_results:
             func(*args, **kwargs)
-            credit_estimate = get_mock_cost()
+            time_estimate, credit_estimate = get_simulation_results()
         access_token = get_access_token()
         api_usage = ServiceClient.get_api_usage(access_token)
 
