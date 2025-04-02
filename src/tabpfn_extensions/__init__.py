@@ -14,7 +14,7 @@ from .post_hoc_ensembles import AutoTabPFNClassifier, AutoTabPFNRegressor
 from .unsupervised import TabPFNUnsupervisedModel
 
 # Import utilities and wrapped TabPFN classes
-from .utils import TabPFNClassifier, TabPFNRegressor, is_tabpfn
+from .utils import TabPFNClassifier, TabPFNRegressor, is_tabpfn, simulate_first
 
 __all__ = [
     "test_utils",
@@ -28,4 +28,5 @@ __all__ = [
     "AutoTabPFNRegressor",
     "TunedTabPFNClassifier",
     "TunedTabPFNRegressor",
+    "simulate_first",
 ]

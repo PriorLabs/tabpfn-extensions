@@ -9,11 +9,10 @@ import logging
 import functools
 import os
 
-from tabpfn_client.client import ServiceClient
-from tabpfn_client.tabpfn_common_utils.expense_estimation import estimate_duration
+from tabpfn_extensions.utils.tabpfn_common_utils.expense_estimation import estimate_duration
 
 
-USE_TABPFN_LOCAL = False  # os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"
+USE_TABPFN_LOCAL = True  # os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"
 CLIENT_COST_ESTIMATION_LATENCY_OFFSET = 1.0
 
 
@@ -179,25 +178,29 @@ def simulate_first(func):
     Decorator that first runs the decorated function in mock mode to simulate its credit usage.
     If user has enough credits, function is then executed for real.
     """
-    from tabpfn_client import get_access_token
-
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         with mock_mode() as get_simulation_results:
             func(*args, **kwargs)
             time_estimate, credit_estimate = get_simulation_results()
-        access_token = get_access_token()
-        api_usage = ServiceClient.get_api_usage(access_token)
+        
+        if not USE_TABPFN_LOCAL:
+            from tabpfn_client.client import ServiceClient
+            from tabpfn_client import get_access_token
+            access_token = get_access_token()
+            api_usage = ServiceClient.get_api_usage(access_token)
 
-        if (
-            not api_usage["usage_limit"] == -1
-            and api_usage["usage_limit"] - api_usage["current_usage"] < credit_estimate
-        ):
-            raise RuntimeError(
-                f"Not enough credits left. Estimated credit usage: {credit_estimate}, credits left: {api_usage['usage_limit'] - api_usage['current_usage']}"
-            )
-        else:
-            print("Enough credits left.")
+            if (
+                not api_usage["usage_limit"] == -1
+                and api_usage["usage_limit"] - api_usage["current_usage"] < credit_estimate
+            ):
+                raise RuntimeError(
+                    f"Not enough credits left. Estimated credit usage: {credit_estimate}, credits left: {api_usage['usage_limit'] - api_usage['current_usage']}"
+                )
+            else:
+                print("Enough credits left.")
+        
+        print(f"Estimated duration: {time_estimate:.1f} seconds")
 
         return func(*args, **kwargs)
 

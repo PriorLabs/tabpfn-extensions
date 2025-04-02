@@ -59,7 +59,7 @@ try:
 
     if tabpfn_spec is not None:
         print("Found tabpfn package")
-        from tabpfn_extensions.utils import (  # noqa: F401
+        from tabpfn_extensions.utils.utils import (  # noqa: F401
             LocalTabPFNClassifier,
             LocalTabPFNRegressor,
         )
@@ -84,7 +84,7 @@ try:
 
     if tabpfn_client_spec is not None:
         print("Found tabpfn_client package")
-        from tabpfn_extensions.utils import (  # noqa: F401
+        from tabpfn_extensions.utils.utils import (  # noqa: F401
             TabPFNClassifier as ClientTabPFNClassifier,
             TabPFNRegressor as ClientTabPFNRegressor,
         )
@@ -229,13 +229,13 @@ def tabpfn_classifier(backend):
 
     if backend == "tabpfn":
         # For local backend, use standard TabPFN
-        from tabpfn_extensions.utils import LocalTabPFNClassifier
+        from tabpfn_extensions.utils.utils import LocalTabPFNClassifier
 
         print("Using TabPFN package for classifier")
         return LocalTabPFNClassifier()
     elif backend == "tabpfn_client":
         # For client backend, use our wrapper to ensure compatibility
-        from tabpfn_extensions.utils import ClientTabPFNClassifier
+        from tabpfn_extensions.utils.utils import ClientTabPFNClassifier
 
         print("Using TabPFN client wrapper for classifier")
         return ClientTabPFNClassifier()
@@ -251,13 +251,13 @@ def tabpfn_regressor(backend):
 
     if backend == "tabpfn":
         # For local backend, use standard TabPFN
-        from tabpfn_extensions.utils import LocalTabPFNRegressor
+        from tabpfn_extensions.utils.utils import LocalTabPFNRegressor
 
         print("Using TabPFN package for regressor")
         return LocalTabPFNRegressor()
     elif backend == "tabpfn_client":
         # For client backend, use our wrapper to ensure compatibility
-        from tabpfn_extensions.utils import ClientTabPFNRegressor
+        from tabpfn_extensions.utils.utils import ClientTabPFNRegressor
 
         print("Using TabPFN client wrapper for regressor")
         return ClientTabPFNRegressor()

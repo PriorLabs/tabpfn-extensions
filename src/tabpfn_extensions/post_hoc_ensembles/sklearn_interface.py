@@ -14,7 +14,7 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
-from tabpfn_extensions.simulator import simulate_first
+from tabpfn_extensions.utils.simulator import simulate_first
 
 from .pfn_phe import (
     AutoPostHocEnsemblePredictor,
@@ -105,7 +105,7 @@ class AutoTabPFNClassifier(ClassifierMixin, BaseEstimator):
 
         # Auto-detect categorical features including text columns
         if self.categorical_feature_indices is None:
-            from tabpfn_extensions.utils import infer_categorical_features
+            from tabpfn_extensions.utils.utils import infer_categorical_features
 
             self.categorical_feature_indices = infer_categorical_features(X)
 
@@ -132,7 +132,7 @@ class AutoTabPFNClassifier(ClassifierMixin, BaseEstimator):
         if np.min(class_counts[class_counts > 0]) < 2:
             # Cannot do stratification with less than 2 samples per class
             # Use a standard TabPFN classifier without ensemble
-            from tabpfn_extensions.utils import TabPFNClassifier, get_device
+            from tabpfn_extensions.utils.utils import TabPFNClassifier, get_device
 
             self.single_class_ = False
             self.predictor_ = TabPFNClassifier(
@@ -149,7 +149,7 @@ class AutoTabPFNClassifier(ClassifierMixin, BaseEstimator):
         self.single_class_ = False
         task_type = TaskType.MULTICLASS if len(self.classes_) > 2 else TaskType.BINARY
         # Use the device utility for automatic selection
-        from tabpfn_extensions.utils import get_device
+        from tabpfn_extensions.utils.utils import get_device
 
         self.predictor_ = AutoPostHocEnsemblePredictor(
             preset=self.preset,
@@ -288,7 +288,7 @@ class AutoTabPFNRegressor(RegressorMixin, BaseEstimator):
 
         # Auto-detect categorical features including text columns
         if self.categorical_feature_indices is None:
-            from tabpfn_extensions.utils import infer_categorical_features
+            from tabpfn_extensions.utils.utils import infer_categorical_features
 
             self.categorical_feature_indices = infer_categorical_features(X)
 
@@ -301,7 +301,7 @@ class AutoTabPFNRegressor(RegressorMixin, BaseEstimator):
         np.random.seed(rnd.randint(0, MAX_INT))
 
         # Use the device utility for automatic selection
-        from tabpfn_extensions.utils import get_device
+        from tabpfn_extensions.utils.utils import get_device
 
         self.predictor_ = AutoPostHocEnsemblePredictor(
             preset=self.preset,

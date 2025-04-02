@@ -63,7 +63,7 @@ from tabpfn_extensions.misc.sklearn_compat import validate_data
 
 # Import TabPFN models from extensions (which handles backend compatibility)
 try:
-    from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
+    from tabpfn_extensions.utils.utils import TabPFNClassifier, TabPFNRegressor
 except ImportError:
     raise ImportError(
         "TabPFN extensions utils module not found. Please make sure tabpfn_extensions is installed correctly.",
@@ -211,7 +211,7 @@ class TunedTabPFNBase(BaseEstimator):
             }
             model_params["inference_config"] = inference_config
             # Use device utility for automatic selection
-            from tabpfn_extensions.utils import get_device
+            from tabpfn_extensions.utils.utils import get_device
 
             model_params["device"] = get_device(self.device)
             model_params["random_state"] = rng.randint(0, 2**31 - 1)

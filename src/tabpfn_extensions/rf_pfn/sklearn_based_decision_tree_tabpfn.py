@@ -33,7 +33,7 @@ from tabpfn_extensions.scoring.scoring_utils import (
     score_classification,
     score_regression,
 )
-from tabpfn_extensions.utils import softmax
+from tabpfn_extensions.utils.utils import softmax
 
 ###############################################################################
 #                             BASE DECISION TREE                              #
