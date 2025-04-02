@@ -1,0 +1,3 @@
+[submodule "src/tabpfn_extensions/utils/tabpfn_common_utils"]
+	path = src/tabpfn_extensions/utils/tabpfn_common_utils
+	url = https://github.com/automl/tabpfn_common_utils.git
