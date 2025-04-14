@@ -369,6 +369,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
         return DecisionTreeTabPFNClassifier(
             tabpfn=self.tabpfn,
             min_samples_split=self.min_samples_split,
+            min_samples_leaf=self.min_samples_leaf,
             max_features=self.max_features,
             random_state=self.random_state,
             categorical_features=self.categorical_features,
@@ -638,6 +639,7 @@ class RandomForestTabPFNRegressor(RandomForestTabPFNBase, RandomForestRegressor)
         return DecisionTreeTabPFNRegressor(
             tabpfn=self.tabpfn,
             min_samples_split=self.min_samples_split,
+            min_samples_leaf=self.min_samples_leaf,
             max_features=self.max_features,
             random_state=self.random_state,
             categorical_features=self.categorical_features,
