@@ -9,10 +9,9 @@ import logging
 import functools
 import os
 
-from tabpfn_extensions.utils.tabpfn_common_utils.expense_estimation import estimate_duration
+from tabpfn_common_utils.expense_estimation import estimate_duration
 
 
-USE_TABPFN_LOCAL = True  # os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"
 CLIENT_COST_ESTIMATION_LATENCY_OFFSET = 1.0
 
 
@@ -22,6 +21,23 @@ _thread_local = threading.local()
 
 # Block of small helper functions to access and modify the thread-local
 # variables used for mock prediction in a simple and unified way.
+def get_is_local_tabpfn() -> bool:
+    return getattr(_thread_local, "use_local_tabpfn", True)
+
+
+def set_is_local_tabpfn():
+    """Figure out whether local TabPFN or client is used and set thread-local variable."""
+    use_local_env = os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"
+
+    try:
+        from tabpfn import TabPFNClassifier as LocalTabPFNClassifier
+    except ImportError:
+        LocalTabPFNClassifier = None
+
+    use_local = use_local_env and LocalTabPFNClassifier is not None
+    setattr(_thread_local, "use_local_tabpfn", use_local)
+
+
 def get_mock_cost() -> float:
     return getattr(_thread_local, "cost", 0.0)
 
@@ -46,21 +62,29 @@ def increment_mock_time(seconds: float):
     set_mock_time(get_mock_time() + seconds)
 
 
+# Block of functions that will replace the actual fit and predict functions in mock mode.
 def mock_fit_local(self, X, y, config=None):
+    # Store train data, as it is needed for mocking prediction correctly. The client
+    # already does this internally.
     self.X_train = X
     self.y_train = y
     return("mock_id")
 
 
-def mock_fit(cls, X, y, config=None):
+def mock_fit_client(cls, X, y, config=None):
     return("mock_id")
 
 
 def mock_predict_local(self, X_test):
+    """Wrapper for being able to distinguish between predict and predict_proba."""
     return mock_predict_proba_local(self, X_test, from_classifier_predict=True)
 
 
 def mock_predict_proba_local(self, X_test, from_classifier_predict=False):
+    """
+    Wrapper for mock_predict to set the correct arguments for local prediction. The client
+    already does this internally.
+    """
     task = "classification" if self.__class__.__name__ == "TabPFNClassifier" else "regression"
     config = {"n_estimators": self.n_estimators}
     params = {}
@@ -96,7 +120,7 @@ def mock_predict(
         num_features=X_test.shape[1],
         task=task,
         tabpfn_config=config,
-        latency_offset=0 if USE_TABPFN_LOCAL else CLIENT_COST_ESTIMATION_LATENCY_OFFSET,  # To slightly overestimate (safer)
+        latency_offset=0 if get_is_local_tabpfn() else CLIENT_COST_ESTIMATION_LATENCY_OFFSET,  # To slightly overestimate (safer)
     )
     increment_mock_time(duration)
 
@@ -145,10 +169,11 @@ def mock_mode():
 
     # Store original logging levels for all loggers
     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
-    loggers.append(logging.getLogger())  # Add root logger
+    loggers.append(logging.getLogger())
     original_levels = {logger: logger.level for logger in loggers}
 
-    if USE_TABPFN_LOCAL:
+    # Overwrite actual fit and predict functions with mock functions
+    if get_is_local_tabpfn():
         from tabpfn import TabPFNClassifier
         from tabpfn import TabPFNRegressor
         original_fit_classification = getattr(TabPFNClassifier, "fit")
@@ -165,7 +190,7 @@ def mock_mode():
         from tabpfn_client.service_wrapper import InferenceClient
         original_fit = getattr(InferenceClient, "fit")
         original_predict = getattr(InferenceClient, "predict")
-        setattr(InferenceClient, "fit", classmethod(mock_fit))
+        setattr(InferenceClient, "fit", classmethod(mock_fit_client))
         setattr(InferenceClient, "predict", classmethod(mock_predict))
 
     # Suppress all warnings and logging
@@ -179,7 +204,7 @@ def mock_mode():
             try:
                 yield lambda: (get_mock_time() - start_time, get_mock_cost())
             finally:
-                if USE_TABPFN_LOCAL:
+                if get_is_local_tabpfn():
                     from tabpfn.classifier import TabPFNClassifier
                     from tabpfn.regressor import TabPFNRegressor
                     setattr(TabPFNClassifier, "fit", original_fit_classification)
@@ -199,16 +224,17 @@ def mock_mode():
 
 def simulate_first(func):
     """
-    Decorator that first runs the decorated function in mock mode to simulate its credit usage.
-    If user has enough credits, function is then executed for real.
+    Decorator that first runs the decorated function in mock mode to simulate its duration
+    and credit usage. If client is used, only executes function if enough credits are available.
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        set_is_local_tabpfn()
         with mock_mode() as get_simulation_results:
             func(*args, **kwargs)
             time_estimate, credit_estimate = get_simulation_results()
         
-        if not USE_TABPFN_LOCAL:
+        if not get_is_local_tabpfn():
             from tabpfn_client.client import ServiceClient
             from tabpfn_client import get_access_token
             access_token = get_access_token()
@@ -223,8 +249,8 @@ def simulate_first(func):
                 )
             else:
                 print("Enough credits left.")
-        
-        print(f"Estimated duration: {time_estimate:.1f} seconds")
+
+        print(f"Estimated duration: {time_estimate:.1f} seconds {'(on GPU)' if get_is_local_tabpfn() else ''}")
 
         return func(*args, **kwargs)
 
