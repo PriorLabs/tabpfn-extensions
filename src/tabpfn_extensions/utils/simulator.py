@@ -1,16 +1,17 @@
-import threading
+from __future__ import annotations
+
 import contextlib
-from typing import Literal
-import numpy as np
-import time
-from unittest import mock
-import warnings
-import logging
 import functools
+import logging
 import os
+import threading
+import time
+import warnings
+from typing import Literal
+from unittest import mock
 
+import numpy as np
 from tabpfn_common_utils.expense_estimation import estimate_duration
-
 
 CLIENT_COST_ESTIMATION_LATENCY_OFFSET = 1.0
 
@@ -68,11 +69,11 @@ def mock_fit_local(self, X, y, config=None):
     # already does this internally.
     self.X_train = X
     self.y_train = y
-    return("mock_id")
+    return "mock_id"
 
 
 def mock_fit_client(cls, X, y, config=None):
-    return("mock_id")
+    return "mock_id"
 
 
 def mock_predict_local(self, X_test):
@@ -85,14 +86,27 @@ def mock_predict_proba_local(self, X_test, from_classifier_predict=False):
     Wrapper for mock_predict to set the correct arguments for local prediction. The client
     already does this internally.
     """
-    task = "classification" if self.__class__.__name__ == "TabPFNClassifier" else "regression"
+    task = (
+        "classification"
+        if self.__class__.__name__ == "TabPFNClassifier"
+        else "regression"
+    )
     config = {"n_estimators": self.n_estimators}
     params = {}
     if task == "classification":
         params["output_type"] = "preds" if from_classifier_predict else "probas"
     else:
         params["output_type"] = "mean"
-    return mock_predict(self, X_test, task, "dummy", self.X_train, self.y_train, config, params)
+    return mock_predict(
+        self,
+        X_test,
+        task,
+        "dummy",
+        self.X_train,
+        self.y_train,
+        config,
+        params,
+    )
 
 
 def mock_predict(
@@ -112,7 +126,7 @@ def mock_predict(
     """
     if X_train is None or y_train is None:
         raise ValueError(
-            "X_train and y_train must be provided in mock mode during prediction."
+            "X_train and y_train must be provided in mock mode during prediction.",
         )
 
     duration = estimate_duration(
@@ -120,7 +134,9 @@ def mock_predict(
         num_features=X_test.shape[1],
         task=task,
         tabpfn_config=config,
-        latency_offset=0 if get_is_local_tabpfn() else CLIENT_COST_ESTIMATION_LATENCY_OFFSET,  # To slightly overestimate (safer)
+        latency_offset=0
+        if get_is_local_tabpfn()
+        else CLIENT_COST_ESTIMATION_LATENCY_OFFSET,  # To slightly overestimate (safer)
     )
     increment_mock_time(duration)
 
@@ -174,12 +190,15 @@ def mock_mode():
 
     # Overwrite actual fit and predict functions with mock functions
     if get_is_local_tabpfn():
-        from tabpfn import TabPFNClassifier
-        from tabpfn import TabPFNRegressor
+        from tabpfn import TabPFNClassifier, TabPFNRegressor
+
         original_fit_classification = getattr(TabPFNClassifier, "fit")
         original_fit_regressor = getattr(TabPFNRegressor, "fit")
         original_predict_classification = getattr(TabPFNClassifier, "predict")
-        original_predict_proba_classification = getattr(TabPFNClassifier, "predict_proba")
+        original_predict_proba_classification = getattr(
+            TabPFNClassifier,
+            "predict_proba",
+        )
         original_predict_regressor = getattr(TabPFNRegressor, "predict")
         setattr(TabPFNClassifier, "fit", mock_fit_local)
         setattr(TabPFNClassifier, "predict", mock_predict_local)
@@ -188,6 +207,7 @@ def mock_mode():
         setattr(TabPFNRegressor, "predict", mock_predict_proba_local)
     else:
         from tabpfn_client.service_wrapper import InferenceClient
+
         original_fit = getattr(InferenceClient, "fit")
         original_predict = getattr(InferenceClient, "predict")
         setattr(InferenceClient, "fit", classmethod(mock_fit_client))
@@ -207,16 +227,26 @@ def mock_mode():
                 if get_is_local_tabpfn():
                     from tabpfn.classifier import TabPFNClassifier
                     from tabpfn.regressor import TabPFNRegressor
+
                     setattr(TabPFNClassifier, "fit", original_fit_classification)
-                    setattr(TabPFNClassifier, "predict", original_predict_classification)
-                    setattr(TabPFNClassifier, "predict_proba", original_predict_proba_classification)
+                    setattr(
+                        TabPFNClassifier,
+                        "predict",
+                        original_predict_classification,
+                    )
+                    setattr(
+                        TabPFNClassifier,
+                        "predict_proba",
+                        original_predict_proba_classification,
+                    )
                     setattr(TabPFNRegressor, "fit", original_fit_regressor)
                     setattr(TabPFNRegressor, "predict", original_predict_regressor)
                 else:
                     from tabpfn_client.service_wrapper import InferenceClient
+
                     setattr(InferenceClient, "fit", original_fit)
                     setattr(InferenceClient, "predict", original_predict)
-                
+
                 # Restore original logging levels
                 for logger in loggers:
                     logger.setLevel(original_levels[logger])
@@ -227,30 +257,35 @@ def simulate_first(func):
     Decorator that first runs the decorated function in mock mode to simulate its duration
     and credit usage. If client is used, only executes function if enough credits are available.
     """
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         set_is_local_tabpfn()
         with mock_mode() as get_simulation_results:
             func(*args, **kwargs)
             time_estimate, credit_estimate = get_simulation_results()
-        
+
         if not get_is_local_tabpfn():
-            from tabpfn_client.client import ServiceClient
             from tabpfn_client import get_access_token
+            from tabpfn_client.client import ServiceClient
+
             access_token = get_access_token()
             api_usage = ServiceClient.get_api_usage(access_token)
 
             if (
                 not api_usage["usage_limit"] == -1
-                and api_usage["usage_limit"] - api_usage["current_usage"] < credit_estimate
+                and api_usage["usage_limit"] - api_usage["current_usage"]
+                < credit_estimate
             ):
                 raise RuntimeError(
-                    f"Not enough credits left. Estimated credit usage: {credit_estimate}, credits left: {api_usage['usage_limit'] - api_usage['current_usage']}"
+                    f"Not enough credits left. Estimated credit usage: {credit_estimate}, credits left: {api_usage['usage_limit'] - api_usage['current_usage']}",
                 )
             else:
                 print("Enough credits left.")
 
-        print(f"Estimated duration: {time_estimate:.1f} seconds {'(on GPU)' if get_is_local_tabpfn() else ''}")
+        print(
+            f"Estimated duration: {time_estimate:.1f} seconds {'(on GPU)' if get_is_local_tabpfn() else ''}",
+        )
 
         return func(*args, **kwargs)
 
