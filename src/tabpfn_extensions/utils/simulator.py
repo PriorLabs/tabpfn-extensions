@@ -36,7 +36,7 @@ def set_is_local_tabpfn():
         LocalTabPFNClassifier = None
 
     use_local = use_local_env and LocalTabPFNClassifier is not None
-    setattr(_thread_local, "use_local_tabpfn", use_local)
+    _thread_local.use_local_tabpfn = use_local
 
 
 def get_mock_cost() -> float:
@@ -44,19 +44,19 @@ def get_mock_cost() -> float:
 
 
 def increment_mock_cost(value: float):
-    setattr(_thread_local, "cost", get_mock_cost() + value)
+    _thread_local.cost = get_mock_cost() + value
 
 
 def set_mock_cost(value: float = 0.0):
-    setattr(_thread_local, "cost", value)
+    _thread_local.cost = value
 
 
 def get_mock_time() -> float:
-    return getattr(_thread_local, "mock_time")
+    return _thread_local.mock_time
 
 
 def set_mock_time(value: float):
-    setattr(_thread_local, "mock_time", value)
+    _thread_local.mock_time = value
 
 
 def increment_mock_time(seconds: float):
@@ -82,8 +82,7 @@ def mock_predict_local(self, X_test):
 
 
 def mock_predict_proba_local(self, X_test, from_classifier_predict=False):
-    """
-    Wrapper for mock_predict to set the correct arguments for local prediction. The client
+    """Wrapper for mock_predict to set the correct arguments for local prediction. The client
     already does this internally.
     """
     task = (
@@ -119,8 +118,7 @@ def mock_predict(
     config=None,
     predict_params=None,
 ):
-    """
-    Mock function for prediction, which can be called instead of the real
+    """Mock function for prediction, which can be called instead of the real
     prediction function. Outputs random results in the expacted format and
     keeps track of the simulated cost and time.
     """
@@ -172,13 +170,12 @@ def mock_predict(
                 "ei": np.random.rand(X_test.shape[0]),
                 "pi": np.random.rand(X_test.shape[0]),
             }
+    return None
 
 
 @contextlib.contextmanager
 def mock_mode():
-    """
-    Context manager that enables mock mode in the current thread.
-    """
+    """Context manager that enables mock mode in the current thread."""
     set_mock_cost(0.0)
     start_time = time.time()
     set_mock_time(start_time)
@@ -192,26 +189,23 @@ def mock_mode():
     if get_is_local_tabpfn():
         from tabpfn import TabPFNClassifier, TabPFNRegressor
 
-        original_fit_classification = getattr(TabPFNClassifier, "fit")
-        original_fit_regressor = getattr(TabPFNRegressor, "fit")
-        original_predict_classification = getattr(TabPFNClassifier, "predict")
-        original_predict_proba_classification = getattr(
-            TabPFNClassifier,
-            "predict_proba",
-        )
-        original_predict_regressor = getattr(TabPFNRegressor, "predict")
-        setattr(TabPFNClassifier, "fit", mock_fit_local)
-        setattr(TabPFNClassifier, "predict", mock_predict_local)
-        setattr(TabPFNClassifier, "predict_proba", mock_predict_proba_local)
-        setattr(TabPFNRegressor, "fit", mock_fit_local)
-        setattr(TabPFNRegressor, "predict", mock_predict_proba_local)
+        original_fit_classification = TabPFNClassifier.fit
+        original_fit_regressor = TabPFNRegressor.fit
+        original_predict_classification = TabPFNClassifier.predict
+        original_predict_proba_classification = TabPFNClassifier.predict_proba
+        original_predict_regressor = TabPFNRegressor.predict
+        TabPFNClassifier.fit = mock_fit_local
+        TabPFNClassifier.predict = mock_predict_local
+        TabPFNClassifier.predict_proba = mock_predict_proba_local
+        TabPFNRegressor.fit = mock_fit_local
+        TabPFNRegressor.predict = mock_predict_proba_local
     else:
         from tabpfn_client.service_wrapper import InferenceClient
 
-        original_fit = getattr(InferenceClient, "fit")
-        original_predict = getattr(InferenceClient, "predict")
-        setattr(InferenceClient, "fit", classmethod(mock_fit_client))
-        setattr(InferenceClient, "predict", classmethod(mock_predict))
+        original_fit = InferenceClient.fit
+        original_predict = InferenceClient.predict
+        InferenceClient.fit = classmethod(mock_fit_client)
+        InferenceClient.predict = classmethod(mock_predict)
 
     # Suppress all warnings and logging
     with warnings.catch_warnings():
@@ -228,24 +222,18 @@ def mock_mode():
                     from tabpfn.classifier import TabPFNClassifier
                     from tabpfn.regressor import TabPFNRegressor
 
-                    setattr(TabPFNClassifier, "fit", original_fit_classification)
-                    setattr(
-                        TabPFNClassifier,
-                        "predict",
-                        original_predict_classification,
+                    TabPFNClassifier.fit = original_fit_classification
+                    TabPFNClassifier.predict = original_predict_classification
+                    TabPFNClassifier.predict_proba = (
+                        original_predict_proba_classification
                     )
-                    setattr(
-                        TabPFNClassifier,
-                        "predict_proba",
-                        original_predict_proba_classification,
-                    )
-                    setattr(TabPFNRegressor, "fit", original_fit_regressor)
-                    setattr(TabPFNRegressor, "predict", original_predict_regressor)
+                    TabPFNRegressor.fit = original_fit_regressor
+                    TabPFNRegressor.predict = original_predict_regressor
                 else:
                     from tabpfn_client.service_wrapper import InferenceClient
 
-                    setattr(InferenceClient, "fit", original_fit)
-                    setattr(InferenceClient, "predict", original_predict)
+                    InferenceClient.fit = original_fit
+                    InferenceClient.predict = original_predict
 
                 # Restore original logging levels
                 for logger in loggers:
@@ -253,8 +241,7 @@ def mock_mode():
 
 
 def simulate_first(func):
-    """
-    Decorator that first runs the decorated function in mock mode to simulate its duration
+    """Decorator that first runs the decorated function in mock mode to simulate its duration
     and credit usage. If client is used, only executes function if enough credits are available.
     """
 
@@ -280,12 +267,6 @@ def simulate_first(func):
                 raise RuntimeError(
                     f"Not enough credits left. Estimated credit usage: {credit_estimate}, credits left: {api_usage['usage_limit'] - api_usage['current_usage']}",
                 )
-            else:
-                print("Enough credits left.")
-
-        print(
-            f"Estimated duration: {time_estimate:.1f} seconds {'(on GPU)' if get_is_local_tabpfn() else ''}",
-        )
 
         return func(*args, **kwargs)
 
