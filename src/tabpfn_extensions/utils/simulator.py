@@ -269,9 +269,9 @@ def simulate_first(func):
                 )
             print("Enough credits left.")  # noqa: T201
 
-        print(
+        print(  # noqa: T201
             f"Estimated duration: {time_estimate:.1f} seconds {'(on GPU)' if get_is_local_tabpfn() else ''}",
-        )  # noqa: T201
+        )
 
         return func(*args, **kwargs)
 
