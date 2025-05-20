@@ -12,7 +12,7 @@ from tabpfn_extensions.rf_pfn import (
     RandomForestTabPFNClassifier,
     RandomForestTabPFNRegressor,
 )
-from tabpfn_extensions.utils.utils import (
+from tabpfn_extensions.utils import (
     TabPFNClassifier,
     TabPFNRegressor,
     product_dict,

@@ -52,7 +52,7 @@ from sklearn.base import BaseEstimator
 from tqdm import tqdm
 
 # Import TabPFN models from extensions (which handles backend compatibility)
-from tabpfn_extensions.utils.utils import (  # type: ignore
+from tabpfn_extensions.utils import (  # type: ignore
     TabPFNClassifier,
     TabPFNRegressor,
     infer_categorical_features,

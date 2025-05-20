@@ -41,7 +41,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from tabpfn_extensions.utils.utils import is_tabpfn
+from tabpfn_extensions.utils import is_tabpfn
 
 
 def calculate_shap_subset(args: tuple) -> np.ndarray:
