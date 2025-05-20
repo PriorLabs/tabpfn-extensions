@@ -267,12 +267,11 @@ def simulate_first(func):
                 raise RuntimeError(
                     f"Not enough credits left. Estimated credit usage: {credit_estimate}, credits left: {api_usage['usage_limit'] - api_usage['current_usage']}",
                 )
-            else:
-                print("Enough credits left.")
+            print("Enough credits left.")  # noqa: T201
 
         print(
             f"Estimated duration: {time_estimate:.1f} seconds {'(on GPU)' if get_is_local_tabpfn() else ''}",
-        )
+        )  # noqa: T201
 
         return func(*args, **kwargs)
 
