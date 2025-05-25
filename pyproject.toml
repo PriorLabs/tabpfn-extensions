@@ -57,6 +57,10 @@ interpretability = [
     "shapiq>=0.4.0",
     "seaborn>=0.12.2",
 ]
+tabpfgen_datasynthesizer = [
+    "tabpfgen>=0.1.3",
+]
+
 post_hoc_ensembles = [
     "kditransform>=0.2.0",
     "llvmlite",
@@ -79,6 +83,9 @@ all = [
     "kditransform>=0.2.0",
     "llvmlite>=0.30.0",
     "hyperopt>=0.2.7",
+
+    "tabpfgen>=0.1.3",
+
 ]
 
 dev = [
