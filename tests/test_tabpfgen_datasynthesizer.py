@@ -1,21 +1,51 @@
 """Test suite for TabPFGen Data Synthesizer Extension."""
+
 from __future__ import annotations
+
+import sys
 
 import numpy as np
 import pandas as pd
 import pytest
 from sklearn.datasets import make_classification, make_regression
 
-# Import modules to test
-from tabpfn_extensions.tabpfgen_datasynthesizer import TabPFNDataSynthesizer
-from tabpfn_extensions.tabpfgen_datasynthesizer.tabpfgen_wrapper import (
-    TABPFGEN_AVAILABLE,
+# Python version check
+PYTHON_VERSION_OK = sys.version_info >= (3, 10)
+SKIP_REASON_PYTHON = "Python >=3.10 required for tabpfgen_datasynthesizer extension"
+
+# Import modules to test (with proper error handling)
+try:
+    from tabpfn_extensions.tabpfgen_datasynthesizer import TabPFNDataSynthesizer
+    from tabpfn_extensions.tabpfgen_datasynthesizer.tabpfgen_wrapper import (
+        TABPFGEN_AVAILABLE,
+    )
+    from tabpfn_extensions.tabpfgen_datasynthesizer.utils import (
+        analyze_class_distribution,
+        calculate_synthetic_quality_metrics,
+        combine_datasets,
+        validate_tabpfn_data,
+    )
+
+    EXTENSION_IMPORTABLE = True
+except ImportError:
+    EXTENSION_IMPORTABLE = False
+    # Create dummy objects to prevent test collection errors
+    TabPFNDataSynthesizer = None
+    TABPFGEN_AVAILABLE = False
+
+
+# Combined skip condition - skip if Python version is too old OR if extension can't be imported
+SKIP_EXTENSION_TESTS = not PYTHON_VERSION_OK or not EXTENSION_IMPORTABLE
+SKIP_TABPFGEN_TESTS = SKIP_EXTENSION_TESTS or not TABPFGEN_AVAILABLE
+
+# Skip reasons
+SKIP_REASON_EXTENSION = (
+    SKIP_REASON_PYTHON
+    if not PYTHON_VERSION_OK
+    else "tabpfgen_datasynthesizer extension not available"
 )
-from tabpfn_extensions.tabpfgen_datasynthesizer.utils import (
-    analyze_class_distribution,
-    calculate_synthetic_quality_metrics,
-    combine_datasets,
-    validate_tabpfn_data,
+SKIP_REASON_TABPFGEN = (
+    SKIP_REASON_EXTENSION if SKIP_EXTENSION_TESTS else "TabPFGen not available"
 )
 
 
@@ -50,6 +80,7 @@ def imbalanced_data():
     return X, y
 
 
+@pytest.mark.skipif(SKIP_EXTENSION_TESTS, reason=SKIP_REASON_EXTENSION)
 class TestTabPFNDataSynthesizer:
     """Test the TabPFNDataSynthesizer class."""
 
@@ -59,7 +90,7 @@ class TestTabPFNDataSynthesizer:
         assert synthesizer.n_sgld_steps == 100
         assert synthesizer.device == "auto"
 
-    @pytest.mark.skipif(not TABPFGEN_AVAILABLE, reason="TabPFGen not available")
+    @pytest.mark.skipif(SKIP_TABPFGEN_TESTS, reason=SKIP_REASON_TABPFGEN)
     def test_generate_classification(self, classification_data):
         """Test classification data generation."""
         X, y = classification_data
@@ -73,7 +104,7 @@ class TestTabPFNDataSynthesizer:
         assert y_synth.shape == (20,)
         assert set(np.unique(y_synth)).issubset(set(np.unique(y)))
 
-    @pytest.mark.skipif(not TABPFGEN_AVAILABLE, reason="TabPFGen not available")
+    @pytest.mark.skipif(SKIP_TABPFGEN_TESTS, reason=SKIP_REASON_TABPFGEN)
     def test_generate_regression(self, regression_data):
         """Test regression data generation."""
         X, y = regression_data
@@ -88,7 +119,7 @@ class TestTabPFNDataSynthesizer:
         assert np.isfinite(X_synth).all()
         assert np.isfinite(y_synth).all()
 
-    @pytest.mark.skipif(not TABPFGEN_AVAILABLE, reason="TabPFGen not available")
+    @pytest.mark.skipif(SKIP_TABPFGEN_TESTS, reason=SKIP_REASON_TABPFGEN)
     def test_balance_dataset(self, imbalanced_data):
         """Test the balance_dataset method."""
         X, y = imbalanced_data
@@ -116,6 +147,7 @@ class TestTabPFNDataSynthesizer:
         assert X_synth.shape[1] == X.shape[1]
         assert X_combined.shape[1] == X.shape[1]
 
+    @pytest.mark.skipif(SKIP_EXTENSION_TESTS, reason=SKIP_REASON_EXTENSION)
     def test_pandas_input(self, classification_data):
         """Test that pandas DataFrames are handled correctly."""
         X, y = classification_data
@@ -133,6 +165,7 @@ class TestTabPFNDataSynthesizer:
             pytest.skip("TabPFGen not available")
 
 
+@pytest.mark.skipif(SKIP_EXTENSION_TESTS, reason=SKIP_REASON_EXTENSION)
 class TestUtilityFunctions:
     """Test utility functions."""
 
@@ -272,10 +305,10 @@ class TestUtilityFunctions:
             assert isinstance(metrics["mean_absolute_error"], (int, float))
 
 
+@pytest.mark.skipif(SKIP_TABPFGEN_TESTS, reason=SKIP_REASON_TABPFGEN)
 class TestIntegration:
     """Integration tests requiring TabPFGen."""
 
-    @pytest.mark.skipif(not TABPFGEN_AVAILABLE, reason="TabPFGen not available")
     def test_end_to_end_classification_with_balancing(self, imbalanced_data):
         """Test complete classification workflow with balancing."""
         X, y = imbalanced_data
@@ -314,7 +347,6 @@ class TestIntegration:
         assert len(X_combined_append) == len(X_balanced)
         assert len(y_combined_append) == len(y_balanced)
 
-    @pytest.mark.skipif(not TABPFGEN_AVAILABLE, reason="TabPFGen not available")
     def test_end_to_end_regression(self, regression_data):
         """Test complete regression workflow."""
         X, y = regression_data
@@ -342,6 +374,7 @@ class TestIntegration:
         assert X_synth.shape[1] == X.shape[1]
 
 
+@pytest.mark.skipif(SKIP_EXTENSION_TESTS, reason=SKIP_REASON_EXTENSION)
 class TestErrorHandling:
     """Test error handling and edge cases."""
 
@@ -388,10 +421,10 @@ class TestErrorHandling:
 
 
 # Performance and benchmarking tests
+@pytest.mark.skipif(SKIP_TABPFGEN_TESTS, reason=SKIP_REASON_TABPFGEN)
 class TestPerformance:
     """Test performance characteristics."""
 
-    @pytest.mark.skipif(not TABPFGEN_AVAILABLE, reason="TabPFGen not available")
     def test_generation_performance(self, classification_data):
         """Test that generation completes in reasonable time."""
         import time
@@ -409,6 +442,7 @@ class TestPerformance:
         assert elapsed_time < 30.0  # 30 seconds max for small dataset
         assert len(X_synth) == 20
 
+    @pytest.mark.skipif(SKIP_EXTENSION_TESTS, reason=SKIP_REASON_EXTENSION)
     def test_utility_function_performance(self):
         """Test that utility functions perform well on larger datasets."""
         import time
@@ -427,8 +461,41 @@ class TestPerformance:
         assert isinstance(analysis, dict)
 
 
+# Test to verify version checking works correctly
+class TestVersionCompatibility:
+    """Test version compatibility checks."""
+
+    def test_python_version_detection(self):
+        """Test that Python version detection works correctly."""
+        assert isinstance(PYTHON_VERSION_OK, bool)
+        assert isinstance(SKIP_EXTENSION_TESTS, bool)
+        assert isinstance(SKIP_TABPFGEN_TESTS, bool)
+
+        # On Python <3.10, extension tests should be skipped
+        if sys.version_info < (3, 10):
+            assert SKIP_EXTENSION_TESTS
+            assert "Python >=3.10 required" in SKIP_REASON_EXTENSION
+
+    def test_skip_conditions_logic(self):
+        """Test that skip conditions are logically correct."""
+        # SKIP_TABPFGEN_TESTS should always be True if SKIP_EXTENSION_TESTS is True
+        if SKIP_EXTENSION_TESTS:
+            assert SKIP_TABPFGEN_TESTS
+
+        # If Python version is OK and extension is importable,
+        # then SKIP_EXTENSION_TESTS should be False
+        if PYTHON_VERSION_OK and EXTENSION_IMPORTABLE:
+            assert not SKIP_EXTENSION_TESTS
+
+
 if __name__ == "__main__":
+    # Print version information for debugging
+    print(f"Python version: {sys.version}")
+    print(f"Python >=3.10: {PYTHON_VERSION_OK}")
+    print(f"Extension importable: {EXTENSION_IMPORTABLE}")
+    print(f"TabPFGen available: {TABPFGEN_AVAILABLE}")
+    print(f"Skip extension tests: {SKIP_EXTENSION_TESTS}")
+    print(f"Skip TabPFGen tests: {SKIP_TABPFGEN_TESTS}")
+
     # Run tests with pytest
-    pytest.main(
-        [__file__, "-v"]
-    )  # TabPFGen Data Synthesizer Extension for TabPFN Extensions
+    pytest.main([__file__, "-v"])
