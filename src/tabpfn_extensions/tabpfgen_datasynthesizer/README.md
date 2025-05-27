@@ -28,19 +28,28 @@ What makes TabPFGen interesting is that it's built on the TabPFN transformer arc
 - Built on TabPFN transformer architecture
 - No additional training required
 
+## Requirements
+
+- **Python 3.10+** (due to TabPFGen dependency)
+- TabPFN Extensions framework
+
+> **Note**: While tabpfn-extensions supports Python 3.9+, this specific extension requires Python 3.10+ due to its TabPFGen dependency. 
 
 ## Installation
 
 ```bash
+# Ensure Python 3.10+
+python --version  # Should show 3.10 or higher
+
 # Install TabPFN (choose one)
 pip install tabpfn              # For local inference  
 pip install tabpfn-client       # For cloud-based inference
 
-# Install TabPFGen v0.1.3+
-pip install tabpfgen>=0.1.3
+# Python 3.10+ users who want every extension including TabPFGen
+pip install "tabpfn-extensions[all,tabpfgen_datasynthesizer]"
 
-# Install TabPFN Extensions
-pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-extensions.git"
+# Or install only the tabpfgen_datasynthesizer extension
+pip install "tabpfn-extensions[tabpfgen_datasynthesizer]"
 ```
 
 ## 🚀 Quick Start
@@ -164,6 +173,27 @@ X_synth, y_synth = synthesizer.generate_regression(
 )
 ```
 
+### TabPFNDataSynthesizer Parameters
+
+- `n_sgld_steps` (int, default=500): Number of SGLD iterations for generation
+- `sgld_step_size` (float, default=0.01): Step size for SGLD updates  
+- `sgld_noise_scale` (float, default=0.01): Scale of noise in SGLD
+- `device` (str, default='auto'): Computing device ('cpu', 'cuda', or 'auto')
+
+### balance_dataset() Parameters
+
+- `target_per_class` (int, optional): Custom target samples per class
+- `visualize` (bool, default=False): Enable TabPFGen's built-in visualizations
+- `feature_names` (list, optional): Feature names for visualization
+
+### Generation Parameters
+
+- `n_samples` (int): Number of synthetic samples to generate
+- `balance_classes` (bool, default=True): Balance only synthetic samples
+- `use_quantiles` (bool, default=True): Quantile-based sampling for regression
+- `visualize` (bool, default=False): Enable visualization plots
+
+
 ### Utility Functions
 
 ```python
@@ -242,17 +272,28 @@ cd examples/tabpfgen_datasynthesizer/
 python basic_classification_example.py
 ```
 
-## ⚡ Performance Tips
+## ⚡ Troubleshooting
 
-1. **SGLD Steps**: 
-   - Development: 100-300 steps
-   - Production: 500+ steps
+### Common Issues
 
-2. **Device**: Use `device='cuda'` for speedup
+1. **TabPFGen Import Error**: 
+   ```bash
+   pip install tabpfgen>=0.1.4
+   ```
 
-3. **Batch Size**: Generate larger batches vs. multiple small ones
+2. **Memory Issues**: Reduce `n_samples` or `n_sgld_steps`
 
-4. **Memory**: Reduce `n_samples` if memory constrained
+3. **Generation Quality**: Increase `n_sgld_steps` or adjust step size
+
+4. **Imbalanced Results**: Use `balance_dataset()` instead of `generate_classification()`
+
+### Performance Optimization
+
+- **Development**: Use 100-300 SGLD steps for faster iteration
+- **Production**: Use 500+ SGLD steps for best quality
+- **GPU**: Enable with `device='cuda'` for 5-10x speedup
+- **Batch Processing**: Generate larger batches rather than multiple small ones
+
 
 ## 🔍 Important Notes
 
@@ -267,8 +308,12 @@ Final class distributions may be **approximately balanced** rather than perfectl
 
 ## 📚 Citation
 
-TabPFGen: Synthetic Tabular Data Generation with TabPFN. https://github.com/sebhaan/TabPFGen
-
+@software{haan2025tabpfgen,
+  author = {Haan, Sebastian},
+  title = {TabPFGen: Synthetic Tabular Data Generation with TabPFN},
+  url = {https://github.com/sebhaan/TabPFGen},
+  year = {2025}
+}
 
 ## 📄 License
 
