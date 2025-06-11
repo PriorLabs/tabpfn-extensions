@@ -15,6 +15,7 @@ Key features:
 - Compatibility with both TabPFN and TabPFN-client backends
 - Support for mixed data types (categorical and numerical features)
 - Flexible permutation-based approach for feature dependencies
+- Support for Directed Acyclic Graphs (DAGs) to define feature relationships
 
 Example usage:
     ```python
@@ -45,6 +46,7 @@ import os
 import random
 from typing import Any
 
+from graphlib import TopologicalSorter
 import numpy as np
 import pandas as pd
 import torch
@@ -266,6 +268,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         t: float = 0.000000001,
         n_permutations: int = 10,
         condition_on_all_features: bool = True,
+        dag: dict[int, list[int]] | None = None,
         fast_mode: bool = False,
     ) -> torch.Tensor:
         """Impute missing values (np.nan) in X by sampling all cells independently from the trained models.
@@ -279,6 +282,8 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 Number of permutations to use for imputation
             condition_on_all_features: bool, default=True
                 Whether to condition on all other features (True) or only previous features (False)
+            dag: dict[int, list[int]] | None, default=None
+                Dictionary representing a Directed Acyclic Graph (DAG) defining feature dependencies.
             fast_mode: bool, default=False
                 Whether to use faster settings for testing
 
@@ -290,11 +295,26 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         X_fit = self.X_
         impute_X = copy.deepcopy(X)
-
+        
+        # check if dag is provided
+        if dag is not None:
+            if condition_on_all_features:
+                raise ValueError(
+                    "DAG cannot be used with condition_on_all_features=True."
+                )
+            # the following will raise an error if the DAG is not a valid DAG
+            ts = TopologicalSorter(dag)
+            ts.static_order()
+            # re-order all_features based on the DAG
+            all_features = list(ts.static_order())
+            
         for i in tqdm(range(len(all_features))):
             column_idx = all_features[i]
 
-            if not condition_on_all_features:
+            if dag is not None:
+                # If a DAG is provided, use the dependencies from the DAG
+                conditional_idx = dag.get(column_idx, [])
+            elif not condition_on_all_features:
                 conditional_idx = all_features[:i] if i > 0 else []
             else:
                 conditional_idx = list(set(range(X.shape[1])) - {column_idx})
@@ -310,7 +330,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             densities: list[Any] = []
             # Use fewer permutations in fast mode
             actual_n_permutations = 1 if fast_mode else n_permutations
-
+            
             for perm in efficient_random_permutation(
                 conditional_idx,
                 actual_n_permutations,
@@ -527,6 +547,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X: torch.Tensor | np.ndarray | pd.DataFrame,
         t: float = 0.000000001,
         n_permutations: int = 10,
+        dag: dict[int, list[int]] | None = None,
     ) -> torch.Tensor:
         """Impute missing values in the input data using the fitted TabPFN models.
 
@@ -547,6 +568,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             n_permutations: int, default=10
                 Number of random feature permutations to use for imputation.
                 Higher values may improve robustness but increase computation time.
+                
+            dag: dict[int, list[int]] | None, default=None
+                Dictionary representing a Directed Acyclic Graph (DAG) defining feature dependencies.
 
         Returns:
             torch.Tensor
@@ -569,6 +593,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             t,
             condition_on_all_features=True,
             n_permutations=n_permutations,
+            dag=dag,
             fast_mode=fast_mode,
         )
 
@@ -770,6 +795,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         n_samples: int = 100,
         t: float = 1.0,
         n_permutations: int = 3,
+        dag: dict[int, list[int]] | None = None,
     ) -> torch.Tensor:
         """Generate synthetic tabular data samples using the fitted TabPFN models.
 
@@ -789,6 +815,10 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             n_permutations: int, default=3
                 Number of feature permutations to use for generation
                 More permutations may provide more robust results but increase computation time
+                
+            dag: dict[int, list[int]] | None, default=None
+                Dictionary representing a Directed Acyclic Graph (DAG) defining feature dependencies.
+                If provided, the generation will respect the dependencies defined in the DAG.
 
         Returns:
             torch.Tensor:
@@ -822,6 +852,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             condition_on_all_features=False,
             n_permutations=actual_n_permutations,
             fast_mode=fast_mode,
+            dag=dag,
         )
 
     def get_embeddings(self, X: torch.tensor, per_column: bool = False) -> torch.tensor:

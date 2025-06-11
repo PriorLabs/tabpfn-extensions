@@ -116,6 +116,9 @@ class GenerateSyntheticDataExperiment(Experiment):
 
             temp = kwargs.get("temp", 1.0)
             n_samples = kwargs.get("n_samples", X.shape[0])
+            
+            n_permutations = kwargs.get("n_permutations", 1)
+            dag = kwargs.get("dag", None)
 
             self.X, self.y = X, y
             self.X = self.X[:, indices]
@@ -133,6 +136,8 @@ class GenerateSyntheticDataExperiment(Experiment):
             self.synthetic_X = tabpfn.generate_synthetic_data(
                 n_samples=n_samples,
                 t=temp,
+                n_permutations=n_permutations,
+                dag=dag,
             )
 
             data_real = pd.DataFrame(
