@@ -302,6 +302,10 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 raise ValueError(
                     "DAG cannot be used with condition_on_all_features=True."
                 )
+            # fill up the DAG with empty lists for features not in the DAG
+            for i in all_features:
+                if i not in dag:
+                    dag[i] = []
             # the following will raise an error if the DAG is not a valid DAG
             ts = TopologicalSorter(dag)
             ts.static_order()
