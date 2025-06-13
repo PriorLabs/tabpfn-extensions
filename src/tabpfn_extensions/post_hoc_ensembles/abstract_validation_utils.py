@@ -175,9 +175,13 @@ class AbstractValidationUtils(ABC, BaseEstimator):
 
         # TODO: Update documentation to make user aware that self.n_foldds and self.n_repeats are not used
         if self.cv_splitter:
-            logger.info(f"Using provided CV splitter: {self.cv_splitter.__class__.__name__}")
+            logger.info(
+                f"Using provided CV splitter: {self.cv_splitter.__class__.__name__}"
+            )
             logger.info(f"Ignoring n_folds parameter: {self.n_folds}")
-            logger.info(f"Ignoring n_repeats parameter: {self.n_repeats}, hardcoded to 1 in splitter")
+            logger.info(
+                f"Ignoring n_repeats parameter: {self.n_repeats}, hardcoded to 1 in splitter"
+            )
 
             # Generate splits once and reuse for all models
             splits = list(self.cv_splitter.split(X, y))
@@ -201,17 +205,22 @@ class AbstractValidationUtils(ABC, BaseEstimator):
             holdout_validation = self._is_holdout
             _folds = self.n_folds if not holdout_validation else 1
             for repeat_i in range(self.n_repeats):
-
                 # Prepare the splits for the CURRENT repeat
                 splits_for_repeat = None
                 if holdout_validation:
-                    splitter = StratifiedShuffleSplit if self.stratifed_split else ShuffleSplit
+                    splitter = (
+                        StratifiedShuffleSplit if self.stratifed_split else ShuffleSplit
+                    )
                     # In holdout, we generate one split per repeat
-                    splits_for_repeat = list(splitter(
-                        n_splits=1,
-                        test_size=self.holdout_fraction,
-                        random_state=self._repeats_seed[repeat_i], # different seed for each repeat
-                    ).split(X,y))
+                    splits_for_repeat = list(
+                        splitter(
+                            n_splits=1,
+                            test_size=self.holdout_fraction,
+                            random_state=self._repeats_seed[
+                                repeat_i
+                            ],  # different seed for each repeat
+                        ).split(X, y)
+                    )
                 else:
                     splits_for_repeat = get_cv_split_for_data(
                         x=X,
