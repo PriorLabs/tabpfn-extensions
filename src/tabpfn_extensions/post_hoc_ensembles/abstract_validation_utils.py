@@ -8,7 +8,7 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import deepcopy
-from typing import Literal
+from typing import Literal, Optional
 
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
@@ -46,6 +46,7 @@ class AbstractValidationUtils(ABC, BaseEstimator):
         n_folds: int | None = None,
         time_limit: int | None = None,
         score_metric: str | None = None,
+        cv_splitter: Optional[BaseCrossValidator] = None,
     ):
         """Abstract validation utilities for sklearn-like models.
 
@@ -77,6 +78,7 @@ class AbstractValidationUtils(ABC, BaseEstimator):
         self._estimators = estimators.copy()  # internal copy for early stopping.
         self.validation_method = validation_method
         self.holdout_fraction = holdout_fraction
+        self.cv_splitter = cv_splitter
 
     @property
     @abstractmethod
@@ -147,79 +149,86 @@ class AbstractValidationUtils(ABC, BaseEstimator):
                 )
             self._extra_processing(split_i, base_model, test_index)
 
-    def _get_split(
-        self,
-        *,
-        X,
-        y,
-        fold_i: int,
-        repeat_i: int,
-        holdout_validation: bool,
-    ) -> list[list[int], list[int]]:
-        if holdout_validation:
-            _spliter = StratifiedShuffleSplit if self.stratifed_split else ShuffleSplit
-
-            return list(
-                _spliter(
-                    n_splits=self.n_repeats,
-                    test_size=self.holdout_fraction,
-                    random_state=self._repeats_seed[0],  # take the first one.
-                ).split(X, y),
-            )[repeat_i]
-
-        return get_cv_split_for_data(
-            x=X,
-            y=y,
-            stratified_split=self.stratifed_split,
-            n_splits=self.n_folds,
-            splits_seed=self._repeats_seed[repeat_i],
-            safety_shuffle=True,
-            auto_fix_stratified_splits=True,
-        )[fold_i]
-
     def yield_cv_data_iterator(
         self,
-        X,
-        y,
+        X: np.ndarray,
+        y: np.ndarray,
     ) -> tuple[int, int, int, BaseEstimator, list[int], list[int], bool, bool]:
         n_models = len(self.estimators)
-        holdout_validation = self._is_holdout
-        _folds = self.n_folds if not holdout_validation else 1
 
-        for repeat_i in range(self.n_repeats):
+        # TODO: Update documentation to make user aware that self.n_foldds and self.n_repeats are not used
+        if self.cv_splitter:
+            logger.info(f"Using provided CV splitter: {self.cv_splitter.__class__.__name__}")
+            logger.info(f"Ignore n_folds parameter: {self.n_folds}")
+            logger.info(f"Ignore n_repeats parameter: {self.n_repeats}, hardcoded to 1 in splitter")
+            splits = list(self.cv_splitter.split(X, y))
+            n_folds_per_rep = self.cv_splitter.get_n_splits()
+            split_iterator = iter(splits)
             for model_i in range(n_models):
-                for fold_i in range(_folds):
-                    split_i = fold_i + repeat_i * _folds
-                    train_index, test_index = _get_split = self._get_split(
-                        X=X,
-                        y=y,
-                        fold_i=fold_i,
-                        repeat_i=repeat_i,
-                        holdout_validation=holdout_validation,
-                    )
-                    check_for_model_early_stopping = False
-                    check_for_repeat_early_stopping = False
-
-                    if (fold_i + 1) == _folds:  # check after last fold of model
-                        check_for_model_early_stopping = True
-                        if (
-                            model_i + 1
-                        ) == n_models:  # check after last fold of last model
-                            check_for_repeat_early_stopping = True
-
-                    logger.info(
-                        f"Yield data for model {self.estimators[model_i][0]} and split {split_i} (repeat={repeat_i + 1}).",
-                    )
+                # For a custom splitter, we reset the iterator for each model
+                # This assumes the user wants to apply the same fold structure to each model
+                split_iterator = iter(splits)
+                for fold_i in range(n_folds_per_rep):
+                    train_index, test_index = next(split_iterator)
+                    is_last_fold = (fold_i + 1) == n_folds_per_rep
+                    is_last_model = (model_i + 1) == n_models
                     yield (
                         model_i,
-                        split_i,
-                        repeat_i + 1,
+                        fold_i,
+                        1, # Custom splitters don't have a native concept of repeats
                         self.estimators[model_i][1],
                         train_index,
                         test_index,
-                        check_for_model_early_stopping,
-                        check_for_repeat_early_stopping,
+                        is_last_fold,
+                        is_last_fold and is_last_model,
                     )
+        else:
+            # --- Fallback to original, correct logic ---
+            holdout_validation = self._is_holdout
+            _folds = self.n_folds if not holdout_validation else 1
+            for repeat_i in range(self.n_repeats):
+                
+                # This logic block prepares the splits for the CURRENT repeat
+                splits_for_repeat = None
+                if holdout_validation:
+                    splitter = StratifiedShuffleSplit if self.stratifed_split else ShuffleSplit
+                    # In holdout, we generate one split per repeat
+                    splits_for_repeat = list(splitter(
+                        n_splits=1,
+                        test_size=self.holdout_fraction,
+                        random_state=self._repeats_seed[repeat_i], # different seed for each repeat
+                    ).split(X,y))
+                else:
+                    splits_for_repeat = get_cv_split_for_data(
+                        x=X,
+                        y=y,
+                        stratified_split=self.stratifed_split,
+                        n_splits=self.n_folds,
+                        splits_seed=self._repeats_seed[repeat_i],
+                        safety_shuffle=True,
+                        auto_fix_stratified_splits=True,
+                    )
+                
+                for model_i in range(n_models):
+                    for fold_i in range(_folds):
+                        train_index, test_index = splits_for_repeat[fold_i]
+                        split_i = fold_i + repeat_i * _folds
+                        is_last_fold = (fold_i + 1) == _folds
+                        is_last_model = (model_i + 1) == n_models
+
+                        logger.info(
+                            f"Yielding data for model {self.estimators[model_i][0]} and split {split_i}."
+                        )
+                        yield (
+                            model_i,
+                            split_i,
+                            repeat_i + 1,
+                            self.estimators[model_i][1],
+                            train_index,
+                            test_index,
+                            is_last_fold,
+                            is_last_fold and is_last_model,
+                        )
 
     def time_limit_reached(self) -> bool:
         """Check if the time limit for execution has been reached.

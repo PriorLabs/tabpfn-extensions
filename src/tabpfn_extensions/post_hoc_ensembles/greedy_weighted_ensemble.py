@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 from sklearn.ensemble import VotingClassifier, VotingRegressor
 from sklearn.utils import check_random_state
+from sklearn.model_selection import BaseCrossValidator
 
 from .abstract_validation_utils import (
     AbstractValidationUtils,
@@ -277,6 +278,7 @@ class GreedyWeightedEnsembleClassifier(
         n_iterations: int = 50,
         silo_top_n: int = 25,
         model_family_per_estimator: list[str] | None = None,
+        cv_splitter: Optional[BaseCrossValidator] = None,
     ):
         """Post Hoc Ensemble Classifier Specialized for TabPFN models.
 
@@ -310,6 +312,7 @@ class GreedyWeightedEnsembleClassifier(
             time_limit=time_limit,
             holdout_fraction=holdout_fraction,
             validation_method=validation_method,
+            cv_splitter=cv_splitter,
         )
 
     def _build_ensemble(self, base_models, weights):
@@ -334,6 +337,7 @@ class GreedyWeightedEnsembleRegressor(
         n_iterations: int = 50,
         silo_top_n: int = 25,
         model_family_per_estimator: list[str] | None = None,
+        cv_splitter: Optional[BaseCrossValidator] = None,
     ):
         """Post Hoc Ensemble Regressor Specialized for TabPFN models.
 
@@ -367,6 +371,7 @@ class GreedyWeightedEnsembleRegressor(
             time_limit=time_limit,
             holdout_fraction=holdout_fraction,
             validation_method=validation_method,
+            cv_splitter=cv_splitter,
         )
 
     def _build_ensemble(self, base_models, weights):
