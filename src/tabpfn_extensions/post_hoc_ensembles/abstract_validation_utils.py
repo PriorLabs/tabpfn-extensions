@@ -80,6 +80,10 @@ class AbstractValidationUtils(ABC, BaseEstimator):
         self.holdout_fraction = holdout_fraction
         self.cv_splitter = cv_splitter
 
+        if self.cv_splitter: 
+            self.n_repeats = 1
+            self.n_folds = self.cv_splitter.get_n_splits()
+
     @property
     @abstractmethod
     def stratifed_split(self) -> bool:
@@ -154,6 +158,15 @@ class AbstractValidationUtils(ABC, BaseEstimator):
         X: np.ndarray,
         y: np.ndarray,
     ) -> tuple[int, int, int, BaseEstimator, list[int], list[int], bool, bool]:
+        """Yields data for cross-validation, handling both default and custom splitters.
+
+        This iterator yields tuples containing the necessary information for a single
+        cross-validation split, such as model index, split index, train/test indices, etc.
+
+        When a custom `cv_splitter` is provided, this method assumes that the user
+        wants to apply the same fold structure to each estimator. Therefore, the splits
+        are generated once and reused for every model in `self.estimators`."""
+
         n_models = len(self.estimators)
 
         # TODO: Update documentation to make user aware that self.n_foldds and self.n_repeats are not used
@@ -183,12 +196,11 @@ class AbstractValidationUtils(ABC, BaseEstimator):
                         is_last_fold and is_last_model,
                     )
         else:
-            # --- Fallback to original, correct logic ---
             holdout_validation = self._is_holdout
             _folds = self.n_folds if not holdout_validation else 1
             for repeat_i in range(self.n_repeats):
                 
-                # This logic block prepares the splits for the CURRENT repeat
+                # Prepare the splits for the CURRENT repeat
                 splits_for_repeat = None
                 if holdout_validation:
                     splitter = StratifiedShuffleSplit if self.stratifed_split else ShuffleSplit
