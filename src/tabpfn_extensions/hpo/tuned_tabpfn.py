@@ -200,13 +200,13 @@ class TunedTabPFNBase(BaseEstimator):
             }
 
             # Print and assert shapes for debugging
-            assert (
-                len(X_train.shape) == 2
-            ), f"X_train shape is {X_train.shape}, should be 2D"
+            assert len(X_train.shape) == 2, (
+                f"X_train shape is {X_train.shape}, should be 2D"
+            )
             assert len(X_val.shape) == 2, f"X_val shape is {X_val.shape}, should be 2D"
-            assert (
-                len(y_train.shape) == 1
-            ), f"y_train shape is {y_train.shape}, should be 1D"
+            assert len(y_train.shape) == 1, (
+                f"y_train shape is {y_train.shape}, should be 1D"
+            )
             assert len(y_val.shape) == 1, f"y_val shape is {y_val.shape}, should be 1D"
 
             # Clean up params
