@@ -18,14 +18,16 @@ from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import (
     AutoTabPFNRegressor,
 )
 
-btc = fetch_openml(data_id=43563, as_frame=True)       # ↔ name="Digital-currency---Time-series", version=1
+btc = fetch_openml(
+    data_id=43563, as_frame=True
+)  # ↔ name="Digital-currency---Time-series", version=1
 df = btc.frame.copy()
 
 df = (
     df.rename(columns={"Unnamed:_0": "date"})
-      .assign(date=lambda x: pd.to_datetime(x["date"]))
-      .set_index("date")
-      .sort_index()
+    .assign(date=lambda x: pd.to_datetime(x["date"]))
+    .set_index("date")
+    .sort_index()
 )
 
 print("Head of raw data")
@@ -58,12 +60,11 @@ print(f"   MAE (relative): {mae_base_rel:.4f}")
 print(f"   MAE (SAR):      {mae_base_raw:,.2f}")
 
 
-
 # ------------------------------------------------------------------
 # no CV respect AutoTabPFNRegressor
 
 print("\n🔹 AutoTabPFNRegressor (holdout)")
-auto_holdout = AutoTabPFNRegressor(max_time=60*3)
+auto_holdout = AutoTabPFNRegressor(max_time=60 * 3)
 auto_holdout.fit(X_tr, y_tr)
 pred_auto_holdout = auto_holdout.predict(X_te)
 
@@ -77,7 +78,7 @@ print(f"   MAE (SAR):      {mae_auto_holdout_raw:,.2f}")
 # 5️⃣  AutoTabPFNRegressor with TimeSeriesSplit
 print("\n🔹 AutoTabPFNRegressor (time-series aware CV)")
 auto = AutoTabPFNRegressor(
-    max_time=60*3,            # quick run
+    max_time=60 * 3,  # quick run
     random_state=42,
     phe_init_args={
         "cv_splitter": ts,
