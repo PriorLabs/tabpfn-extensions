@@ -104,7 +104,7 @@ class TunedTabPFNBase(BaseEstimator):
         self,
         n_trials: int = 50,
         n_validation_size: float = 0.2,
-        shuffle_data: bool = False,
+        shuffle_data: bool = True,
         metric: MetricType = MetricType.ACCURACY,
         device: str = "auto",
         random_state: int | None = None,
