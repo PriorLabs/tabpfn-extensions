@@ -66,11 +66,27 @@ mae_base_raw = mae_base_rel * y_raw.max()
 print(f"   MAE (relative): {mae_base_rel:.4f}")
 print(f"   MAE (SAR):      {mae_base_raw:,.2f}")
 
+
+
+# ------------------------------------------------------------------
+# no CV respect AutoTabPFNRegressor
+
+print("\n🔹 AutoTabPFNRegressor (holdout)")
+auto_holdout = AutoTabPFNRegressor(max_time=60*3)
+auto_holdout.fit(X_tr, y_tr)
+pred_auto_holdout = auto_holdout.predict(X_te)
+
+mae_auto_holdout_rel = mean_absolute_error(y_te, pred_auto_holdout)
+mae_auto_holdout_raw = mae_auto_holdout_rel * y_raw.max()
+print(f"   MAE (relative): {mae_auto_holdout_rel:.4f}")
+print(f"   MAE (SAR):      {mae_auto_holdout_raw:,.2f}")
+
+
 # ------------------------------------------------------------------
 # 5️⃣  AutoTabPFNRegressor with TimeSeriesSplit
 print("\n🔹 AutoTabPFNRegressor (time-series aware CV)")
 auto = AutoTabPFNRegressor(
-    max_time=60*5,            # quick run
+    max_time=60*3,            # quick run
     random_state=42,
     phe_init_args={
         "cv_splitter": ts,
@@ -87,23 +103,3 @@ mae_auto_rel = mean_absolute_error(y_te, pred_auto)
 mae_auto_raw = mae_auto_rel * y_raw.max()
 print(f"   MAE (relative): {mae_auto_rel:.4f}")
 print(f"   MAE (SAR):      {mae_auto_raw:,.2f}")
-
-# ------------------------------------------------------------------
-# no CV respect AutoTabPFNRegressor
-
-print("\n🔹 AutoTabPFNRegressor (holdout)")
-auto_holdout = AutoTabPFNRegressor(
-    max_time=60*5,            # quick run
-    random_state=42,
-    phe_init_args={
-        "validation_method": "holdout",
-        "max_models": 10,
-    },
-)
-auto_holdout.fit(X_tr, y_tr)
-pred_auto_holdout = auto_holdout.predict(X_te)
-
-mae_auto_holdout_rel = mean_absolute_error(y_te, pred_auto_holdout)
-mae_auto_holdout_raw = mae_auto_holdout_rel * y_raw.max()
-print(f"   MAE (relative): {mae_auto_holdout_rel:.4f}")
-print(f"   MAE (SAR):      {mae_auto_holdout_raw:,.2f}")

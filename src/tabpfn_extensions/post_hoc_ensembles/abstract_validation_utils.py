@@ -172,23 +172,21 @@ class AbstractValidationUtils(ABC, BaseEstimator):
         # TODO: Update documentation to make user aware that self.n_foldds and self.n_repeats are not used
         if self.cv_splitter:
             logger.info(f"Using provided CV splitter: {self.cv_splitter.__class__.__name__}")
-            logger.info(f"Ignore n_folds parameter: {self.n_folds}")
-            logger.info(f"Ignore n_repeats parameter: {self.n_repeats}, hardcoded to 1 in splitter")
+            logger.info(f"Ignoring n_folds parameter: {self.n_folds}")
+            logger.info(f"Ignoring n_repeats parameter: {self.n_repeats}, hardcoded to 1 in splitter")
+            
+            # Generate splits once and reuse for all models
             splits = list(self.cv_splitter.split(X, y))
             n_folds_per_rep = self.cv_splitter.get_n_splits()
-            split_iterator = iter(splits)
+
             for model_i in range(n_models):
-                # For a custom splitter, we reset the iterator for each model
-                # This assumes the user wants to apply the same fold structure to each model
-                split_iterator = iter(splits)
-                for fold_i in range(n_folds_per_rep):
-                    train_index, test_index = next(split_iterator)
+                for fold_i, (train_index, test_index) in enumerate(splits):
                     is_last_fold = (fold_i + 1) == n_folds_per_rep
                     is_last_model = (model_i + 1) == n_models
                     yield (
                         model_i,
                         fold_i,
-                        1, # Custom splitters don't have a native concept of repeats
+                        1,  # Custom splitters don't have a native concept of repeats
                         self.estimators[model_i][1],
                         train_index,
                         test_index,
