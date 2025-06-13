@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 from sklearn.ensemble import VotingClassifier, VotingRegressor
 from sklearn.utils import check_random_state
-from sklearn.model_selection import BaseCrossValidator
 
 from .abstract_validation_utils import (
     AbstractValidationUtils,
@@ -22,6 +21,7 @@ from .abstract_validation_utils import (
 
 if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
+    from sklearn.model_selection import BaseCrossValidator
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -278,7 +278,7 @@ class GreedyWeightedEnsembleClassifier(
         n_iterations: int = 50,
         silo_top_n: int = 25,
         model_family_per_estimator: list[str] | None = None,
-        cv_splitter: Optional[BaseCrossValidator] = None,
+        cv_splitter: BaseCrossValidator | None = None,
     ):
         """Post Hoc Ensemble Classifier Specialized for TabPFN models.
 
@@ -337,7 +337,7 @@ class GreedyWeightedEnsembleRegressor(
         n_iterations: int = 50,
         silo_top_n: int = 25,
         model_family_per_estimator: list[str] | None = None,
-        cv_splitter: Optional[BaseCrossValidator] = None,
+        cv_splitter: BaseCrossValidator | None = None,
     ):
         """Post Hoc Ensemble Regressor Specialized for TabPFN models.
 

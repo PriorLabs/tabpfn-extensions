@@ -6,26 +6,17 @@ For better performance, we recommend running with GPU acceleration.
 This example trains multiple TabPFN models, which is computationally intensive.
 """
 
-import numpy as np
-from sklearn.datasets import fetch_openml
 import pandas as pd
-from sklearn.datasets import load_breast_cancer, load_diabetes, load_iris
+from sklearn.datasets import fetch_openml
 from sklearn.metrics import (
-    accuracy_score,
     mean_absolute_error,
-    mean_squared_error,
-    r2_score,
-    roc_auc_score,
 )
-from sklearn.model_selection import train_test_split, TimeSeriesSplit
+from sklearn.model_selection import TimeSeriesSplit
 
-from tabpfn import TabPFNClassifier, TabPFNRegressor
+from tabpfn import TabPFNRegressor
 from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import (
-    AutoTabPFNClassifier,
     AutoTabPFNRegressor,
 )
-
-
 
 btc = fetch_openml(data_id=43563, as_frame=True)       # ↔ name="Digital-currency---Time-series", version=1
 df = btc.frame.copy()
@@ -43,8 +34,8 @@ print(df.head(), "\n")
 # ------------------------------------------------------------------
 # 2️⃣  Features & target
 target_col = "close_SAR"
-y_raw = df[target_col].to_numpy()                
-y = y_raw / y_raw.max()                          
+y_raw = df[target_col].to_numpy()
+y = y_raw / y_raw.max()
 X = df.drop(columns=["close_SAR", "close_USD"]).to_numpy()
 
 # ------------------------------------------------------------------

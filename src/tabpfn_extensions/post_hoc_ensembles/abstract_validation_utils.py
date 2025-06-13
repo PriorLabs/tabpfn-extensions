@@ -8,11 +8,15 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from copy import deepcopy
-from typing import Literal, Optional
+from typing import Literal
 
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
-from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
+from sklearn.model_selection import (
+    BaseCrossValidator,
+    ShuffleSplit,
+    StratifiedShuffleSplit,
+)
 
 from tabpfn_extensions.scoring.scoring_utils import (
     CLF_LABEL_METRICS,
@@ -46,7 +50,7 @@ class AbstractValidationUtils(ABC, BaseEstimator):
         n_folds: int | None = None,
         time_limit: int | None = None,
         score_metric: str | None = None,
-        cv_splitter: Optional[BaseCrossValidator] = None,
+        cv_splitter: BaseCrossValidator | None = None,
     ):
         """Abstract validation utilities for sklearn-like models.
 
@@ -80,7 +84,7 @@ class AbstractValidationUtils(ABC, BaseEstimator):
         self.holdout_fraction = holdout_fraction
         self.cv_splitter = cv_splitter
 
-        if self.cv_splitter: 
+        if self.cv_splitter:
             self.n_repeats = 1
             self.n_folds = self.cv_splitter.get_n_splits()
 
@@ -165,8 +169,8 @@ class AbstractValidationUtils(ABC, BaseEstimator):
 
         When a custom `cv_splitter` is provided, this method assumes that the user
         wants to apply the same fold structure to each estimator. Therefore, the splits
-        are generated once and reused for every model in `self.estimators`."""
-
+        are generated once and reused for every model in `self.estimators`.
+        """
         n_models = len(self.estimators)
 
         # TODO: Update documentation to make user aware that self.n_foldds and self.n_repeats are not used
@@ -174,7 +178,7 @@ class AbstractValidationUtils(ABC, BaseEstimator):
             logger.info(f"Using provided CV splitter: {self.cv_splitter.__class__.__name__}")
             logger.info(f"Ignoring n_folds parameter: {self.n_folds}")
             logger.info(f"Ignoring n_repeats parameter: {self.n_repeats}, hardcoded to 1 in splitter")
-            
+
             # Generate splits once and reuse for all models
             splits = list(self.cv_splitter.split(X, y))
             n_folds_per_rep = self.cv_splitter.get_n_splits()
@@ -197,7 +201,7 @@ class AbstractValidationUtils(ABC, BaseEstimator):
             holdout_validation = self._is_holdout
             _folds = self.n_folds if not holdout_validation else 1
             for repeat_i in range(self.n_repeats):
-                
+
                 # Prepare the splits for the CURRENT repeat
                 splits_for_repeat = None
                 if holdout_validation:
@@ -218,7 +222,7 @@ class AbstractValidationUtils(ABC, BaseEstimator):
                         safety_shuffle=True,
                         auto_fix_stratified_splits=True,
                     )
-                
+
                 for model_i in range(n_models):
                     for fold_i in range(_folds):
                         train_index, test_index = splits_for_repeat[fold_i]
