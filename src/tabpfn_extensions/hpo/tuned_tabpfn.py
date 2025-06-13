@@ -104,6 +104,7 @@ class TunedTabPFNBase(BaseEstimator):
         self,
         n_trials: int = 50,
         n_validation_size: float = 0.2,
+        shuffle_data: bool = False,
         metric: MetricType = MetricType.ACCURACY,
         device: str = "auto",
         random_state: int | None = None,
@@ -116,6 +117,7 @@ class TunedTabPFNBase(BaseEstimator):
     ):
         self.n_trials = n_trials
         self.n_validation_size = n_validation_size
+        self.shuffle_data = shuffle_data
         self.metric = MetricType(metric)
         self.device = device
         self.random_state = random_state
@@ -156,6 +158,7 @@ class TunedTabPFNBase(BaseEstimator):
                 test_size=self.n_validation_size,
                 random_state=rng.randint(0, 2**31 - 1),
                 stratify=y if use_stratification else None,
+                shuffle=self.shuffle_data,
             )
         except ValueError:
             # Fall back to non-stratified split if stratification fails
@@ -169,6 +172,7 @@ class TunedTabPFNBase(BaseEstimator):
                 test_size=self.n_validation_size,
                 random_state=rng.randint(0, 2**31 - 1),
                 stratify=None,
+                shuffle=self.shuffle_data,
             )
 
         # Use custom search space if provided, otherwise use default
