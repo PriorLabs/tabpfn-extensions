@@ -275,7 +275,10 @@ class TunedTabPFNBase(BaseEstimator):
                         score = model.score(X_val, y_val)
                     elif self.metric in [MetricType.ROC_AUC]:
                         y_pred = model.predict_proba(X_val)
-                        score = roc_auc_score(y_val, y_pred, multi_class="ovr")
+                        if y_pred.ndim == 2 and y_pred.shape[1] == 2:  # Binary
+                            score = roc_auc_score(y_val, y_pred[:, 1])
+                        else:
+                            score = roc_auc_score(y_val, y_pred, multi_class="ovr")
                     elif self.metric == MetricType.F1:
                         y_pred = model.predict(X_val)
                         score = f1_score(y_val, y_pred, average="weighted")
