@@ -116,9 +116,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             AssertionError
                 If both tabpfn_clf and tabpfn_reg are None.
         """
-        assert tabpfn_clf is not None or tabpfn_reg is not None, (
-            "You cannot set both `tabpfn_clf` and `tabpfn_reg` to None. You can set one to None, if your table exclusively consists of categoricals/numericals."
-        )
+        assert (
+            tabpfn_clf is not None or tabpfn_reg is not None
+        ), "You cannot set both `tabpfn_clf` and `tabpfn_reg` to None. You can set one to None, if your table exclusively consists of categoricals/numericals."
 
         self.tabpfn_clf = tabpfn_clf
         self.tabpfn_reg = tabpfn_reg

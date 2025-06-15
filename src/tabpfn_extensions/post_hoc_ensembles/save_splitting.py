@@ -134,12 +134,12 @@ def assert_valid_splits(
         )
         # Now we need to check that each class that exists in all splits is in each split.
         for split in splits:
-            assert _real_y == (set(np.unique(y[split[0]]))), (
-                "A class is missing in a train subset!"
-            )
-            assert _real_y == (set(np.unique(y[split[1]]))), (
-                "A class is missing in a test subset!"
-            )
+            assert _real_y == (
+                set(np.unique(y[split[0]]))
+            ), "A class is missing in a train subset!"
+            assert _real_y == (
+                set(np.unique(y[split[1]]))
+            ), "A class is missing in a test subset!"
 
     if same_length_training_splits:
         for split in splits:
