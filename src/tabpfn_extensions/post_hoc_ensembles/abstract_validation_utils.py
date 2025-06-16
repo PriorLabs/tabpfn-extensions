@@ -157,7 +157,6 @@ class AbstractValidationUtils(ABC, BaseEstimator):
                 )
             self._extra_processing(split_i, base_model, test_index)
 
-
     def _get_split(
         self,
         *,
