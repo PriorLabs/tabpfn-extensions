@@ -21,6 +21,7 @@ from .abstract_validation_utils import (
 
 if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
+    from sklearn.model_selection import BaseCrossValidator
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -277,6 +278,7 @@ class GreedyWeightedEnsembleClassifier(
         n_iterations: int = 50,
         silo_top_n: int = 25,
         model_family_per_estimator: list[str] | None = None,
+        cv_splitter: BaseCrossValidator | None = None,
     ):
         """Post Hoc Ensemble Classifier Specialized for TabPFN models.
 
@@ -310,6 +312,7 @@ class GreedyWeightedEnsembleClassifier(
             time_limit=time_limit,
             holdout_fraction=holdout_fraction,
             validation_method=validation_method,
+            cv_splitter=cv_splitter,
         )
 
     def _build_ensemble(self, base_models, weights):
@@ -334,6 +337,7 @@ class GreedyWeightedEnsembleRegressor(
         n_iterations: int = 50,
         silo_top_n: int = 25,
         model_family_per_estimator: list[str] | None = None,
+        cv_splitter: BaseCrossValidator | None = None,
     ):
         """Post Hoc Ensemble Regressor Specialized for TabPFN models.
 
@@ -367,6 +371,7 @@ class GreedyWeightedEnsembleRegressor(
             time_limit=time_limit,
             holdout_fraction=holdout_fraction,
             validation_method=validation_method,
+            cv_splitter=cv_splitter,
         )
 
     def _build_ensemble(self, base_models, weights):

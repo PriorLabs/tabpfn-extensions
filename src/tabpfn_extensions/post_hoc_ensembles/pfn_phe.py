@@ -7,7 +7,7 @@ import itertools
 import logging
 import warnings
 from enum import Enum
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 from sklearn.base import BaseEstimator
@@ -25,6 +25,9 @@ from .greedy_weighted_ensemble import (
     GreedyWeightedEnsembleClassifier,
     GreedyWeightedEnsembleRegressor,
 )
+
+if TYPE_CHECKING:
+    from sklearn.model_selection import BaseCrossValidator
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",
@@ -114,6 +117,7 @@ class AutoPostHocEnsemblePredictor(BaseEstimator):
         holdout_fraction: float = 0.33,
         ges_n_iterations: int = 25,
         ignore_pretraining_limits: bool = False,
+        cv_splitter: BaseCrossValidator | None = None,
     ) -> None:
         """Builds a PostHocEnsembleConfig with default values for the given parameters.
 
@@ -154,6 +158,7 @@ class AutoPostHocEnsemblePredictor(BaseEstimator):
         self.bm_random_state = bm_random_state
         self.ges_random_state = ges_random_state
         self.ignore_pretraining_limits = ignore_pretraining_limits
+        self.cv_splitter = cv_splitter
 
         # Model Source
         self.tabpfn_base_model_source = tabpfn_base_model_source
@@ -331,6 +336,7 @@ class AutoPostHocEnsemblePredictor(BaseEstimator):
             validation_method=self.validation_method,
             holdout_fraction=self.holdout_fraction,
             model_family_per_estimator=model_family_per_estimator,
+            cv_splitter=self.cv_splitter,
         )
 
         self._ens_model.fit(X, y)
