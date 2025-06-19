@@ -59,6 +59,7 @@ from sklearn.utils import check_random_state
 
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 from tabpfn_extensions.misc.sklearn_compat import validate_data
+from ..scoring.scoring_utils import score_regression, score_classification
 
 # Import TabPFN models from extensions (which handles backend compatibility)
 try:
@@ -284,15 +285,23 @@ class TunedTabPFNBase(BaseEstimator):
                 else:  # Regression
                     y_pred = model.predict(X_val)
                     if self.metric == MetricType.RMSE:
-                        score = -mean_squared_error(
-                            y_val, y_pred, squared=False
-                        )  # Negative RMSE
+                        score = -score_regression(
+                            "rmse",
+                            y_val,
+                            y_pred,
+                        )
                     elif self.metric == MetricType.MSE:
-                        score = -mean_squared_error(
-                            y_val, y_pred, squared=True
-                        )  # Negative MSE
+                        score = -score_regression(
+                            "mse",
+                            y_val,
+                            y_pred,
+                        )
                     elif self.metric == MetricType.MAE:
-                        score = -mean_absolute_error(y_val, y_pred)  # Negative MAE
+                        score = -score_regression(
+                            "mae",
+                            y_val,
+                            y_pred,
+                        )
                     else:  # Default to R2 for regression if metric not MAE/MSE/RMSE
                         score = r2_score(y_val, y_pred)
 
