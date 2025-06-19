@@ -370,28 +370,10 @@ class TunedTabPFNBase(BaseEstimator):
         self.trials_ = trials_obj  # Store the modified trials history
 
         if self.best_model_ is None:
-            warnings.warn(
-                "All optimization trials failed or no valid model was found. Creating default model.",
-                stacklevel=2,
+            raise ValueError(
+                "No valid model was found during hyperparameter optimization. "
+                "Check the trials for errors or issues with the search space.",
             )
-            default_model_params = {
-                "device": self.device,
-                "random_state": rng.randint(0, 2**31 - 1),
-            }
-            # Since data is already transformed, categorical_features_indices is not needed for the default model
-            if task_type in ["binary", "multiclass"]:
-                self.best_model_ = TabPFNClassifier(**default_model_params)
-            else:
-                self.best_model_ = TabPFNRegressor(**default_model_params)
-
-            # Attempt to fit the default model with the full (transformed) training data used for optimization setup
-            # This uses X_transformed which was the input to _optimize after categorical encoding
-            try:
-                self.best_model_.fit(X, y)
-            except Exception as e:  # noqa: BLE001
-                warnings.warn(f"Failed to fit default model: {e!s}", stacklevel=2)
-                # self.best_model_ will remain an unfitted default model.
-                # Downstream predict/predict_proba will fail if not fitted.
 
     def _more_tags(self) -> dict[str, Any]:
         return {
