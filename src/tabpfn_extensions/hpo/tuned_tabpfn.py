@@ -48,8 +48,6 @@ from hyperopt import STATUS_OK, Trials, fmin, hp, rand, tpe
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.metrics import (
     f1_score,
-    mean_absolute_error,
-    mean_squared_error,
     r2_score,
     roc_auc_score,
 )
@@ -59,7 +57,9 @@ from sklearn.utils import check_random_state
 
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 from tabpfn_extensions.misc.sklearn_compat import validate_data
-from ..scoring.scoring_utils import score_regression, score_classification
+from tabpfn_extensions.scoring.scoring_utils import (
+    score_regression,
+)
 
 # Import TabPFN models from extensions (which handles backend compatibility)
 try:
