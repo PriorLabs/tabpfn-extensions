@@ -31,8 +31,8 @@ def get_small_test_search_space():
             "model_type",
             ["single"],
         ),  # Only use single model (not dt_pfn)
-        "n_ensemble_repeats": hp.choice(
-            "n_ensemble_repeats",
+        "n_estimators": hp.choice(
+            "n_estimators",
             [1],
         ),  # Minimal ensemble repeats
         # Model hyperparameters - only test minimal options
