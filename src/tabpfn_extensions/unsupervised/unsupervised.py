@@ -306,11 +306,13 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             for i in all_features:
                 if i not in dag:
                     dag[i] = []
-            # the following will raise an error if the DAG is not a valid DAG
             ts = TopologicalSorter(dag)
-            ts.static_order()
-            # re-order all_features based on the DAG
+            # re-order all_features based on the DAG (throws error in case of cycles)
             all_features = list(ts.static_order())
+            # re-order also the indices of categorical features accordingly
+            self.categorical_features = [
+                all_features.index(idx) for idx in self.categorical_features
+            ]
             
         for i in tqdm(range(len(all_features))):
             column_idx = all_features[i]
