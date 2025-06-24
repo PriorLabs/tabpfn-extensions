@@ -154,7 +154,7 @@ def score_classification(
 
 
 def score_regression(
-    optimize_metric: Literal["rmse", "mse", "mae"],
+    optimize_metric: Literal["rmse", "mse", "mae", "r2"],
     y_true,
     y_pred,
     sample_weight=None,
@@ -197,63 +197,9 @@ def score_regression(
         return -mean_squared_error(y_true, y_pred, sample_weight=sample_weight)
     elif optimize_metric == "mae":
         return -mean_absolute_error(y_true, y_pred, sample_weight=sample_weight)
+    elif optimize_metric == "r2":
+        from sklearn.metrics import r2_score
+
+        return r2_score(y_true, y_pred, sample_weight=sample_weight)
     else:
         raise ValueError(f"Unknown metric {optimize_metric}")
-
-
-def get_score_survival_model(metric_used, inv_predictions=True):
-    from tabpfn.scripts.tabular_metrics import get_scoring_direction
-
-    def score_survival_model(model, X, y):
-        censoring, y = next(zip(*y.tolist())), list(zip(*y.tolist()))[1]
-        prediction = model.predict(X)
-        prediction = -prediction if inv_predictions else prediction
-
-        if np.array(censoring).mean() == 0:
-            return 0.5
-
-        result = metric_used(target=y, pred=prediction, event_observed=censoring)
-
-        result *= get_scoring_direction(metric_used)
-
-        if np.isnan(result):
-            return 0.0
-
-        return result
-
-    return score_survival_model
-
-
-def score_survival(
-    optimize_metric: Literal["cindex"],
-    y_true,
-    y_pred,
-    event_observed,
-    sample_weight=None,
-):
-    """General function to score regression predictions.
-
-    Parameters:
-        optimize_metric : {"rmse", "mse", "mae"}
-            The metric to use for scoring the predictions.
-
-        y_true : array-like of shape (n_samples,)
-            True target values.
-
-        y_pred : array-like of shape (n_samples,)
-            Predicted target values.
-
-        sample_weight : array-like of shape (n_samples,), default=None
-            Sample weights.
-
-    Returns:
-        float: The score for the specified metric.
-
-    Raises:
-         ValueError: If an unknown metric is specified.
-    """
-    from lifelines.utils import concordance_index
-
-    if optimize_metric in ("cindex", "c_index", "risk_score", "risk_score_capped"):
-        return concordance_index(y_true, y_pred, event_observed=event_observed)
-    raise ValueError(f"Unknown metric {optimize_metric}")

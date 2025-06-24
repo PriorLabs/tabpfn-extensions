@@ -59,6 +59,25 @@ class TestTunedTabPFNClassifier(BaseClassifierTests):
         pass
 
 
+class TestTunedTabPFNClassifierROCAUC(BaseClassifierTests):
+    """Test TunedTabPFNClassifier with ROC AUC metric."""
+
+    @pytest.fixture
+    def estimator(self, tabpfn_classifier):
+        """Provide a HPO-based TabPFN classifier as the estimator."""
+        n_trials = 3 if FAST_TEST_MODE else 10  # Very limited trials for fast testing
+
+        # Use minimal search space in fast test mode
+        search_space = get_small_test_search_space() if FAST_TEST_MODE else None
+
+        return TunedTabPFNClassifier(
+            n_trials=n_trials,
+            metric="roc_auc",
+            random_state=42,
+            search_space=search_space,
+        )
+
+
 @pytest.mark.local_compatible
 @pytest.mark.client_compatible
 class TestTunedTabPFNRegressor(BaseRegressorTests):

@@ -46,11 +46,6 @@ import numpy as np
 import torch
 from hyperopt import STATUS_OK, Trials, fmin, hp, rand, tpe
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
-from sklearn.metrics import (
-    f1_score,
-    r2_score,
-    roc_auc_score,
-)
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
@@ -58,6 +53,7 @@ from sklearn.utils import check_random_state
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 from tabpfn_extensions.scoring.scoring_utils import (
+    score_classification,
     score_regression,
 )
 
@@ -271,17 +267,13 @@ class TunedTabPFNBase(BaseEstimator):
                     # Custom objective should return a negative score (for minimization)
                     score = -self.objective_fn(model, X_val, y_val)
                 elif task_type in ["binary", "multiclass"]:
+                    y_pred = model.predict_proba(X_val)
                     if self.metric == MetricType.ACCURACY:
-                        score = model.score(X_val, y_val)
+                        score = score_classification("accuracy", y_val, y_pred)
                     elif self.metric in [MetricType.ROC_AUC]:
-                        y_pred = model.predict_proba(X_val)
-                        if y_pred.ndim == 2 and y_pred.shape[1] == 2:  # Binary
-                            score = roc_auc_score(y_val, y_pred[:, 1])
-                        else:
-                            score = roc_auc_score(y_val, y_pred, multi_class="ovr")
+                        score = score_classification("auroc", y_val, y_pred)
                     elif self.metric == MetricType.F1:
-                        y_pred = model.predict(X_val)
-                        score = f1_score(y_val, y_pred, average="weighted")
+                        score = score_classification("f1", y_val, y_pred)
                 else:  # Regression
                     y_pred = model.predict(X_val)
                     if self.metric == MetricType.RMSE:
@@ -303,7 +295,11 @@ class TunedTabPFNBase(BaseEstimator):
                             y_pred,
                         )
                     else:  # Default to R2 for regression if metric not MAE/MSE/RMSE
-                        score = r2_score(y_val, y_pred)
+                        score = -score_regression(
+                            "r2",
+                            y_val,
+                            y_pred,
+                        )
 
                 # Ensure score is not None before negating
                 loss_value = -score if score is not None else float("inf")
