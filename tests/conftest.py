@@ -157,6 +157,12 @@ def pytest_configure(config):
     elif backend_option == "tabpfn_client" and not HAS_TABPFN_CLIENT:
         print("WARNING: Requested TabPFN client backend but it's not available")
 
+    if not TABPFN_SOURCE:
+        pytest.exit(
+            "No TabPFN backend specified or available. "
+            "Please install either the 'tabpfn' or 'tabpfn_client' package.",
+        )
+
     # Print status information
     print("Test configuration:")
     print(f"  Backend: {TABPFN_SOURCE or 'none'}")

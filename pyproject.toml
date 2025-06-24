@@ -63,7 +63,8 @@ post_hoc_ensembles = [
     "hyperopt>=0.2.7"
 ]
 hpo = [
-    "hyperopt>=0.2.7"
+    "hyperopt>=0.2.7",
+    "setuptools>=67.0.0",
 ]
 many_class = []
 classifier_as_regressor = []
@@ -79,6 +80,7 @@ all = [
     "kditransform>=0.2.0",
     "llvmlite>=0.30.0",
     "hyperopt>=0.2.7",
+    "setuptools>=67.0.0",
 ]
 
 dev = [

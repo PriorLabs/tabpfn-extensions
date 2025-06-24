@@ -39,7 +39,6 @@ Example usage:
 from __future__ import annotations
 
 import logging
-import warnings
 from enum import Enum
 from typing import Any, Callable
 
@@ -47,19 +46,16 @@ import numpy as np
 import torch
 from hyperopt import STATUS_OK, Trials, fmin, hp, rand, tpe
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
-from sklearn.metrics import (
-    f1_score,
-    mean_absolute_error,
-    mean_squared_error,
-    r2_score,
-    roc_auc_score,
-)
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 from tabpfn_extensions.misc.sklearn_compat import validate_data
+from tabpfn_extensions.scoring.scoring_utils import (
+    score_classification,
+    score_regression,
+)
 
 # Import TabPFN models from extensions (which handles backend compatibility)
 try:
@@ -271,31 +267,39 @@ class TunedTabPFNBase(BaseEstimator):
                     # Custom objective should return a negative score (for minimization)
                     score = -self.objective_fn(model, X_val, y_val)
                 elif task_type in ["binary", "multiclass"]:
+                    y_pred = model.predict_proba(X_val)
                     if self.metric == MetricType.ACCURACY:
-                        score = model.score(X_val, y_val)
+                        score = score_classification("accuracy", y_val, y_pred)
                     elif self.metric in [MetricType.ROC_AUC]:
-                        y_pred = model.predict_proba(X_val)
-                        if y_pred.ndim == 2 and y_pred.shape[1] == 2:  # Binary
-                            score = roc_auc_score(y_val, y_pred[:, 1])
-                        else:
-                            score = roc_auc_score(y_val, y_pred, multi_class="ovr")
+                        score = score_classification("auroc", y_val, y_pred)
                     elif self.metric == MetricType.F1:
-                        y_pred = model.predict(X_val)
-                        score = f1_score(y_val, y_pred, average="weighted")
+                        score = score_classification("f1", y_val, y_pred)
                 else:  # Regression
                     y_pred = model.predict(X_val)
                     if self.metric == MetricType.RMSE:
-                        score = -mean_squared_error(
-                            y_val, y_pred, squared=False
-                        )  # Negative RMSE
+                        score = -score_regression(
+                            "rmse",
+                            y_val,
+                            y_pred,
+                        )
                     elif self.metric == MetricType.MSE:
-                        score = -mean_squared_error(
-                            y_val, y_pred, squared=True
-                        )  # Negative MSE
+                        score = -score_regression(
+                            "mse",
+                            y_val,
+                            y_pred,
+                        )
                     elif self.metric == MetricType.MAE:
-                        score = -mean_absolute_error(y_val, y_pred)  # Negative MAE
+                        score = -score_regression(
+                            "mae",
+                            y_val,
+                            y_pred,
+                        )
                     else:  # Default to R2 for regression if metric not MAE/MSE/RMSE
-                        score = r2_score(y_val, y_pred)
+                        score = -score_regression(
+                            "r2",
+                            y_val,
+                            y_pred,
+                        )
 
                 # Ensure score is not None before negating
                 loss_value = -score if score is not None else float("inf")
@@ -373,28 +377,10 @@ class TunedTabPFNBase(BaseEstimator):
         self.trials_ = trials_obj  # Store the modified trials history
 
         if self.best_model_ is None:
-            warnings.warn(
-                "All optimization trials failed or no valid model was found. Creating default model.",
-                stacklevel=2,
+            raise ValueError(
+                "No valid model was found during hyperparameter optimization. "
+                "Check the trials for errors or issues with the search space.",
             )
-            default_model_params = {
-                "device": self.device,
-                "random_state": rng.randint(0, 2**31 - 1),
-            }
-            # Since data is already transformed, categorical_features_indices is not needed for the default model
-            if task_type in ["binary", "multiclass"]:
-                self.best_model_ = TabPFNClassifier(**default_model_params)
-            else:
-                self.best_model_ = TabPFNRegressor(**default_model_params)
-
-            # Attempt to fit the default model with the full (transformed) training data used for optimization setup
-            # This uses X_transformed which was the input to _optimize after categorical encoding
-            try:
-                self.best_model_.fit(X, y)
-            except Exception as e:  # noqa: BLE001
-                warnings.warn(f"Failed to fit default model: {e!s}", stacklevel=2)
-                # self.best_model_ will remain an unfitted default model.
-                # Downstream predict/predict_proba will fail if not fitted.
 
     def _more_tags(self) -> dict[str, Any]:
         return {
