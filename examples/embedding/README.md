@@ -11,6 +11,12 @@ The `TabPFNEmbedding` class is a utility for extracting embeddings from `TabPFNC
 
 To use `TabPFNEmbedding`, initialize it with either a `TabPFNClassifier` or `TabPFNRegressor` and specify the number of folds (`n_fold`). Then, call the `get_embeddings` method to generate embeddings for your dataset.
 
+### Data Source Parameter
+
+`data_source` determines whether embeddings from the training or test tokens are
+returned. See the docstring of ``TabPFNEmbedding.get_embeddings`` for details on
+the options and examples of how to combine embeddings when using an ensemble.
+
 
 
 ## Citing This Work

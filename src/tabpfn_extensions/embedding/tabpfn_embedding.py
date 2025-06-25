@@ -107,7 +107,26 @@ class TabPFNEmbedding:
             X_train (np.ndarray): Training feature data.
             y_train (np.ndarray): Training target labels.
             X (np.ndarray): Data for which embeddings are to be extracted.
-            data_source (str): Specifies the data source ("test" for test data).
+            data_source (str):
+                Selects the transformer output to return. Use ``"train"`` to
+                obtain embeddings from the training tokens and ``"test"`` for
+                the test tokens (default).
+
+                When ``n_estimators > 1`` the returned array has shape
+                ``(n_estimators, n_samples, embedding_dim)``. A common approach
+                is to average over the first axis::
+
+                    emb = embedding_extractor.get_embeddings(
+                        X_train,
+                        y_train,
+                        X,
+                        data_source="test",
+                    )
+                    emb_avg = emb.mean(axis=0)
+
+                Alternatively, reshape to concatenate all estimators::
+
+                    emb_concat = emb.reshape(emb.shape[1], -1)
 
         Returns:
             np.ndarray: The extracted embeddings.
