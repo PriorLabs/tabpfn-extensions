@@ -14,7 +14,7 @@ from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
 
-from tabpfn_extensions.misc.sklearn_compat import check_array, check_X_y
+from tabpfn_extensions.misc.sklearn_compat import validate_data
 from tabpfn_extensions.rf_pfn import (
     RandomForestTabPFNClassifier,
     RandomForestTabPFNRegressor,
@@ -247,12 +247,11 @@ class AutoPostHocEnsemblePredictor(BaseEstimator):
             )
 
         # -- Ensure dtype encoding.
-        X, y = check_X_y(
+        X, y = validate_data(
+            self,
             X,
             y,
-            ensure_all_finite="allow-nan",
-            dtype=object,
-            accept_sparse=False,
+            ensure_all_finite=False,
         )
         self.n_features_in_ = X.shape[1]
 
@@ -278,12 +277,11 @@ class AutoPostHocEnsemblePredictor(BaseEstimator):
             y = self._label_encoder.fit_transform(y)
 
         # -- sanity check, no trust.
-        X, y = check_X_y(
+        X, y = validate_data(
+            self,
             X,
             y,
-            ensure_all_finite="allow-nan",
-            dtype="numeric",
-            accept_sparse=False,
+            ensure_all_finite=False,
         )
 
         if self.task_type in [TaskType.BINARY, TaskType.MULTICLASS]:
@@ -396,11 +394,15 @@ class AutoPostHocEnsemblePredictor(BaseEstimator):
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Predicts the target values for the given data."""
-        X = check_array(X, ensure_all_finite="allow-nan", dtype=object)
-        X = check_array(
+        X = validate_data(
+            self,
+            X,
+            ensure_all_finite=False,
+        )
+        X = validate_data(
+            self,
             self._cat_encoder.transform(X),
-            ensure_all_finite="allow-nan",
-            dtype="numeric",
+            ensure_all_finite=False,
         )
         if self.task_type == "regression":
             return self._ens_model.predict(X)
@@ -409,11 +411,15 @@ class AutoPostHocEnsemblePredictor(BaseEstimator):
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """Predicts the target values for the given data."""
-        X = check_array(X, ensure_all_finite="allow-nan", dtype=object)
-        X = check_array(
+        X = validate_data(
+            self,
+            X,
+            ensure_all_finite=False,
+        )
+        X = validate_data(
+            self,
             self._cat_encoder.transform(X),
-            ensure_all_finite="allow-nan",
-            dtype="numeric",
+            ensure_all_finite=False,
         )
         return self._ens_model.predict_proba(X)
 

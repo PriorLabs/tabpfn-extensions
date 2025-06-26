@@ -12,6 +12,7 @@ from sklearn.metrics import (
     log_loss,
     mean_absolute_error,
     mean_squared_error,
+    r2_score,
     roc_auc_score,
 )
 
@@ -198,8 +199,6 @@ def score_regression(
     elif optimize_metric == "mae":
         return -mean_absolute_error(y_true, y_pred, sample_weight=sample_weight)
     elif optimize_metric == "r2":
-        from sklearn.metrics import r2_score
-
         return r2_score(y_true, y_pred, sample_weight=sample_weight)
     else:
         raise ValueError(f"Unknown metric {optimize_metric}")
