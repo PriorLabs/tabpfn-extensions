@@ -35,7 +35,7 @@ def enumerate_preprocess_transforms():
 
         if importlib.util.find_spec("kditransform") is not None:
             # Only add KDI transforms if the module is available
-            if False: # KDI is disabled currently due to warnings thrown by old sklearn versions
+            if False:  # KDI is disabled currently due to warnings thrown by old sklearn versions
                 names_list += [
                     ["kdi_uni"],
                     ["kdi_alpha_0.3"],
