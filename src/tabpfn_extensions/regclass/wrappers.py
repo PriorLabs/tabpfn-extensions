@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Sequence
+from collections.abc import Sequence
+from typing import Any, Literal
 
 import numpy as np
 import torch
-
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_is_fitted
 
 
 class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
-    """
-    Wrap a probabilistic regressor to behave like a multi-class classifier.
+    """Wrap a probabilistic regressor to behave like a multi-class classifier.
 
     This wrapper is designed for regressors that output a full predictive
     distribution (e.g., `TabPFNRegressor` when `output_type="full"`). It allows
@@ -68,7 +67,7 @@ class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
         - "weighted": Weights the probability of each interval by its expected
           absolute value before aggregation.
 
-    Attributes
+    Attributes:
     ----------
     classes_ : ndarray of shape (n_classes,)
         The class labels known to the classifier. These are integers from 0 to
@@ -80,7 +79,7 @@ class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
     thresholds_ : tuple of float
         The sorted tuple of thresholds used to define the class boundaries.
 
-    Notes
+    Notes:
     -----
     This wrapper assumes the underlying regressor's `predict(..., output_type="full")`
     method returns a structure consistent with `TabPFNRegressor`'s
@@ -95,22 +94,24 @@ class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
         *,
         thresholds: Sequence[float],
         decision_strategy: Literal["probabilistic", "weighted"] = "probabilistic",
-    ) -> None:        
+    ) -> None:
         if not hasattr(estimator, "predict"):
             raise TypeError("estimator must implement a predict() method.")
-        if not all(thresholds[i] <= thresholds[i+1] for i in range(len(thresholds) - 1)):
+        if not all(
+            thresholds[i] <= thresholds[i + 1] for i in range(len(thresholds) - 1)
+        ):
             raise ValueError("Thresholds must be sorted in ascending order.")
         if decision_strategy not in {"probabilistic", "weighted"}:
-            raise ValueError(f"decision_strategy must be 'probabilistic' or 'weighted', got '{decision_strategy}'.")
-
+            raise ValueError(
+                f"decision_strategy must be 'probabilistic' or 'weighted', got '{decision_strategy}'."
+            )
 
         self.estimator = estimator
         self.thresholds = thresholds
         self.decision_strategy = decision_strategy
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> "DistributionalRegressorAsClassifier":
-        """
-        Fit the underlying regressor on the continuous target `y`.
+    def fit(self, X: np.ndarray, y: np.ndarray) -> DistributionalRegressorAsClassifier:
+        """Fit the underlying regressor on the continuous target `y`.
 
         The provided `thresholds` are sorted and stored, and the number of
         classes is inferred from them. The `y` values are passed directly to the
@@ -126,7 +127,7 @@ class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
             values will be used by the underlying regressor to learn the
             distribution.
 
-        Returns
+        Returns:
         -------
         self : object
             Returns the instance itself.
@@ -141,16 +142,13 @@ class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """
-        Return the most likely class label for each sample in X.
-        """
+        """Return the most likely class label for each sample in X."""
         check_is_fitted(self)
         probs = self.predict_proba(X)
         return np.argmax(probs, axis=1)
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        """
-        Calculate class probabilities for samples in X.
+        """Calculate class probabilities for samples in X.
 
         The probabilities are derived from the regressor's predictive
         distribution based on the `decision_strategy` chosen during
@@ -161,7 +159,7 @@ class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
         X : array-like of shape (n_samples, n_features)
             The input samples for which to predict class probabilities.
 
-        Returns
+        Returns:
         -------
         proba : ndarray of shape (n_samples, n_classes_)
             The class probabilities for each sample. The columns correspond to
@@ -178,7 +176,9 @@ class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
         # --- Strategy 1: Probabilistic (CDF-based) ---
         if self.decision_strategy == "probabilistic":
             # 2. Calculate the CDF at each threshold point.
-            threshold_tensor = torch.tensor(self.thresholds_, device=device, dtype=torch.float32)
+            threshold_tensor = torch.tensor(
+                self.thresholds_, device=device, dtype=torch.float32
+            )
             cdf_values = criterion.cdf(logits, threshold_tensor)
             cdf_values = cdf_values.cpu().detach().numpy()
 
@@ -197,27 +197,41 @@ class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
             bar_dist_borders = criterion.borders.to(device, dtype=torch.float32)
 
             # Replicate logic from FullSupportBarDistribution.mean to get per-bar means
-            bucket_widths = (bar_dist_borders[1:] - bar_dist_borders[:-1]).to(device, dtype=torch.float32)
+            bucket_widths = (bar_dist_borders[1:] - bar_dist_borders[:-1]).to(
+                device, dtype=torch.float32
+            )
             bucket_means = bar_dist_borders[:-1] + bucket_widths / 2
             side_normals = (
                 criterion.halfnormal_with_p_weight_before(criterion.bucket_widths[0]),
                 criterion.halfnormal_with_p_weight_before(criterion.bucket_widths[-1]),
             )
-            bucket_means[0] = -side_normals[0].mean.to(device, dtype=torch.float32) + bar_dist_borders[1]
-            bucket_means[-1] = side_normals[1].mean.to(device, dtype=torch.float32) + bar_dist_borders[-2]
+            bucket_means[0] = (
+                -side_normals[0].mean.to(device, dtype=torch.float32)
+                + bar_dist_borders[1]
+            )
+            bucket_means[-1] = (
+                side_normals[1].mean.to(device, dtype=torch.float32)
+                + bar_dist_borders[-2]
+            )
 
             # 3. Weight probabilities by the *magnitude* of the expected value
             weighted_bar_values = probs_per_bar * torch.abs(bucket_means)
 
             # 4. Map the regressor's bars to the classifier's buckets
             bar_midpoints = (bar_dist_borders[:-1] + bar_dist_borders[1:]) / 2
-            threshold_tensor = torch.tensor(self.thresholds_, device=device, dtype=torch.float32)
+            threshold_tensor = torch.tensor(
+                self.thresholds_, device=device, dtype=torch.float32
+            )
             class_indices_per_bar = torch.bucketize(bar_midpoints, threshold_tensor)
 
             # 5. Sum the weighted values into the corresponding class buckets
             n_samples = X.shape[0]
-            weighted_scores = torch.zeros((n_samples, self.n_classes_), device=device, dtype=torch.float32)
-            idx_tensor = class_indices_per_bar.unsqueeze(0).expand_as(weighted_bar_values)
+            weighted_scores = torch.zeros(
+                (n_samples, self.n_classes_), device=device, dtype=torch.float32
+            )
+            idx_tensor = class_indices_per_bar.unsqueeze(0).expand_as(
+                weighted_bar_values
+            )
             weighted_scores.scatter_add_(1, idx_tensor, weighted_bar_values)
 
             probs = weighted_scores.cpu().detach().numpy()
