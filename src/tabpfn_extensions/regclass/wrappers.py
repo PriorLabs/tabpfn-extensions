@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_is_fitted
-
+from tabpfn import TabPFNRegressor
 
 class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
     """Wrap a probabilistic regressor to behave like a multi-class classifier.
@@ -90,7 +90,7 @@ class DistributionalRegressorAsClassifier(ClassifierMixin, BaseEstimator):
 
     def __init__(
         self,
-        estimator: Any,
+        estimator: TabPFNRegressor,
         *,
         thresholds: Sequence[float],
         decision_strategy: Literal["probabilistic", "weighted"] = "probabilistic",
