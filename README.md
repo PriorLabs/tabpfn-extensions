@@ -103,7 +103,10 @@ graph TD
 
     %% 2. DEFINE THE GRAPH STRUCTURE
     start((Start)) --> gpu_check{GPU available?};
-    gpu_check -- No --> cpu_only_options["[Use TabPFN Client backend](https://github.com/automl/TabPFN) or<br/>[Local Version](https://github.com/automl/TabPFN)"];
+    
+    % Change: Define node with just text, links added later
+    gpu_check -- No --> cpu_only_options("Use TabPFN Client backend or<br/>Local Version");
+    
     gpu_check -- Yes --> task_type{"Type of task?"};
 
     task_type -- Unsupervised --> unsupervised_type{"What kind of<br/>unsupervised task?"};
@@ -113,7 +116,10 @@ graph TD
     unsupervised_type --> embedding("Get Embeddings");
 
     task_type -- "Prediction Problem" --> text_check{"Contains Text Data?"};
-    text_check -- Yes --> api_backend["Consider using our API client as<br/>TabPFN backend.<br/>Natively understands text."];
+    
+    % Change: Define node with just text, link added later
+    text_check -- Yes --> api_backend("Consider using our API client as<br/>TabPFN backend.<br/>Natively understands text.");
+    
     text_check -- No --> ts_check{"Time-Series Data?"};
 
     ts_check -- Yes --> ts_features["Consider TabPFN-Time-Series features"];
@@ -150,3 +156,7 @@ graph TD
     class start,gpu_check,task_type,unsupervised_type,text_check,ts_check,sample_size_check,class_check,finetune_check,interpretability_check,performance_check decision;
     class congrats terminal;
     class cpu_only_options,imputation,data_gen,density,embedding,api_backend,ts_features,subsample,rfpfn,many_class,finetuning,shapley,more_estimators,hpo,post_hoc,tuning_options main;
+
+    %% 4. ADD CLICKABLE LINKS
+    click cpu_only_options "https://github.com/automl/TabPFN" "TabPFN Backend Options" _blank
+    click api_backend "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Client" _blank
