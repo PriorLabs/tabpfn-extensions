@@ -104,7 +104,6 @@ graph TD
     %% 2. DEFINE THE GRAPH STRUCTURE
     start((Start)) --> gpu_check{GPU available?};
     
-    % Change: Define node with just text, links added later
     gpu_check -- No --> cpu_only_options("Use TabPFN Client backend or<br/>Local Version");
     
     gpu_check -- Yes --> task_type{"Type of task?"};
@@ -117,7 +116,6 @@ graph TD
 
     task_type -- "Prediction Problem" --> text_check{"Contains Text Data?"};
     
-    % Change: Define node with just text, link added later
     text_check -- Yes --> api_backend("Consider using our API client as<br/>TabPFN backend.<br/>Natively understands text.");
     
     text_check -- No --> ts_check{"Time-Series Data?"};
