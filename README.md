@@ -88,3 +88,65 @@ tabpfn-extensions/
 ---
 
 Built with ❤️ by the TabPFN community
+
+
+---
+
+## 🚀 TabPFN Workflow Diagram
+
+```mermaid
+graph TD
+    %% 1. DEFINE ALL STYLES
+    classDef main fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef decision fill:#e0ffff,stroke:#333,stroke-width:2px;
+    classDef terminal fill:#f0fff0,stroke:#28a745,stroke-width:2px;
+
+    %% 2. DEFINE THE GRAPH STRUCTURE
+    start((Start)) --> gpu_check{GPU available?};
+    gpu_check -- No --> cpu_only_options["[Use TabPFN Client backend](https://github.com/automl/TabPFN) or<br/>[Local Version](https://github.com/automl/TabPFN)"];
+    gpu_check -- Yes --> task_type{"Type of task?"};
+
+    task_type -- Unsupervised --> unsupervised_type{"What kind of<br/>unsupervised task?"};
+    unsupervised_type --> imputation(Imputation);
+    unsupervised_type --> data_gen("Data Generation");
+    unsupervised_type --> density("Density Estimation");
+    unsupervised_type --> embedding("Get Embeddings");
+
+    task_type -- "Prediction Problem" --> text_check{"Contains Text Data?"};
+    text_check -- Yes --> api_backend["Consider using our API client as<br/>TabPFN backend.<br/>Natively understands text."];
+    text_check -- No --> ts_check{"Time-Series Data?"};
+
+    ts_check -- Yes --> ts_features["Consider TabPFN-Time-Series features"];
+    ts_check -- No --> sample_size_check{"> 10,000 samples?"};
+
+    ts_features --> sample_size_check;
+    api_backend --> sample_size_check;
+
+    sample_size_check -- No --> class_check{"> 10 classes?"};
+    sample_size_check -- Yes --> subsample["TabPFN subsample<br/>samples 10,000"];
+
+    class_check -- No --> rfpfn("RF-PFN");
+    class_check -- Yes --> many_class("Many Class");
+
+    subsample --> finetune_check{"Need to Finetune?"};
+    rfpfn --> finetune_check;
+    many_class --> finetune_check;
+
+    finetune_check -- Yes --> finetuning("Finetuning");
+    finetune_check -- No --> interpretability_check{"Need Interpretability?"};
+
+    finetuning --> performance_check{"Performance not<br/>good enough?"};
+    interpretability_check -- Yes --> shapley("Shapley Values for TabPFN");
+    interpretability_check -- No --> performance_check;
+    shapley --> performance_check;
+
+    performance_check -- No --> congrats((Congrats!));
+    performance_check -- Yes --> tuning_options("Tuning Options");
+    tuning_options --> more_estimators("More estimators on TabPFN");
+    tuning_options --> hpo("HPO for TabPFN");
+    tuning_options --> post_hoc("Post-Hoc-Ensemble<br/>(AutoTabPFN)");
+
+    %% 3. APPLY STYLES TO NODES
+    class start,gpu_check,task_type,unsupervised_type,text_check,ts_check,sample_size_check,class_check,finetune_check,interpretability_check,performance_check decision;
+    class congrats terminal;
+    class cpu_only_options,imputation,data_gen,density,embedding,api_backend,ts_features,subsample,rfpfn,many_class,finetuning,shapley,more_estimators,hpo,post_hoc,tuning_options main;
