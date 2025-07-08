@@ -106,6 +106,15 @@ class RandomForestTabPFNBase:
             ValueError: If tabpfn is None
             TypeError: If tabpfn is not of the expected type
         """
+
+        if X.shape[0] > 10000 and self.tabpfn.inference_config.SUBSAMPLE_SAMPLES is None:
+            warnings.warn(
+                "The number of samples is greater than 10000. "
+                "This may cause issues with the TabPFN model. "
+                "Consider using a smaller number of samples or setting the "
+                "inference_config/SUBSAMPLE_SAMPLES paramter to 10_000 or below.",
+            )
+
         # Validate tabpfn parameter
         self._validate_tabpfn()
 
