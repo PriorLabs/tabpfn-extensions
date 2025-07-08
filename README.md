@@ -1,7 +1,7 @@
 # TabPFN Extensions ⚡
 
 - **sag**: Scalable Adaptive Gradient — robust optimization method for tabular data  
-<object data="test_overview.svg" width="600" alt="SAG Overview">
+<object data="test_overview2.svg" width="600" alt="SAG Overview">
 
 [![PyPI version](https://badge.fury.io/py/tabpfn-extensions.svg)](https://badge.fury.io/py/tabpfn-extensions)
 [![Downloads](https://pepy.tech/badge/tabpfn)](https://pepy.tech/project/tabpfn)
