@@ -7,7 +7,7 @@ from tabpfn import TabPFNClassifier, TabPFNRegressor
 from tabpfn_extensions.regclass.wrappers import DistributionalRegressorAsClassifier
 
 # ------------------------------------------------------------------
-# 1.  Synthetic data – continuous spread with sign → class
+# 1.  Synthetic data: continuous spread with sign → class
 # ------------------------------------------------------------------
 rng = np.random.default_rng(0)
 N, D = 1000, 40
@@ -15,7 +15,7 @@ X = rng.normal(size=(N, D))
 coef = rng.normal(size=D)
 noise = rng.normal(scale=0.5, size=N)
 spread = X @ coef + noise  # continuous     (regression target)
-labels = (spread >= 0).astype(int)  # binary class (≥0 ⇒ class 1 else 0)
+labels = (spread >= 0).astype(int)  # binary classes
 
 X_tr, X_te, y_tr_reg, y_te_reg, y_tr_cls, y_te_cls = train_test_split(
     X, spread, labels, test_size=0.3, random_state=42
@@ -33,8 +33,8 @@ clf_plain.fit(X_tr, y_tr_cls)
 prob_plain = clf_plain.predict_proba(X_te)[:, 1]
 logloss_plain = log_loss(y_te_cls, prob_plain)
 auc_plain = roc_auc_score(y_te_cls, prob_plain)
-print(f"Log Loss – TabPFNClassifier (plain labels) : {logloss_plain:.3f}")
-print(f"ROC AUC – TabPFNClassifier (plain labels) : {auc_plain:.3f}")
+print(f"Log Loss - TabPFNClassifier (plain labels) : {logloss_plain:.3f}")
+print(f"ROC AUC - TabPFNClassifier (plain labels) : {auc_plain:.3f}")
 
 
 # -------------------------------------------------
@@ -49,10 +49,10 @@ prob_weighted = clf_weight.predict_proba(X_te)[:, 1]
 logloss_weighted = log_loss(y_te_cls, prob_weighted)
 dist_auc_weighted = roc_auc_score(y_te_cls, prob_weighted)
 print(
-    f"Log Loss – DistributionalRegressorAsClassifier (weighted): {logloss_weighted:.3f}"
+    f"Log Loss - DistributionalRegressorAsClassifier (weighted): {logloss_weighted:.3f}"
 )
 print(
-    f"ROC AUC – DistributionalRegressorAsClassifier (weighted): {dist_auc_weighted:.3f}"
+    f"ROC AUC - DistributionalRegressorAsClassifier (weighted): {dist_auc_weighted:.3f}"
 )
 
 
@@ -64,10 +64,10 @@ prob_weighted = clf_prob.predict_proba(X_te)[:, 1]
 logloss_prob = log_loss(y_te_cls, prob_weighted)
 dist_auc_prob = roc_auc_score(y_te_cls, prob_weighted)
 print(
-    f"Log Loss – DistributionalRegressorAsClassifier (probabilistic): {logloss_prob:.3f}"
+    f"Log Loss - DistributionalRegressorAsClassifier (probabilistic): {logloss_prob:.3f}"
 )
 print(
-    f"ROC AUC – DistributionalRegressorAsClassifier (probabilistic): {dist_auc_prob:.3f}"
+    f"ROC AUC - DistributionalRegressorAsClassifier (probabilistic): {dist_auc_prob:.3f}"
 )
 
 
@@ -90,9 +90,9 @@ auc_plain_mc = roc_auc_score(
     y_te_cls_mc, prob_plain_mc, multi_class="ovr", average="macro"
 )
 print(
-    f"Log Loss – TabPFNClassifier (plain labels, Multiclass) : {logloss_plain_mc:.3f}"
+    f"Log Loss - TabPFNClassifier (plain labels, Multiclass) : {logloss_plain_mc:.3f}"
 )
-print(f"ROC AUC – TabPFNClassifier (plain labels, Multiclass) : {auc_plain_mc:.3f}")
+print(f"ROC AUC - TabPFNClassifier (plain labels, Multiclass) : {auc_plain_mc:.3f}")
 
 
 # ------------------------------------------------------------------
@@ -111,10 +111,10 @@ auc_weighted_mc = roc_auc_score(
     y_te_cls_mc, prob_weighted_mc, multi_class="ovr", average="macro"
 )
 print(
-    f"Log Loss – DistributionalRegressorAsClassifier (weighted, Multiclass): {logloss_weighted_mc:.3f}"
+    f"Log Loss - DistributionalRegressorAsClassifier (weighted, Multiclass): {logloss_weighted_mc:.3f}"
 )
 print(
-    f"ROC AUC – DistributionalRegressorAsClassifier (weighted, Multiclass): {auc_weighted_mc:.3f}"
+    f"ROC AUC - DistributionalRegressorAsClassifier (weighted, Multiclass): {auc_weighted_mc:.3f}"
 )
 
 # Probabilistic strategy for multiclass
@@ -128,8 +128,8 @@ auc_prob_mc = roc_auc_score(
     y_te_cls_mc, prob_prob_mc, multi_class="ovr", average="macro"
 )
 print(
-    f"Log Loss – DistributionalRegressorAsClassifier (probabilistic, Multiclass): {logloss_prob_mc:.3f}"
+    f"Log Loss - DistributionalRegressorAsClassifier (probabilistic, Multiclass): {logloss_prob_mc:.3f}"
 )
 print(
-    f"ROC AUC – DistributionalRegressorAsClassifier (probabilistic, Multiclass): {auc_prob_mc:.3f}"
+    f"ROC AUC - DistributionalRegressorAsClassifier (probabilistic, Multiclass): {auc_prob_mc:.3f}"
 )
