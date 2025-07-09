@@ -1,7 +1,7 @@
 
 
 
-from .sklearn import (
+from tabpfn_extensions.autogluon.sklearn_interface import (
     AutogluonTabPFNClassifier,
     AutogluonTabPFNRegressor,
 )
