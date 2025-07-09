@@ -118,6 +118,7 @@ class _BaseAutoGluonTabPFN:
             **self._predictor_kwargs,
         )
 
+        # TODO (Klemens): feed TabPFN HPO Search Space in here
         hyperparameters = {
             TabPFNV2Model: [
                 {
