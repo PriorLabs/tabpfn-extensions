@@ -121,12 +121,12 @@ graph TD
     text_check -- No --> ts_check{"Time-Series Data?"};
 
     ts_check -- Yes --> ts_features["Consider TabPFN-Time-Series features"];
-    ts_check -- No --> sample_size_check{"> 10,000 samples?"};
+    ts_check -- No --> sample_size_check{"More than 10,000 samples?"};
 
     ts_features --> sample_size_check;
     api_backend --> sample_size_check;
 
-    sample_size_check -- No --> class_check{"> 10 classes?"};
+    sample_size_check -- No --> class_check{"More than 10 classes?"};
     sample_size_check -- Yes --> subsample["TabPFN subsample<br/>samples 10,000"];
 
     class_check -- No --> rfpfn("RF-PFN");
@@ -156,10 +156,19 @@ graph TD
     class cpu_only_options,imputation,data_gen,density,embedding,api_backend,ts_features,subsample,rfpfn,many_class,finetuning,shapley,more_estimators,hpo,post_hoc,tuning_options main;
 
     %% 4. ADD CLICKABLE LINKS
-    click cpu_only_options "https://github.com/automl/TabPFN" "TabPFN Backend Options" _blank
+    click cpu_only_options "https://github.com/PriorLabs/TabPFN" "TabPFN Backend Options" _blank
     click api_backend "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Client" _blank
     click unsupervised_type "https://github.com/PriorLabs/tabpfn-extensions" "TabPFN Extensions" _blank
     click imputation "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/imputation" "TabPFN Imputation Example" _blank
     click data_gen "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/generate_data.py" "TabPFN Data Generation Example" _blank
     click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/detect_outliers.py" "TabPFN Density Estimation Example" _blank
     click embedding "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding" "TabPFN Embedding Example" _blank
+    click ts_features "https://github.com/PriorLabs/tabpfn-time-series" "TabPFN Time-Series Example" _blank
+    click rfpfn "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/rf_pfn/rf_pfn_example.py" "RF-PFN Example" _blank
+    click many_class "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/many_class/many_class_classifier_example.py" "Many Class Example" _blank
+    click finetuning "https://github.com/PriorLabs/TabPFN/blob/main/examples/finetune_classifier.py" "Finetuning Example" _blank
+    click shapley "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/interpretability/shap_example.py" "Shapley Values Example" _blank
+    click post_hoc "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/phe/phe_example.py" "Post-Hoc Ensemble Example" _blank
+    click hpo "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/hpo/tuned_tabpfn.py" "HPO Example" _blank
+
+    
