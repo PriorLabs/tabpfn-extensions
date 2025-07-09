@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 try:
     from autogluon.core.models import AbstractModel
+
     AUTOGLUON_AVAILABLE = True
 except ImportError:
     AbstractModel = None
@@ -136,7 +137,6 @@ class TabPFNV2Model(AbstractModel):
         hps["ignore_pretraining_limits"] = True  # to ignore warnings and size limits
 
         max_depth_rf_pfn = hps.pop("max_depth")
-
 
         # Resolve inference_config
         inference_config = {

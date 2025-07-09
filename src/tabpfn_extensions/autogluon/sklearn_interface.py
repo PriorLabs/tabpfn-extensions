@@ -5,9 +5,9 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-
 from tabpfn_extensions.autogluon.model import TabPFNV2Model
 from tabpfn_extensions.autogluon.utils import search_space_func
+
 
 class _BaseAutoGluonTabPFN:
     """Shared logic between classifier and regressor for TabPFN models powered by AutoGluon.
@@ -78,7 +78,7 @@ class _BaseAutoGluonTabPFN:
         **predictor_kwargs : dict, optional
             Additional keyword arguments to pass directly to the `TabularPredictor`
             constructor. This allows for fine-grained control over its behavior.
-            
+
             See the official AutoGluon `TabularPredictor` documentation for a
             complete list of available options.
         """
@@ -86,7 +86,7 @@ class _BaseAutoGluonTabPFN:
             from autogluon.tabular import TabularPredictor
         except ImportError:
             raise ImportError("AutoGluon is required but not installed")
-        
+
         self.max_time = max_time
         self.presets = presets
         self.num_gpus = num_gpus
@@ -120,17 +120,17 @@ class _BaseAutoGluonTabPFN:
 
         task_type = "multiclass" if self._is_classifier else "regression"
 
-        num_configs_to_generate = max(1, self.num_random_configs) # Ensure at least one config
+        num_configs_to_generate = max(
+            1, self.num_random_configs
+        )  # Ensure at least one config
 
         tabpfn_configs = search_space_func(
             task_type=task_type,
             num_random_configs=num_configs_to_generate,
-            seed=self.random_state
+            seed=self.random_state,
         )
 
-        hyperparameters = {
-            TabPFNV2Model: tabpfn_configs
-        }
+        hyperparameters = {TabPFNV2Model: tabpfn_configs}
         self._predictor.fit(
             train_data=training_df,
             time_limit=self.max_time,

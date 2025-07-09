@@ -12,7 +12,6 @@ from typing import Any, Literal
 
 import numpy as np
 import scipy
-
 from sklearn.preprocessing import PowerTransformer
 from sklearn.utils.validation import FLOAT_DTYPES
 
@@ -34,15 +33,15 @@ def search_space_func(
     num_random_configs: int = 200,
     seed=1234,
 ) -> list[dict]:
-    '''
-    Generate a list of random configurations for TabPFNv2 from Search Space,
+    """Generate a list of random configurations for TabPFNv2 from Search Space,
     which can be used as by Autogluon to construct a ensemble model.
 
     Also includes lazy imports for hyperopt since it is not in base requirements of package
-    '''
+    """
     from hyperopt.pyll import stochastic
+
     from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
-    
+
     search_space = get_param_grid_hyperopt(task_type=task_type)
     rng = np.random.default_rng(seed)
     stochastic.sample(search_space, rng=rng)
