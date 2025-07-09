@@ -6,15 +6,15 @@ For better performance, we recommend running with GPU acceleration.
 This example trains multiple TabPFN models, which is computationally intensive.
 """
 
-import torch
 import numpy as np
+import torch
 from sklearn.datasets import load_breast_cancer, load_diabetes, load_iris
 from sklearn.metrics import (
+    accuracy_score,
     mean_absolute_error,
     mean_squared_error,
     r2_score,
     roc_auc_score,
-    accuracy_score,
 )
 from sklearn.model_selection import train_test_split
 
@@ -48,14 +48,17 @@ print("\n--- Using AutogluonTabPFNClassifier (TabPFN with AutoGluon) ---")
 clf = AutogluonTabPFNClassifier(
     max_time=60 * 3,
     presets="medium_quality",
-    verbosity = 0,
+    verbosity=0,
     num_gpus=n_gpus,
 )
 clf.fit(X_train, y_train)
 prediction_probabilities = clf.predict_proba(X_test)
 predictions = np.argmax(prediction_probabilities, axis=-1)
 
-print("Autogluon TabPFN Binary ROC AUC:", roc_auc_score(y_test, prediction_probabilities[:, 1]))
+print(
+    "Autogluon TabPFN Binary ROC AUC:",
+    roc_auc_score(y_test, prediction_probabilities[:, 1]),
+)
 print("Autogluon TabPFN Binary Accuracy", accuracy_score(y_test, predictions))
 
 # Multiclass
@@ -73,7 +76,10 @@ normal_tabpfn_clf.fit(X_train, y_train)
 normal_tabpfn_proba = normal_tabpfn_clf.predict_proba(X_test)
 normal_tabpfn_preds = np.argmax(normal_tabpfn_proba, axis=-1)
 
-print("TabPFN Multiclass ROC AUC:",  roc_auc_score(y_test, normal_tabpfn_proba, multi_class="ovr"))
+print(
+    "TabPFN Multiclass ROC AUC:",
+    roc_auc_score(y_test, normal_tabpfn_proba, multi_class="ovr"),
+)
 print("TabPFN Multiclass Accuracy:", accuracy_score(y_test, normal_tabpfn_preds))
 
 print("\n--- Using AutogluonTabPFNClassifier (TabPFN with AutoGluon) ---")
@@ -87,7 +93,10 @@ clf.fit(X_train, y_train)
 prediction_probabilities = clf.predict_proba(X_test)
 predictions = np.argmax(prediction_probabilities, axis=-1)
 
-print("Autogluon TabPFN Multiclass ROC AUC:", roc_auc_score(y_test, prediction_probabilities, multi_class="ovr"))
+print(
+    "Autogluon TabPFN Multiclass ROC AUC:",
+    roc_auc_score(y_test, prediction_probabilities, multi_class="ovr"),
+)
 print("Autogluon TabPFN Multiclass Accuracy", accuracy_score(y_test, predictions))
 
 # Regression
@@ -104,8 +113,14 @@ normal_tabpfn_reg = TabPFNRegressor(device=device)
 normal_tabpfn_reg.fit(X_train, y_train)
 normal_tabpfn_preds = normal_tabpfn_reg.predict(X_test)
 
-print("TabPFN Regression Mean Squared Error (MSE):", mean_squared_error(y_test, normal_tabpfn_preds))
-print("TabPFN Regression Mean Absolute Error (MAE):", mean_absolute_error(y_test, normal_tabpfn_preds))
+print(
+    "TabPFN Regression Mean Squared Error (MSE):",
+    mean_squared_error(y_test, normal_tabpfn_preds),
+)
+print(
+    "TabPFN Regression Mean Absolute Error (MAE):",
+    mean_absolute_error(y_test, normal_tabpfn_preds),
+)
 print("TabPFN Regression R-squared (R^2):", r2_score(y_test, normal_tabpfn_preds))
 
 print("\n--- Using AutogluonTabPFNRegressor (TabPFN with AutoGluon) ---")
@@ -117,6 +132,12 @@ reg = AutogluonTabPFNRegressor(
 )
 reg.fit(X_train, y_train)
 predictions = reg.predict(X_test)
-print("Autogluon TabPFN Regression Mean Squared Error (MSE):", mean_squared_error(y_test, predictions))
-print("Autogluon TabPFN Regression Mean Absolute Error (MAE):", mean_absolute_error(y_test, predictions))
+print(
+    "Autogluon TabPFN Regression Mean Squared Error (MSE):",
+    mean_squared_error(y_test, predictions),
+)
+print(
+    "Autogluon TabPFN Regression Mean Absolute Error (MAE):",
+    mean_absolute_error(y_test, predictions),
+)
 print("Autogluon TabPFN Regression R-squared (R^2):", r2_score(y_test, predictions))

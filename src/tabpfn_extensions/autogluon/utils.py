@@ -28,6 +28,7 @@ def _check_inputs(self, X, in_fit, accept_sparse_negative=False, copy=False):
         force_all_finite="allow-nan",
     )
 
+
 # TODO: merge into TabPFnv2 codebase
 class FixedSafePowerTransformer(PowerTransformer):
     """Fixed version of safe power THAT FOLLOWS BASIC SKLEARN STANDARD ANS THUS DOES NOT HAVE A BUG WHEN CLONING

@@ -42,7 +42,9 @@ class TabPFNV2Model(AbstractModel):
 
         if self._feature_generator.features_in:
             X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
+            X[self._feature_generator.features_in] = self._feature_generator.transform(
+                X=X
+            )
 
             # Detect/set cat features and indices
             if self._cat_features is None:
@@ -143,7 +145,9 @@ class TabPFNV2Model(AbstractModel):
 
         # Resolve inference_config
         inference_config = {
-            _k: v for k, v in hps.items() if k.startswith("inference_config/") and (_k := k.split("/")[-1])
+            _k: v
+            for k, v in hps.items()
+            if k.startswith("inference_config/") and (_k := k.split("/")[-1])
         }
         if inference_config:
             hps["inference_config"] = inference_config
@@ -162,7 +166,9 @@ class TabPFNV2Model(AbstractModel):
             inference_config["PREPROCESS_TRANSFORMS"] = safe_config
         if "REGRESSION_Y_PREPROCESS_TRANSFORMS" in inference_config:
             safe_config = []
-            for preprocessing_name in inference_config["REGRESSION_Y_PREPROCESS_TRANSFORMS"]:
+            for preprocessing_name in inference_config[
+                "REGRESSION_Y_PREPROCESS_TRANSFORMS"
+            ]:
                 if preprocessing_name == "power":
                     preprocessing_name = "safepower"
                 safe_config.append(preprocessing_name)
@@ -170,7 +176,7 @@ class TabPFNV2Model(AbstractModel):
 
         # Resolve model_type
         n_ensemble_repeats = hps.pop("n_ensemble_repeats", None)
-        model_is_rf_pfn = hps.pop("model_type", "no") == "dt_pfn"
+        model_is_rf_pfn = hps.pop("model_type", "no") == "rf_pfn"
         if model_is_rf_pfn:
             from tabpfn_extensions.rf_pfn import (
                 RandomForestTabPFNClassifier,
@@ -178,7 +184,11 @@ class TabPFNV2Model(AbstractModel):
             )
 
             hps["n_estimators"] = 1
-            rf_model_base = RandomForestTabPFNClassifier if is_classification else RandomForestTabPFNRegressor
+            rf_model_base = (
+                RandomForestTabPFNClassifier
+                if is_classification
+                else RandomForestTabPFNRegressor
+            )
             self.model = rf_model_base(
                 tabpfn=model_base(**hps),
                 categorical_features=self._cat_indices,
@@ -194,7 +204,6 @@ class TabPFNV2Model(AbstractModel):
             y=y,
         )
 
-
     def _get_default_resources(self) -> tuple[int, int]:
         """Determines the default CPU and GPU resources available for the model."""
         from torch.cuda import is_available
@@ -204,7 +213,6 @@ class TabPFNV2Model(AbstractModel):
         num_cpus = ResourceManager.get_cpu_count_psutil()
         num_gpus = 1 if is_available() else 0
         return num_cpus, num_gpus
-
 
     def _set_default_params(self):
         """Sets default hyperparameters for the TabPFN model.
@@ -217,12 +225,10 @@ class TabPFNV2Model(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
         """Returns the list of supported problem types for the TabPFN model."""
         return ["binary", "multiclass", "regression"]
-
 
     def _get_default_auxiliary_params(self) -> dict:
         """Returns the default auxiliary parameters for the TabPFN model."""
@@ -234,11 +240,9 @@ class TabPFNV2Model(AbstractModel):
         )
         return default_auxiliary_params
 
-
     def _ag_params(self) -> set:
         """Returns the set of auxiliary parameters for the TabPFN model."""
         return {"max_classes"}
-
 
     def _more_tags(self) -> dict:
         """Returns the additional tags for the TabPFN model."""

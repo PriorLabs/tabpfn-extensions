@@ -24,8 +24,10 @@ class _BaseAutoGluonTabPFN:
         *,
         max_time: int = 180,
         num_gpus: int = 0,
-        presets: Literal["best_quality", "high_quality", "good_quality", "medium_quality"] = "medium_quality",
-        tabpfn_model_type: Literal["dt_pfn", "single"] = "single",
+        presets: Literal[
+            "best_quality", "high_quality", "good_quality", "medium_quality"
+        ] = "medium_quality",
+        tabpfn_model_type: Literal["rf_pfn", "single"] = "single",
         **predictor_kwargs,
     ) -> None:
         """Initializes the AutoGluonTabPFN wrapper.
@@ -47,9 +49,9 @@ class _BaseAutoGluonTabPFN:
             - 'good_quality': Good accuracy with very fast inference.
             - 'medium_quality': Competitive with other AutoML frameworks, ideal for prototyping.
             For serious usage, 'best_quality' or 'high_quality' are recommended.
-        tabpfn_model_type : Literal["dt_pfn", "single"], default="dt_pfn"
+        tabpfn_model_type : Literal["rf_pfn", "single"], default="rf_pfn"
             Specifies the type of TabPFN model to use within AutoGluon.
-            - "dt_pfn": Uses a Random Forest TabPFN (ensemble of TabPFNs).
+            - "rf_pfn": Uses a Random Forest TabPFN (ensemble of TabPFNs).
             - "single": Uses a single TabPFN model.
             This parameter is passed directly to the `TabPFNV2Model`'s hyperparameters.
         path : str, optional
@@ -116,10 +118,14 @@ class _BaseAutoGluonTabPFN:
             **self._predictor_kwargs,
         )
 
-        hyperparameters = {TabPFNV2Model: [{
-            "ag_args_fit": {"num_gpus": self.num_gpus},
-            "model_type": self.tabpfn_model_type,
-        }]}
+        hyperparameters = {
+            TabPFNV2Model: [
+                {
+                    "ag_args_fit": {"num_gpus": self.num_gpus},
+                    "model_type": self.tabpfn_model_type,
+                }
+            ]
+        }
 
         self._predictor.fit(
             train_data=training_df,
