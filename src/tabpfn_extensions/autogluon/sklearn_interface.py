@@ -5,9 +5,9 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from autogluon.tabular import TabularPredictor
-from tabpfn_extensions.autogluon.model import TabPFNV2Model
 
+from tabpfn_extensions.autogluon.model import TabPFNV2Model
+from tabpfn_extensions.autogluon.utils import search_space_func
 
 class _BaseAutoGluonTabPFN:
     """Shared logic between classifier and regressor for TabPFN models powered by AutoGluon.
@@ -27,7 +27,8 @@ class _BaseAutoGluonTabPFN:
         presets: Literal[
             "best_quality", "high_quality", "good_quality", "medium_quality"
         ] = "medium_quality",
-        tabpfn_model_type: Literal["rf_pfn", "single"] = "single",
+        num_random_configs: int = 200,
+        random_state: int = 1234,
         **predictor_kwargs,
     ) -> None:
         """Initializes the AutoGluonTabPFN wrapper.
@@ -49,11 +50,6 @@ class _BaseAutoGluonTabPFN:
             - 'good_quality': Good accuracy with very fast inference.
             - 'medium_quality': Competitive with other AutoML frameworks, ideal for prototyping.
             For serious usage, 'best_quality' or 'high_quality' are recommended.
-        tabpfn_model_type : Literal["rf_pfn", "single"], default="rf_pfn"
-            Specifies the type of TabPFN model to use within AutoGluon.
-            - "rf_pfn": Uses a Random Forest TabPFN (ensemble of TabPFNs).
-            - "single": Uses a single TabPFN model.
-            This parameter is passed directly to the `TabPFNV2Model`'s hyperparameters.
         path : str, optional
             Path to directory where models and intermediate artifacts will be saved.
             If not specified, a default path will be used by AutoGluon.
@@ -75,34 +71,38 @@ class _BaseAutoGluonTabPFN:
             Examples for classification: 'accuracy', 'balanced_accuracy', 'roc_auc', 'f1', 'log_loss'.
             Examples for regression: 'root_mean_squared_error', 'mean_absolute_error', 'r2'.
             Passed directly to `TabularPredictor(eval_metric=...)`.
-        predictor_kwargs : dict, optional
+        num_random_configs : int, default=200
+            Number of random TabPFN hyperparameter configurations to sample.
+        random_state : int, default=1234
+            Seed for the random number generator to ensure reproducibility.
+        **predictor_kwargs : dict, optional
             Additional keyword arguments to pass directly to the `TabularPredictor`
-            constructor. This allows for fine-grained control over AutoGluon's
-            behavior, such as `problem_type` (though inferred if not set),
-            `sample_weight`, or `groups`.
-            See AutoGluon's `TabularPredictor` documentation for full details.
-            Example: `predictor_kwargs={'positive_class': 'positive_label'}`.
-        fit_kwargs : dict, optional
-            Additional keyword arguments to pass directly to the `TabularPredictor.fit`
-            method. This provides extensive control over the training process,
-            including aspects like `num_bag_folds`, `num_stack_levels`, `auto_stack`,
-            `hyperparameters` (for other AutoGluon models), `calibrate_decision_threshold`,
-            `infer_limit`, `infer_limit_batch_size`, etc.
-            See AutoGluon's `TabularPredictor.fit` documentation for full details.
-            Example: `fit_kwargs={'num_bag_folds': 5, 'auto_stack': True}
+            constructor. This allows for fine-grained control over its behavior.
+            
+            See the official AutoGluon `TabularPredictor` documentation for a
+            complete list of available options.
         """
+        try:
+            from autogluon.tabular import TabularPredictor
+        except ImportError:
+            raise ImportError("AutoGluon is required but not installed")
+        
         self.max_time = max_time
         self.presets = presets
         self.num_gpus = num_gpus
-        self.tabpfn_model_type = tabpfn_model_type
         self._predictor_kwargs = predictor_kwargs
         self._predictor: TabularPredictor | None = None
+
+        self.num_random_configs = num_random_configs
+        self.random_state = random_state
 
     # ---------------------------------------------------------------------
     # Public scikit-style API
     # ---------------------------------------------------------------------
     def fit(self, X, y):
         """Train a single TabPFN model within *AutoGluon*."""
+        from autogluon.tabular import TabularPredictor
+
         training_df = pd.DataFrame(X).copy()
         training_df["_target_"] = y  # lightweight, avoids name clashes
 
@@ -118,16 +118,19 @@ class _BaseAutoGluonTabPFN:
             **self._predictor_kwargs,
         )
 
-        # TODO (Klemens): feed TabPFN HPO Search Space in here
-        hyperparameters = {
-            TabPFNV2Model: [
-                {
-                    "ag_args_fit": {"num_gpus": self.num_gpus},
-                    "model_type": self.tabpfn_model_type,
-                }
-            ]
-        }
+        task_type = "multiclass" if self._is_classifier else "regression"
 
+        num_configs_to_generate = max(1, self.num_random_configs) # Ensure at least one config
+
+        tabpfn_configs = search_space_func(
+            task_type=task_type,
+            num_random_configs=num_configs_to_generate,
+            seed=self.random_state
+        )
+
+        hyperparameters = {
+            TabPFNV2Model: tabpfn_configs
+        }
         self._predictor.fit(
             train_data=training_df,
             time_limit=self.max_time,

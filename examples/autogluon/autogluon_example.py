@@ -47,6 +47,7 @@ print("TabPFN Binary Accuracy:", accuracy_score(y_test, normal_tabpfn_preds))
 print("\n--- Using AutogluonTabPFNClassifier (TabPFN with AutoGluon) ---")
 clf = AutogluonTabPFNClassifier(
     max_time=60 * 3,
+    num_random_configs=50,
     presets="medium_quality",
     verbosity=0,
     num_gpus=n_gpus,

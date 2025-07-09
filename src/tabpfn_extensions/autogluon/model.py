@@ -2,12 +2,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from autogluon.core.models import AbstractModel
-from autogluon.features.generators import LabelEncoderFeatureGenerator
+from torch.cuda import is_available
+
+from tabpfn import TabPFNClassifier, TabPFNRegressor
+from tabpfn.model import preprocessing
 from tabpfn_extensions.autogluon.utils import FixedSafePowerTransformer, _check_inputs
 
 if TYPE_CHECKING:
     import pandas as pd
+
+try:
+    from autogluon.core.models import AbstractModel
+    AUTOGLUON_AVAILABLE = True
+except ImportError:
+    AbstractModel = None
+    AUTOGLUON_AVAILABLE = False
 
 
 class TabPFNV2Model(AbstractModel):
@@ -29,10 +38,15 @@ class TabPFNV2Model(AbstractModel):
         self._feature_generator = None
         self._cat_features = None
 
+        if not AUTOGLUON_AVAILABLE:
+            raise ImportError("AutoGluon is required but not installed")
+
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
         """Preprocesses the input DataFrame, including label encoding for categorical features.
         This method is called by AutoGluon's internal pipeline.
         """
+        from autogluon.features.generators import LabelEncoderFeatureGenerator
+
         X = super()._preprocess(X, **kwargs)
         self._cat_indices = []
 
@@ -86,15 +100,8 @@ class TabPFNV2Model(AbstractModel):
         **kwargs :
             Additional keyword arguments from AutoGluon's training process.
         """
-        from tabpfn.model import preprocessing
-
         preprocessing.SafePowerTransformer = FixedSafePowerTransformer
         preprocessing.KDITransformerWithNaN._check_inputs = _check_inputs
-
-        from torch.cuda import is_available
-
-        from tabpfn import TabPFNClassifier, TabPFNRegressor
-        from tabpfn.model.loading import resolve_model_path
 
         ag_params = self._get_ag_params()
         max_classes = ag_params.get("max_classes")
@@ -128,20 +135,8 @@ class TabPFNV2Model(AbstractModel):
         hps["categorical_features_indices"] = self._cat_indices
         hps["ignore_pretraining_limits"] = True  # to ignore warnings and size limits
 
-        _, model_dir, _, _ = resolve_model_path(
-            model_path=None,
-            which="classifier" if is_classification else "regressor",
-        )
-        if is_classification:
-            if "classification_model_path" in hps:
-                hps["model_path"] = model_dir / hps.pop("classification_model_path")
-            if "regression_model_path" in hps:
-                del hps["regression_model_path"]
-        else:
-            if "regression_model_path" in hps:
-                hps["model_path"] = model_dir / hps.pop("regression_model_path")
-            if "classification_model_path" in hps:
-                del hps["classification_model_path"]
+        max_depth_rf_pfn = hps.pop("max_depth")
+
 
         # Resolve inference_config
         inference_config = {
@@ -193,6 +188,7 @@ class TabPFNV2Model(AbstractModel):
                 tabpfn=model_base(**hps),
                 categorical_features=self._cat_indices,
                 n_estimators=n_ensemble_repeats,
+                max_depth=max_depth_rf_pfn,
             )
         else:
             if n_ensemble_repeats is not None:
@@ -206,8 +202,6 @@ class TabPFNV2Model(AbstractModel):
 
     def _get_default_resources(self) -> tuple[int, int]:
         """Determines the default CPU and GPU resources available for the model."""
-        from torch.cuda import is_available
-
         from autogluon.common.utils.resource_utils import ResourceManager
 
         num_cpus = ResourceManager.get_cpu_count_psutil()
@@ -215,13 +209,8 @@ class TabPFNV2Model(AbstractModel):
         return num_cpus, num_gpus
 
     def _set_default_params(self):
-        """Sets default hyperparameters for the TabPFN model.
-        The n_ensemble_repeats is only used in the RandomForestTabPFNClassifier/RandomForestTabPFNRegressor.
-        """
-        default_params = {
-            "model_type": "single",
-            "n_ensemble_repeats": 8,
-        }
+        """Sets default hyperparameters for the TabPFN model."""
+        default_params = {}
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 

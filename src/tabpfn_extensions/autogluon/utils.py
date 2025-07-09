@@ -8,12 +8,48 @@ Original Code: https://github.com/autogluon/tabrepo/tree/main/tabrepo/benchmark/
 from __future__ import annotations
 
 import warnings
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import scipy
+
 from sklearn.preprocessing import PowerTransformer
 from sklearn.utils.validation import FLOAT_DTYPES
+
+
+def prepare_tabpfnv2_config(raw_config: dict, *, refit_folds: bool = True) -> dict:
+    """Set refit folds to True and convert tuples to lists."""
+    raw_config = {
+        k: list(v) if isinstance(v, tuple) else v for k, v in raw_config.items()
+    }
+    if "ag_args_ensemble" not in raw_config:
+        raw_config["ag_args_ensemble"] = {}
+    raw_config["ag_args_ensemble"]["refit_folds"] = True
+
+    return raw_config
+
+
+def search_space_func(
+    task_type: Literal["regression", "multiclass"],
+    num_random_configs: int = 200,
+    seed=1234,
+) -> list[dict]:
+    '''
+    Generate a list of random configurations for TabPFNv2 from Search Space,
+    which can be used as by Autogluon to construct a ensemble model.
+
+    Also includes lazy imports for hyperopt since it is not in base requirements of package
+    '''
+    from hyperopt.pyll import stochastic
+    from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
+    
+    search_space = get_param_grid_hyperopt(task_type=task_type)
+    rng = np.random.default_rng(seed)
+    stochastic.sample(search_space, rng=rng)
+    return [
+        prepare_tabpfnv2_config(dict(stochastic.sample(search_space, rng=rng)))
+        for _ in range(num_random_configs)
+    ]
 
 
 # TODO: merge into codebase or remove KDITransformer from search space
