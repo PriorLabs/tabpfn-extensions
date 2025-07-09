@@ -110,9 +110,9 @@ graph TD
 
     task_type -- Unsupervised --> unsupervised_type{"What kind of<br/>unsupervised task?"};
     unsupervised_type --> imputation(Imputation);
-    unsupervised_type --> data_gen("Data Generation");
-    unsupervised_type --> density("Density Estimation");
-    unsupervised_type --> embedding("Get Embeddings");
+    unsupervised_type --> data_gen("Data Generation"); 
+    unsupervised_type --> density("Density Estimation"); 
+    unsupervised_type --> embedding("Get Embeddings"); 
 
     task_type -- "Prediction Problem" --> text_check{"Contains Text Data?"};
     
@@ -158,3 +158,8 @@ graph TD
     %% 4. ADD CLICKABLE LINKS
     click cpu_only_options "https://github.com/automl/TabPFN" "TabPFN Backend Options" _blank
     click api_backend "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Client" _blank
+    click unsupervised_type "https://github.com/PriorLabs/tabpfn-extensions" "TabPFN Extensions" _blank
+    click imputation "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/imputation" "TabPFN Imputation Example" _blank
+    click data_gen "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/generate_data.py" "TabPFN Data Generation Example" _blank
+    click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/detect_outliers.py" "TabPFN Density Estimation Example" _blank
+    click embedding "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding" "TabPFN Embedding Example" _blank
