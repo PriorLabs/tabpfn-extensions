@@ -6,12 +6,14 @@ from autogluon.tabular import TabularPredictor
 
 # Re‑use the already provided AutoGluon model wrapper for TabPFN
 from tabpfn_extensions.autogluon.model import TabPFNV2Model
+from tabpfn_extensions.autogluon.best_models import get_best_tabpfn_config
 
 __all__ = [
     "AutogluonTabPFNClassifier",
     "AutogluonTabPFNRegressor",
 ]
 
+# TODO: save_path for Autogluon models
 
 class _BaseAutoGluonTabPFN:
     """Shared logic between classifier and regressor."""
@@ -24,11 +26,13 @@ class _BaseAutoGluonTabPFN:
         max_time: int = 180,
         presets: str | None = "medium_quality",
         num_gpus: int = 0,
+        tabpfn_model_type: str = "single",
         **predictor_kwargs,
     ) -> None:
         self.max_time = max_time
         self.presets = presets
         self.num_gpus = num_gpus
+        self.tabpfn_model_type = tabpfn_model_type
         self._predictor_kwargs = predictor_kwargs
         self._predictor: TabularPredictor | None = None
 
@@ -46,6 +50,13 @@ class _BaseAutoGluonTabPFN:
             else ("multiclass" if self._is_classifier else "regression")
         )
 
+        tabpfn_task_type = "multiclass" if self._is_classifier else "regression"
+
+        tabpfn_config = get_best_tabpfn_config(
+            task_type=tabpfn_task_type,
+            model_type=self.tabpfn_model_type # Using the stored attribute
+        )
+
         self._predictor = TabularPredictor(
             label="_target_",
             problem_type=problem_type,
@@ -57,6 +68,7 @@ class _BaseAutoGluonTabPFN:
             TabPFNV2Model: [
                 {
                     "ag_args_fit": {"num_gpus": self.num_gpus},
+                    "tabpfn_config": tabpfn_config,
                 }
             ]
         }

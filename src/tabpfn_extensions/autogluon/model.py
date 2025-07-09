@@ -12,9 +12,9 @@ from autogluon.features.generators import LabelEncoderFeatureGenerator
 from autogluon.tabular.configs.hyperparameter_configs import hyperparameter_config_dict
 from autogluon.tabular.configs.presets_configs import tabular_presets_dict
 
-from best_models import get_best_tabpfn, get_best_tabpfn_config
-from utils import get_tabpfn
-from configs import TabPFNConfig
+from tabpfn_extensions.autogluon.best_models import get_best_tabpfn, get_best_tabpfn_config
+from tabpfn_extensions.autogluon.utils import get_tabpfn
+from tabpfn_extensions.autogluon.configs import TabPFNConfig
 
 
 class TabPFNV2Model(AbstractModel):

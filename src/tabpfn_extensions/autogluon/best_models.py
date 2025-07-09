@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import sklearn
-from shared_utils.local_settings import model_string_config
 from tabpfn import TabPFNClassifier, TabPFNRegressor
 from tabpfn.preprocessing import PreprocessorConfig
 from tabpfn_extensions.sklearn_ensembles.configs import (
@@ -17,14 +16,16 @@ from tabpfn_extensions.sklearn_ensembles.configs import (
 )
 from torch import nn
 
-from configs import (
+from tabpfn_extensions.autogluon.configs import (
     TabPFNClassificationConfig,
     TabPFNConfig,
     TabPFNModelPathsConfig,
     TabPFNRegressionConfig,
     TabPFNRFConfig,
 )
-from utils import get_tabpfn
+from tabpfn_extensions.autogluon.utils import get_tabpfn
+
+from tabpfn_extensions.autogluon.local_settings import model_string_config
 
 # Best model paths, descending order of performance
 
@@ -56,20 +57,20 @@ def get_model_strings(model_string_config):
         pass
     elif model_string_config == "LOCAL":
         # Support for local debugging.
-        from shared_utils.local_settings import local_model_path
+        from tabpfn_extensions.autogluon.local_settings import local_model_path
 
         local_dir = Path(local_model_path).resolve()
 
         model_strings = {
             "multiclass": [
                 {
-                    "path": str(local_dir / "model_hans_classification.ckpt"),
+                    "path": str(local_dir / "tabpfn-v2-classifier.ckpt"),
                     "wandb_id": "-1",
                 },
             ],
             "regression": [
                 {
-                    "path": str(local_dir / "model_hans_regression.ckpt"),
+                    "path": str(local_dir / "tabpfn-v2-regressor.ckpt"),
                     "wandb_id": "-1",
                 },
             ],
