@@ -34,7 +34,7 @@ graph TD
     api_backend --> sample_size_check;
 
     sample_size_check -- No --> class_check{"More than 10 classes?"};
-    sample_size_check -- Yes --> subsample["TabPFN subsample<br/>samples 10,000"];
+    sample_size_check -- Yes --> subsample["TabPFN subsample<br/> to 10,000"];
 
     class_check -- No --> rfpfn("RF-PFN");
     class_check -- Yes --> many_class("Many Class");
@@ -51,7 +51,7 @@ graph TD
     interpretability_check -- No --> performance_check;
     shapley --> performance_check;
 
-    performance_check -- No --> congrats((Congrats!));
+    performance_check -- No --> congrats((Congrats!));    
     performance_check -- Yes --> tuning_options("Tuning Options");
     tuning_options --> more_estimators("More estimators on TabPFN");
     tuning_options --> hpo("HPO for TabPFN");
