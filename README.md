@@ -98,7 +98,7 @@ Built with ❤️ by the TabPFN community
 graph TD
     %% 1. DEFINE ALL STYLES
     classDef start_node fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#333;
-    classDef end_node fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#333;
+    classDef end_node fill:#f0fff0,stroke:#28a745,stroke-width:2px;
     classDef process_node fill:#e0f7fa,stroke:#007bff,stroke-width:2px,color:#333;
     classDef decision_node fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#333;
     classDef info_node fill:#f0f0f0,stroke:#6c757d,stroke-width:2px,color:#333;
