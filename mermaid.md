@@ -1,9 +1,12 @@
 ```mermaid
 graph TD
     %% 1. DEFINE ALL STYLES
-    classDef main fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef decision fill:#e0ffff,stroke:#333,stroke-width:2px;
-    classDef terminal fill:#f0fff0,stroke:#28a745,stroke-width:2px;
+    classDef start_node fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#333;
+    classDef end_node fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#333;
+    classDef process_node fill:#e0f7fa,stroke:#007bff,stroke-width:2px,color:#333;
+    classDef decision_node fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#333;
+    classDef info_node fill:#f0f0f0,stroke:#6c757d,stroke-width:2px,color:#333;
+
 
     %% 2. DEFINE THE GRAPH STRUCTURE
     start((Start)) --> gpu_check{GPU available?};
@@ -55,15 +58,16 @@ graph TD
     tuning_options --> post_hoc("Post-Hoc-Ensemble<br/>(AutoTabPFN)");
 
     %% 3. APPLY STYLES TO NODES
-    class start,gpu_check,task_type,unsupervised_type,text_check,ts_check,sample_size_check,class_check,finetune_check,interpretability_check,performance_check decision;
-    class congrats terminal;
-    class cpu_only_options,imputation,data_gen,density,embedding,api_backend,ts_features,subsample,rfpfn,many_class,finetuning,shapley,more_estimators,hpo,post_hoc,tuning_options main;
+    class Start start_node;
+    class Congrats end_node;
+    class gpu_check,task_type,unsupervised_type,text_check,ts_check,sample_size_check,class_check,finetune_check,interpretability_check,performance_check decision_node;
+    class cpu_only_options,imputation,data_gen,density,embedding,api_backend,ts_features,subsample,rfpfn,many_class,finetuning,shapley,more_estimators,hpo,post_hoc,tuning_options process_node;
+
 
     %% 4. ADD CLICKABLE LINKS
     click cpu_only_options "https://github.com/PriorLabs/TabPFN" "TabPFN Backend Options" _blank
     click api_backend "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Client" _blank
     click unsupervised_type "https://github.com/PriorLabs/tabpfn-extensions" "TabPFN Extensions" _blank
-    click imputation "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/imputation" "TabPFN Imputation Example" _blank
     click data_gen "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/generate_data.py" "TabPFN Data Generation Example" _blank
     click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/detect_outliers.py" "TabPFN Density Estimation Example" _blank
     click embedding "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding" "TabPFN Embedding Example" _blank
