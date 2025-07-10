@@ -12,7 +12,10 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
+from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
+from autogluon.features.generators import LabelEncoderFeatureGenerator
+
 
 class TabPFNV2Model(AbstractModel):
     """AutoGluon model wrapper for TabPFN (Tabular PFN v2).
@@ -33,15 +36,10 @@ class TabPFNV2Model(AbstractModel):
         self._feature_generator = None
         self._cat_features = None
 
-        if not AUTOGLUON_AVAILABLE:
-            raise ImportError("AutoGluon is required but not installed")
-
     def _preprocess(self, X: pd.DataFrame, is_train=False, **kwargs) -> pd.DataFrame:
         """Preprocesses the input DataFrame, including label encoding for categorical features.
         This method is called by AutoGluon's internal pipeline.
         """
-        from autogluon.features.generators import LabelEncoderFeatureGenerator
-
         X = super()._preprocess(X, **kwargs)
         self._cat_indices = []
 
@@ -196,8 +194,6 @@ class TabPFNV2Model(AbstractModel):
 
     def _get_default_resources(self) -> tuple[int, int]:
         """Determines the default CPU and GPU resources available for the model."""
-        from autogluon.common.utils.resource_utils import ResourceManager
-
         num_cpus = ResourceManager.get_cpu_count_psutil()
         num_gpus = 1 if is_available() else 0
         return num_cpus, num_gpus

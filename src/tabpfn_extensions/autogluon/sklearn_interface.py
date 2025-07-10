@@ -96,11 +96,13 @@ class _BaseAutoGluonTabPFN:
     # ---------------------------------------------------------------------
     # Public scikit-style API
     # ---------------------------------------------------------------------
-    def fit(self, X, y):        
+    def fit(self, X, y):
         """Train a single TabPFN model within *AutoGluon*."""
-        from autogluon.tabular import TabularPredictor                
-        from tabpfn_extensions.autogluon.model import TabPFNV2Model
-        from tabpfn_extensions.autogluon.model import _get_tabpfn_v2_model_class
+        from autogluon.tabular import TabularPredictor
+        from tabpfn_extensions.autogluon.model import (
+            TabPFNV2Model,
+        )
+        from tabpfn_extensions.autogluon.utils import search_space_func
 
         training_df = pd.DataFrame(X).copy()
         training_df["_target_"] = y  # lightweight, avoids name clashes
