@@ -12,8 +12,11 @@ from typing import Any, Literal
 
 import numpy as np
 import scipy
+from hyperopt.pyll import stochastic
 from sklearn.preprocessing import PowerTransformer
 from sklearn.utils.validation import FLOAT_DTYPES
+
+from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 
 
 def prepare_tabpfnv2_config(raw_config: dict, *, refit_folds: bool = True) -> dict:
@@ -38,10 +41,6 @@ def search_space_func(
 
     Also includes lazy imports for hyperopt since it is not in base requirements of package
     """
-    from hyperopt.pyll import stochastic
-
-    from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
-
     search_space = get_param_grid_hyperopt(task_type=task_type)
     rng = np.random.default_rng(seed)
     stochastic.sample(search_space, rng=rng)

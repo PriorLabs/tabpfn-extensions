@@ -6,10 +6,9 @@ This project is a lightweight wrapper that integrates **TabPFN (Tabular PFN v2)*
 
 To use this AutoGluon TabPFN wrapper, you need the following Python packages:
 
-- `autogluon.tabular`
-- `tabpfn_extensions` (which likely includes `tabpfn` as a dependency)
-- `ray>=2.10.0,<2.45.0` (for AutoGluon's parallel processing)
-- `scipy`
+```bash
+pip install "autogluon.tabular" "ray>=2.10.0,<2.45.0"
+```
 
 
 # TODOs: 
