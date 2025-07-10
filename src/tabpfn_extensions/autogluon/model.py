@@ -28,8 +28,10 @@ class TabPFNV2Model(AbstractModel):
     categorical feature encoding, and manages the underlying TabPFNClassifier
     or TabPFNRegressor instances.
 
-    The implementation is based on TabArena: A Living Benchmark for Machine
-    Learning on Tabular Data (Erickson et al., 2025).
+    The implementation is based on TabArena: A Living Benchmark for Machine Learning on Tabular Data,
+    Nick Erickson, Lennart Purucker, Andrej Tschalzev, David Holzmüller, Prateek Mutalik Desai, David Salinas,
+    Frank Hutter, Preprint., 2025,
+
     Original Code: https://github.com/autogluon/tabrepo/tree/main/tabrepo/benchmark/models/ag/tabpfnv2
     """
 
