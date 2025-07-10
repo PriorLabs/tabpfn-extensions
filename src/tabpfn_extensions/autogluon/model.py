@@ -4,17 +4,19 @@ from typing import TYPE_CHECKING
 
 from torch.cuda import is_available
 
-from tabpfn import TabPFNClassifier, TabPFNRegressor
-from tabpfn.model import preprocessing
-from tabpfn_extensions.autogluon.utils import FixedSafePowerTransformer, _check_inputs
-
-if TYPE_CHECKING:
-    import pandas as pd
-
-
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.models import AbstractModel
 from autogluon.features.generators import LabelEncoderFeatureGenerator
+from tabpfn import TabPFNClassifier, TabPFNRegressor
+from tabpfn.model import preprocessing
+from tabpfn_extensions.autogluon.utils import FixedSafePowerTransformer, _check_inputs
+from tabpfn_extensions.rf_pfn import (
+    RandomForestTabPFNClassifier,
+    RandomForestTabPFNRegressor,
+)
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class TabPFNV2Model(AbstractModel):
@@ -165,11 +167,6 @@ class TabPFNV2Model(AbstractModel):
         n_ensemble_repeats = hps.pop("n_ensemble_repeats", None)
         model_is_rf_pfn = hps.pop("model_type", "no") == "rf_pfn"
         if model_is_rf_pfn:
-            from tabpfn_extensions.rf_pfn import (
-                RandomForestTabPFNClassifier,
-                RandomForestTabPFNRegressor,
-            )
-
             hps["n_estimators"] = 1
             rf_model_base = (
                 RandomForestTabPFNClassifier
