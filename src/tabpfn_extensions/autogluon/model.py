@@ -125,7 +125,6 @@ class TabPFNV2Model(AbstractModel):
         X = self.preprocess(X, is_train=True)
 
         hps = self._get_model_params()
-
         hps["device"] = device
         hps["n_jobs"] = num_cpus
         hps["random_state"] = 42  # TODO: get seed from AutoGluon.
@@ -166,7 +165,7 @@ class TabPFNV2Model(AbstractModel):
             inference_config["REGRESSION_Y_PREPROCESS_TRANSFORMS"] = safe_config
 
         # Resolve model_type
-        n_ensemble_repeats = hps.pop("n_ensemble_repeats", None)
+        n_ensemble_repeats = hps.pop("n_ensemble_repeats", hps["n_estimators"])
         model_is_rf_pfn = hps.pop("model_type", "no") == "rf_pfn"
         if model_is_rf_pfn:
             hps["n_estimators"] = 1
@@ -182,8 +181,6 @@ class TabPFNV2Model(AbstractModel):
                 max_depth=max_depth_rf_pfn,
             )
         else:
-            if n_ensemble_repeats is not None:
-                hps["n_estimators"] = n_ensemble_repeats
             self.model = model_base(**hps)
 
         self.model = self.model.fit(
@@ -194,12 +191,15 @@ class TabPFNV2Model(AbstractModel):
     def _get_default_resources(self) -> tuple[int, int]:
         """Determines the default CPU and GPU resources available for the model."""
         num_cpus = ResourceManager.get_cpu_count_psutil()
-        num_gpus = 1 if is_available() else 0
+        num_gpus = min(ResourceManager.get_gpu_count_torch(), 1)
         return num_cpus, num_gpus
 
     def _set_default_params(self):
         """Sets default hyperparameters for the TabPFN model."""
-        default_params = {}
+        default_params = {
+            "random_state": 42,
+            "ignore_pretraining_limits": True,  # to ignore warnings and size limits
+        }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
@@ -218,9 +218,69 @@ class TabPFNV2Model(AbstractModel):
         )
         return default_auxiliary_params
 
-    def _ag_params(self) -> set:
-        """Returns the set of auxiliary parameters for the TabPFN model."""
-        return {"max_classes"}
+    @classmethod
+    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
+        """Set fold_fitting_strategy to sequential_local,
+        as parallel folding crashes if model weights aren't pre-downloaded.
+        """
+        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
+        extra_ag_args_ensemble = {
+            # FIXME: Find a work-around to avoid crash if parallel and weights are not downloaded
+            "fold_fitting_strategy": "sequential_local",
+            "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
+        }
+        default_ag_args_ensemble.update(extra_ag_args_ensemble)
+        return default_ag_args_ensemble
+
+    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        hyperparameters = self._get_model_params()
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=hyperparameters,
+            **kwargs,
+        )
+
+    @classmethod
+    def _estimate_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict | None = None,  # noqa: ARG003
+        **kwargs,  # noqa: ARG003
+    ) -> int:
+        """Heuristic memory estimate based on TabPFN's memory estimate logic in:
+        https://github.com/PriorLabs/TabPFN/blob/57a2efd3ebdb3886245e4d097cefa73a5261a969/src/tabpfn/model/memory.py#L147
+        This is based on GPU memory usage, but hopefully with overheads it also approximates CPU memory usage.
+        """
+        # features_per_group = 2  # Based on TabPFNv2 default (unused) # noqa: ERA001
+        n_layers = 12  # Based on TabPFNv2 default
+        embedding_size = 192  # Based on TabPFNv2 default
+        dtype_byte_size = 2  # Based on TabPFNv2 default
+
+        model_mem = 14489108  # Based on TabPFNv2 default
+
+        n_samples, n_features = X.shape[0], X.shape[1]
+        n_feature_groups = n_features + 1  # TODO: Unsure how to calculate this
+
+        X_mem = n_samples * n_feature_groups * dtype_byte_size
+        activation_mem = (
+            n_samples * n_feature_groups * embedding_size * n_layers * dtype_byte_size
+        )
+
+        baseline_overhead_mem_est = 1e9  # 1 GB generic overhead
+
+        # Add some buffer to each term + 1 GB overhead to be safe
+        total_mem_bytes = int(
+            model_mem + 4 * X_mem + 1.5 * activation_mem + baseline_overhead_mem_est
+        )
+
+        return total_mem_bytes
+
+    @classmethod
+    def _class_tags(cls):
+        return {"can_estimate_memory_usage_static": True}
 
     def _more_tags(self) -> dict:
         """Returns the additional tags for the TabPFN model."""
