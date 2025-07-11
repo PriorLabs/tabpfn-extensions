@@ -39,6 +39,7 @@ from test_base_tabpfn import BaseClassifierTests, BaseRegressorTests
 
 NUM_CONFIGS_TO_TEST = 100
 
+
 @pytest.mark.local_compatible
 @pytest.mark.client_compatible
 class TestTunedTabPFNClassifier(BaseClassifierTests):
@@ -140,8 +141,8 @@ class TestSearchSpaceCompatibility:
         for i in range(NUM_CONFIGS_TO_TEST):
             sample_rng = np.random.default_rng(rng.integers(0, 2**32 - 1))
 
-            sampled_config = sample(full_search_space, rng=sample_rng)            
-            
+            sampled_config = sample(full_search_space, rng=sample_rng)
+
             inference_config_params = {}
             model_params = {}
             for k, v in sampled_config.items():
