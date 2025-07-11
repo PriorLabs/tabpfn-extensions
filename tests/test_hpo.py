@@ -219,5 +219,5 @@ class TestSearchSpaceCompatibility:
                     f"Test failed for sample {i+1} ({task_type} task).\n"
                     f"Sampled parameters: model_params: {model_params}, "
                     f"inference_config: {inference_config_params}.\n"
-                    f"Error: {type(e).__name__}: {e}"  # Include exception type in message
+                    f"Error: {type(e).__name__}: {e}"
                 )
