@@ -18,23 +18,16 @@ try:
     from tabpfn_extensions.hpo import TunedTabPFNClassifier, TunedTabPFNRegressor
     from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 
-    HYPEROPT_AVAILABLE = True
 except ImportError:
-    HYPEROPT_AVAILABLE = False
     pytest.skip(
         "hyperopt not installed. Install with 'pip install \"tabpfn-extensions[hpo]\"'",
         allow_module_level=True,
     )
 
 try:
-    from tabpfn import (
-        TabPFNClassifier as CoreTabPFNClassifier,
-        TabPFNRegressor as CoreTabPFNRegressor,
-    )
+    from tabpfn import TabPFNClassifier, TabPFNRegressor
 
-    TABPFN_CORE_AVAILABLE = True
 except ImportError:
-    TABPFN_CORE_AVAILABLE = False
     pytest.skip(
         "tabpfn core library not installed. Cannot run compatibility tests.",
         allow_module_level=True,
@@ -44,6 +37,7 @@ from test_base_tabpfn import BaseClassifierTests, BaseRegressorTests
 
 # Using get_small_test_search_space from tests.utils - all HPO modules should use it
 
+NUM_CONFIGS_TO_TEST = 100
 
 @pytest.mark.local_compatible
 @pytest.mark.client_compatible
@@ -130,7 +124,6 @@ class TestTunedTabPFNRegressor(BaseRegressorTests):
 
 @pytest.mark.local_compatible
 @pytest.mark.client_compatible
-@pytest.mark.skipif(not TABPFN_CORE_AVAILABLE, reason="tabpfn core not available")
 class TestSearchSpaceCompatibility:
     """Tests to ensure the search space is compatible with core TabPFN models."""
 
@@ -143,9 +136,8 @@ class TestSearchSpaceCompatibility:
         """
         full_search_space = get_param_grid_hyperopt(task_type)
         rng = np.random.default_rng(42)
-        num_samples_to_test = 100
 
-        for i in range(num_samples_to_test):
+        for i in range(NUM_CONFIGS_TO_TEST):
             sample_rng = np.random.default_rng(rng.integers(0, 2**32 - 1))
 
             sampled_config = sample(full_search_space, rng=sample_rng)
@@ -170,7 +162,7 @@ class TestSearchSpaceCompatibility:
             try:
                 if task_type == "multiclass":
                     if model_type == "single":
-                        model_instance = CoreTabPFNClassifier(
+                        model_instance = TabPFNClassifier(
                             **model_params,
                             inference_config=inference_config_params,
                             device="cpu",
@@ -180,7 +172,7 @@ class TestSearchSpaceCompatibility:
                             DecisionTreeTabPFNClassifier,
                         )
 
-                        base_clf = CoreTabPFNClassifier(
+                        base_clf = TabPFNClassifier(
                             **model_params,
                             inference_config=inference_config_params,
                             device="cpu",
@@ -195,7 +187,7 @@ class TestSearchSpaceCompatibility:
 
                 elif task_type == "regression":
                     if model_type == "single":
-                        model_instance = CoreTabPFNRegressor(
+                        model_instance = TabPFNRegressor(
                             **model_params,
                             inference_config=inference_config_params,
                             device="cpu",
@@ -203,7 +195,7 @@ class TestSearchSpaceCompatibility:
                     elif model_type == "dt_pfn":
                         from tabpfn_extensions.rf_pfn import DecisionTreeTabPFNRegressor
 
-                        base_reg = CoreTabPFNRegressor(
+                        base_reg = TabPFNRegressor(
                             **model_params,
                             inference_config=inference_config_params,
                             device="cpu",
