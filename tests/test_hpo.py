@@ -140,17 +140,15 @@ class TestSearchSpaceCompatibility:
         for i in range(NUM_CONFIGS_TO_TEST):
             sample_rng = np.random.default_rng(rng.integers(0, 2**32 - 1))
 
-            sampled_config = sample(full_search_space, rng=sample_rng)
-            inference_config_params = {
-                k.split("/")[-1]: v
-                for k, v in sampled_config.items()
-                if k.startswith("inference_config/")
-            }
-            model_params = {
-                k: v
-                for k, v in sampled_config.items()
-                if not k.startswith("inference_config/")
-            }
+            sampled_config = sample(full_search_space, rng=sample_rng)            
+            
+            inference_config_params = {}
+            model_params = {}
+            for k, v in sampled_config.items():
+                if k.startswith("inference_config/"):
+                    inference_config_params[k.split("/")[-1]] = v
+                else:
+                    model_params[k] = v
 
             # Handle model_type and max_depth which are specific to TunedTabPFN and not core TabPFN
             model_type = model_params.pop("model_type", "single")
