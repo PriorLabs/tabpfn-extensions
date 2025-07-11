@@ -7,6 +7,7 @@ except PackageNotFoundError:
 
 # Create alias for test_utils
 from . import test_utils
+from .autogluon import AutogluonTabPFNClassifier, AutogluonTabPFNRegressor
 from .embedding import TabPFNEmbedding
 from .hpo import TunedTabPFNClassifier, TunedTabPFNRegressor
 from .many_class import ManyClassClassifier
@@ -28,4 +29,6 @@ __all__ = [
     "AutoTabPFNRegressor",
     "TunedTabPFNClassifier",
     "TunedTabPFNRegressor",
+    "AutogluonTabPFNClassifier",
+    "AutogluonTabPFNRegressor",
 ]
