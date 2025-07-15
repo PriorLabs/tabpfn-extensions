@@ -614,13 +614,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                             # Proper tensor construction to avoid warning
                             pred[idx] = torch.as_tensor(prob_row[y_idx])
             else:
-                pred = model.predict(X_predict.numpy(), output_type="full")
-                # Proper tensor construction to avoid warning
-                y_tensor = (
-                    y_predict.clone().detach()
-                    if torch.is_tensor(y_predict)
-                    else torch.tensor(y_predict)
-                )
+                pred = model.predict(X_predict, output_type="full")
 
                 # Get logits tensor properly
                 logits = pred["logits"]
@@ -630,7 +624,14 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                     else torch.tensor(logits)
                 )
 
-                pred = pred["criterion"].pdf(logits_tensor, y_tensor)
+                # Proper tensor construction to avoid warning
+                y_tensor = (
+                    y_predict.clone().detach()
+                    if torch.is_tensor(y_predict)
+                    else torch.tensor(y_predict)
+                ).to(logits.device)
+
+                pred = pred["criterion"].pdf(logits_tensor, y_tensor).cpu()
 
             # Handle zero or negative probabilities (avoid log(0))
             pred = torch.clamp(pred, min=1e-10)
