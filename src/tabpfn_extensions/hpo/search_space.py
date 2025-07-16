@@ -27,7 +27,7 @@ def enumerate_preprocess_transforms():
         ["robust"],
         ["safepower", "quantile_uni"],
         ["none", "safepower"],
-    ]    
+    ]
 
     for names in names_list:
         for categorical_name in [
