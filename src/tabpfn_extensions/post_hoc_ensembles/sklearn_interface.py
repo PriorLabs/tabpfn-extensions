@@ -17,6 +17,7 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 import torch
+from typing import Any
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.utils import check_random_state
 from sklearn.utils.multiclass import unique_labels
@@ -27,6 +28,7 @@ from tabpfn_extensions.utils import get_device
 
 
 MAX_INT = int(np.iinfo(np.int32).max)
+
 
 # TODO: Convert to Dataclass and use these
 class TaskType(str, Enum):
@@ -45,7 +47,8 @@ class DeviceType(str, Enum):
     CUDA = "cuda"
     AUTO = "auto"
 
-#TODO: Figure out if there is like a get_Scoring_String
+
+# TODO: Figure out if there is like a get_Scoring_String
 
 
 class AutoTabPFNBase(BaseEstimator):
@@ -70,7 +73,10 @@ class AutoTabPFNBase(BaseEstimator):
             Whether to ignore the pretraining limits of the TabPFN base models.
         phe_init_args : dict | None, default=None
             The initialization arguments for the post hoc ensemble predictor.
-            See post_hoc_ensembles.pfn_phe.AutoPostHocEnsemblePredictor for more options and all details.
+            See Autogluon TabularPredictor for more options and all details.
+        phe_fit_args : dict | None, default=None
+            The fit arguments for the post hoc ensemble predictor.
+            See Autogluon TabularPredictor for more options and all details.
 
     Attributes:
     ----------
@@ -84,7 +90,7 @@ class AutoTabPFNBase(BaseEstimator):
         self,
         *,
         ges_scoring_string: str,
-        max_time: int | None = 60*3,
+        max_time: int | None = 60 * 3,
         preset: Literal[
             "best_quality", "high_quality", "good_quality", "medium_quality"
         ] = "medium_quality",
@@ -93,6 +99,7 @@ class AutoTabPFNBase(BaseEstimator):
         categorical_feature_indices: list[int] | None = None,
         ignore_pretraining_limits: bool = False,
         phe_init_args: dict | None = None,
+        phe_fit_args: dict | None = None,
         num_random_configs: int = 200,
     ):
         self.ges_scoring_string = ges_scoring_string
@@ -104,12 +111,10 @@ class AutoTabPFNBase(BaseEstimator):
         self.ignore_pretraining_limits = ignore_pretraining_limits
         self.num_random_configs = num_random_configs
 
-        self._predictor: TabularPredictor | None = None
+        self._predictor: "TabularPredictor" | None = None
         self.phe_init_args = phe_init_args
-
+        self.phe_fit_args = phe_fit_args
         self.use_ensemble_model = True
-
-
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
@@ -117,7 +122,18 @@ class AutoTabPFNBase(BaseEstimator):
         user_args = self.phe_init_args or {}
         return {**default_args, **user_args}
 
-    def _prepare_fit(self, X: np.ndarray, y: np.ndarray, categorical_feature_indices: list[int] | None = None) -> tuple[np.ndarray, np.ndarray]:
+    def _get_predictor_fit_args(self) -> dict[str, Any]:
+        """Constructs the fit arguments for AutoGluon's TabularPredictor."""
+        default_args = {}
+        user_args = self.phe_fit_args or {}
+        return {**default_args, **user_args}
+
+    def _prepare_fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        categorical_feature_indices: list[int] | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
         X, y = validate_data(
             self,
             X,
@@ -131,6 +147,7 @@ class AutoTabPFNBase(BaseEstimator):
         # Auto-detect categorical features including text columns
         if self.categorical_feature_indices is None:
             from tabpfn_extensions.utils import infer_categorical_features
+
             self.categorical_feature_indices = infer_categorical_features(X)
 
         return X, y
@@ -151,7 +168,6 @@ class AutoTabPFNBase(BaseEstimator):
         from autogluon.tabular import TabularPredictor
         from tabpfn_extensions.post_hoc_ensembles.utils import search_space_func
         from autogluon.tabular.models import TabPFNV2Model
-
 
         self._column_names = [f"f{i}" for i in range(X.shape[1])]
         training_df = pd.DataFrame(X.copy(), columns=self._column_names)
@@ -190,13 +206,11 @@ class AutoTabPFNBase(BaseEstimator):
             presets=self.presets,
             hyperparameters=hyperparameters,
             num_gpus=num_gpus,
+            **self._get_predictor_fit_args(),
         )
 
-
-        #TODO: Put this back in
-        # -- Sklearn required values
-        #self.classes_ = self.predictor_._label_encoder.classes_
-        #self.n_features_in_ = self.predictor_.n_features_in_
+        # TODO: Put the Sklearn required values for the classes
+        # and number of features input feature back in here
 
         return self
 
@@ -206,14 +220,7 @@ class AutoTabPFNBase(BaseEstimator):
         }
 
 
-
 class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
-
-
-    predictor_: AutoPostHocEnsemblePredictor
-    phe_init_args_: dict
-    n_features_in_: int
-
     def __init__(self, ges_scoring_string: str = "roc", **kwargs):
         super().__init__(ges_scoring_string=ges_scoring_string, **kwargs)
 
@@ -225,9 +232,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         return tags
 
     def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
-
         X, y = self._prepare_fit(X, y, categorical_feature_indices)
-
 
         # TODO: Make sure the logic below works as intended
         # Check for single class
@@ -251,7 +256,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
             super().fit(X, y)
 
-
             # Store the classes
             self.classes_ = self.predictor_.classes_
             self.n_features_in_ = X.shape[1]
@@ -263,7 +267,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
         super().fit(X, y)
 
-
     def predict(self, X):
         check_is_fitted(self)
         X = validate_data(
@@ -274,7 +277,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         if hasattr(self, "single_class_") and self.single_class_:
             # For single class, always predict that class
             return np.full(X.shape[0], self.single_class_value_)
-        #Convert to pandas dataframe for AutoGluon
+        # Convert to pandas dataframe for AutoGluon
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         # Convert back to numpy array for sklearn
         return preds.to_numpy()
@@ -289,18 +292,13 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         if hasattr(self, "single_class_") and self.single_class_:
             # For single class, return probabilities of 1.0
             return np.ones((X.shape[0], 1))
-        #Convert to pandas dataframe for AutoGluon
+        # Convert to pandas dataframe for AutoGluon
         preds = self.predictor_.predict_proba(pd.DataFrame(X))
         # Convert back to numpy array for sklearn
         return preds.to_numpy()
 
 
 class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
-
-    predictor_: AutoPostHocEnsemblePredictor
-    phe_init_args_: dict
-    n_features_in_: int
-
     def __init__(self, ges_scoring_string: str = "mse", **kwargs):
         super().__init__(ges_scoring_string=ges_scoring_string, **kwargs)
 
@@ -317,8 +315,9 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         return tags
 
     def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
-
-        X, y = self._prepare_fit(X, y, categorical_feature_indices=categorical_feature_indices)
+        X, y = self._prepare_fit(
+            X, y, categorical_feature_indices=categorical_feature_indices
+        )
 
         super().fit(X, y)
 
@@ -331,7 +330,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
             X,
             ensure_all_finite=False,
         )
-        #Convert to pandas dataframe for AutoGluon
+        # Convert to pandas dataframe for AutoGluon
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         # Convert back to numpy array for sklearn
         return preds.to_numpy()
@@ -376,5 +375,4 @@ if __name__ == "__main__":
                         continue
                     if raise_on_error:
                         raise e
-                    lst.append((i, x, e))
-                break
+     

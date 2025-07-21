@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-import warnings
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
-import scipy
 from hyperopt.pyll import stochastic
-from sklearn.preprocessing import PowerTransformer
-from sklearn.utils.validation import FLOAT_DTYPES
 
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 
@@ -24,10 +20,10 @@ def prepare_tabpfnv2_config(raw_config: dict, *, refit_folds: bool = True) -> di
     # TODO: Look into this, does not seem to be supported by official AG
     raw_config.pop("max_depth", None)
 
-    '''File "/home/klemens_priorlabs_ai/tabpfn-extensions/.venv/lib/python3.10/site-packages/autogluon/tabular/models/tabpfnv2/rfpfn/sklearn_based_random_forest_tabpfn.py", line 137, in fit
+    """File "/home/klemens_priorlabs_ai/tabpfn-extensions/.venv/lib/python3.10/site-packages/autogluon/tabular/models/tabpfnv2/rfpfn/sklearn_based_random_forest_tabpfn.py", line 137, in fit
     if n_estimators <= 0:
     TypeError: '<=' not supported between instances of 'NoneType' and 'int'
-    '''
+    """
 
     raw_config["n_estimators"] = 16
     model_type = raw_config.get("model_type")
