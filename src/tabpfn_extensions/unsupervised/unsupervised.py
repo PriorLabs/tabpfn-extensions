@@ -224,6 +224,11 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             TabPFNUnsupervisedModel
                 Fitted model instance (self).
         """
+        if isinstance(X, np.ndarray):
+            X = torch.tensor(X, dtype=torch.float32)
+        elif isinstance(X, pd.DataFrame):
+            X = torch.tensor(X.values, dtype=torch.float32)
+
         self.X_ = copy.deepcopy(X)
 
         # Ensure y is not None and doesn't contain NaN values
@@ -291,18 +296,20 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X_fit = self.X_
         impute_X = copy.deepcopy(X)
 
-        for i in tqdm(range(len(all_features))):
+        feature_indices_to_impute = [
+            i
+            for i in range(n_features)
+            if torch.isnan(impute_X[:, all_features[i]]).sum() > 0
+        ]
+
+        for i in tqdm(feature_indices_to_impute):
             column_idx = all_features[i]
+            y_predict = impute_X[:, column_idx]
 
             if not condition_on_all_features:
                 conditional_idx = all_features[:i] if i > 0 else []
             else:
                 conditional_idx = list(set(range(X.shape[1])) - {column_idx})
-
-            y_predict = impute_X[:, column_idx]
-
-            if torch.isnan(y_predict).sum() == 0:
-                continue
 
             X_where_y_is_nan = impute_X[torch.isnan(y_predict)]
             X_where_y_is_nan = X_where_y_is_nan.reshape(-1, impute_X.shape[1])
