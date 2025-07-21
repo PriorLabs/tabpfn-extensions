@@ -9,10 +9,11 @@ from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 
 
 def prepare_tabpfnv2_config(
-            raw_config: dict, *,
-            refit_folds: bool = True,
-            default_n_estimators: int | None = 16,
-            ) -> dict:
+    raw_config: dict,
+    *,
+    refit_folds: bool = True,
+    default_n_estimators: int | None = 16,
+) -> dict:
     """Set refit folds to True and convert tuples to lists."""
     raw_config = {
         k: list(v) if isinstance(v, tuple) else v for k, v in raw_config.items()

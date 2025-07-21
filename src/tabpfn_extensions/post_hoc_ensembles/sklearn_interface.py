@@ -10,22 +10,17 @@ Original Code: https://github.com/autogluon/tabrepo/tree/main/tabrepo/benchmark/
 
 from __future__ import annotations
 
-import random
-from typing import Literal
 from enum import Enum
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
-import torch
-from typing import Any
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
-from sklearn.utils import check_random_state
 from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 from tabpfn_extensions.utils import get_device
-
 
 MAX_INT = int(np.iinfo(np.int32).max)
 
@@ -48,9 +43,6 @@ class DeviceType(str, Enum):
     AUTO = "auto"
 
 
-# TODO: Figure out if there is like a get_Scoring_String
-
-
 class AutoTabPFNBase(BaseEstimator):
     """Base class for AutoGluon-powered TabPFN scikit-learn wrappers.
 
@@ -63,10 +55,7 @@ class AutoTabPFNBase(BaseEstimator):
         ges_scoring_string : str, default=None
             The scoring string to use for the eval_emtric of Autogluon.
             If None it is automciatlly chosen based on problem type, here
-            are the options:
-            Multiclass: [‘accuracy’, ‘balanced_accuracy’, ‘f1’, ‘f1_macro’, ‘f1_micro’, ‘f1_weighted’, ‘roc_auc’, ‘roc_auc_ovo’, ‘roc_auc_ovr’, ‘average_precision’, ‘precision’, ‘precision_macro’, ‘precision_micro’, ‘precision_weighted’, ‘recall’, ‘recall_macro’, ‘recall_micro’, ‘recall_weighted’, ‘log_loss’, ‘pac_score’, ‘quadratic_kappa’]
-            Binary: [‘accuracy’, ‘balanced_accuracy’, ‘f1’, ‘f1_macro’, ‘f1_micro’, ‘f1_weighted’, ‘roc_auc’, ‘roc_auc_ovo’, ‘roc_auc_ovr’, ‘average_precision’, ‘precision’, ‘precision_macro’, ‘precision_micro’, ‘precision_weighted’, ‘recall’, ‘recall_macro’, ‘recall_micro’, ‘recall_weighted’, ‘log_loss’, ‘pac_score’, ‘quadratic_kappa’]
-            Regression: [‘root_mean_squared_error’, ‘mean_squared_error’, ‘mean_absolute_error’, ‘median_absolute_error’, ‘r2’]
+            are the options, https://auto.gluon.ai/dev/api/autogluon.tabular.models.html
         device : {"cpu", "cuda"}, default="auto"
             The device to use for training and prediction.
         random_state : int, RandomState instance or None, default=None
@@ -115,7 +104,6 @@ class AutoTabPFNBase(BaseEstimator):
         self.ignore_pretraining_limits = ignore_pretraining_limits
         self.num_random_configs = num_random_configs
 
-        self._predictor: "TabularPredictor" | None = None
         self.phe_init_args = phe_init_args
         self.phe_fit_args = phe_fit_args
         self.use_ensemble_model = True
@@ -165,13 +153,13 @@ class AutoTabPFNBase(BaseEstimator):
     # E.g. With numpy and then internally convert to Pandas
     # Or also allow pandas dataframes
     def fit(self, X: np.ndarray, y: np.ndarray):
-        """
-        Fits the model by training an ensemble of TabPFN configurations using AutoGluon.
+        """Fits the model by training an ensemble of TabPFN configurations using AutoGluon.
         This method should be called from the child class's fit method after validation.
         """
         from autogluon.tabular import TabularPredictor
-        from tabpfn_extensions.post_hoc_ensembles.utils import search_space_func
         from autogluon.tabular.models import TabPFNV2Model
+
+        from tabpfn_extensions.post_hoc_ensembles.utils import search_space_func
 
         self._column_names = [f"f{i}" for i in range(X.shape[1])]
         training_df = pd.DataFrame(X.copy(), columns=self._column_names)
@@ -202,7 +190,6 @@ class AutoTabPFNBase(BaseEstimator):
 
         device = get_device(self.device)
         num_gpus = 1 if device == DeviceType.CUDA else 0
-        print(f"Using {num_gpus} GPUs")
 
         self.predictor_.fit(
             train_data=training_df,
@@ -253,7 +240,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         class_counts = np.bincount(y.astype(int))
         # TODO: Re-Implement this
         if np.min(class_counts[class_counts > 0]) < 2:
-
             from tabpfn_extensions.utils import TabPFNClassifier, get_device
 
             self.single_class_ = False
@@ -276,6 +262,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             self.ges_scoring_string = "nll"
 
         super().fit(X, y)
+        return None
 
     def predict(self, X):
         check_is_fitted(self)
@@ -303,7 +290,9 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             # For single class, return probabilities of 1.0
             return np.ones((X.shape[0], 1))
         # Convert to pandas dataframe for AutoGluon
-        preds = self.predictor_.predict_proba(pd.DataFrame(X, columns=self._column_names))
+        preds = self.predictor_.predict_proba(
+            pd.DataFrame(X, columns=self._column_names)
+        )
         # Convert back to numpy array for sklearn
         return preds.to_numpy()
 
