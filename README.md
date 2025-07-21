@@ -165,6 +165,7 @@ graph TD
     %% 4. ADD CLICKABLE LINKS
     click local_version "https://github.com/PriorLabs/TabPFN" "TabPFN Backend Options" _blank
     click api_client "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Client" _blank
+    click api_backend "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Backend" _blank
     click unsupervised_type "https://github.com/PriorLabs/tabpfn-extensions" "TabPFN Extensions" _blank
     click data_gen "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/generate_data.py" "TabPFN Data Generation Example" _blank
     click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/density_estimation_outlier_detection.py" "TabPFN Density Estimation Example" _blank
