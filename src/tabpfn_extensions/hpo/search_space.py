@@ -29,23 +29,6 @@ def enumerate_preprocess_transforms():
         ["none", "safepower"],
     ]
 
-    # Add KDI transforms if available
-    try:
-        import importlib.util
-
-        if importlib.util.find_spec("kditransform") is not None:
-            # Only add KDI transforms if the module is available
-            if False:  # KDI is disabled currently due to warnings thrown by old sklearn versions
-                names_list += [
-                    ["kdi_uni"],
-                    ["kdi_alpha_0.3"],
-                    ["kdi_alpha_3.0"],
-                    ["kdi", "quantile_uni"],
-                ]
-    except ImportError:
-        # KDI transform not available, skipping related transforms
-        pass
-
     for names in names_list:
         for categorical_name in [
             "numeric",

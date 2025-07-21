@@ -7,6 +7,7 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/Prior_Labs?style=social)](https://twitter.com/Prior_Labs)
 ![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen)
 ![Last Commit](https://img.shields.io/github/last-commit/automl/tabpfn-client)
+[![colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PriorLabs/TabPFN/blob/main/examples/notebooks/TabPFN_Demo_Local.ipynb)
 
 <img src="tabpfn_summary.webp" width="650" alt="TabPFN Summary">
 

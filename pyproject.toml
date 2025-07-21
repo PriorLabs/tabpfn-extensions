@@ -58,7 +58,6 @@ interpretability = [
     "seaborn>=0.12.2",
 ]
 post_hoc_ensembles = [
-    "kditransform>=0.2.0",
     "llvmlite",
     "hyperopt>=0.2.7"
 ]
@@ -77,7 +76,6 @@ all = [
     "shapiq>=0.4.0",
     "seaborn>=0.12.2",
 
-    "kditransform>=0.2.0",
     "llvmlite>=0.30.0",
     "hyperopt>=0.2.7",
     "setuptools>=67.0.0",
