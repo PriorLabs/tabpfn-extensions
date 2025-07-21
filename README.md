@@ -108,10 +108,11 @@ graph TD
     start((Start)) --> gpu_check{GPU available?};
 
     gpu_check -- No --> api_client("Use TabPFN Client backend");
-    gpu_check -- No --> local_version("Local Version");
+    gpu_check -- Yes --> local_version("Use TabPFN Local Version");
 
 
-    gpu_check -- Yes --> task_type{"Type of task?"};
+    api_client --> task_type{"Type of task?"};
+    local_version --> task_type{"Type of task?"};
 
     task_type -- Unsupervised --> unsupervised_type{"What kind of<br/>unsupervised task?"};
     unsupervised_type --> imputation(Imputation);
@@ -159,15 +160,15 @@ graph TD
     class Start start_node;
     class Congrats end_node;
     class gpu_check,task_type,unsupervised_type,text_check,ts_check,sample_size_check,class_check,finetune_check,interpretability_check,performance_check decision_node;
-    class local_version, api_client,imputation,data_gen,density,embedding,api_backend,ts_features,subsample,rfpfn,many_class,finetuning,shapley,more_estimators,hpo,post_hoc,tuning_options process_node;
-
+    class local_version,api_client,imputation,data_gen,density,embedding,api_backend,ts_features,subsample,rfpfn,many_class,finetuning,shapley,more_estimators,hpo,post_hoc,tuning_options process_node;
 
     %% 4. ADD CLICKABLE LINKS
     click local_version "https://github.com/PriorLabs/TabPFN" "TabPFN Backend Options" _blank
     click api_client "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Client" _blank
     click unsupervised_type "https://github.com/PriorLabs/tabpfn-extensions" "TabPFN Extensions" _blank
     click data_gen "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/generate_data.py" "TabPFN Data Generation Example" _blank
-    click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/detect_outliers.py" "TabPFN Density Estimation Example" _blank
+    click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/density_estimation_outlier_detection.py" "TabPFN Density Estimation Example" _blank
+    click imputation "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/imputation.py" "TabPFN Imputation Example" _blank
     click embedding "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding" "TabPFN Embedding Example" _blank
     click ts_features "https://github.com/PriorLabs/tabpfn-time-series" "TabPFN Time-Series Example" _blank
     click rfpfn "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/rf_pfn/rf_pfn_example.py" "RF-PFN Example" _blank
