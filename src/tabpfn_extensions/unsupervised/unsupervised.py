@@ -309,11 +309,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             ts = TopologicalSorter(dag)
             # re-order all_features based on the DAG (throws error in case of cycles)
             all_features = list(ts.static_order())
-            # re-order also the indices of categorical features accordingly
-            self.categorical_features = [
-                all_features.index(idx) for idx in self.categorical_features
-            ]
-            
+        
         for i in tqdm(range(len(all_features))):
             column_idx = all_features[i]
 
@@ -528,8 +524,8 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         else:
             # If the first feature, use a zero feature as input
             # Because of preprocessing, we can't use a zero feature, so we use a random feature
-            X_fit, y_fit = torch.randn_like(X_fit[:, 0:1]), X_fit[:, 0]
-            X_predict, y_predict = torch.randn_like(X_predict[:, 0:1]), X_predict[:, 0]
+            X_fit, y_fit = torch.randn_like(X_fit[:, 0:1]), X_fit[:, column_idx]
+            X_predict, y_predict = torch.randn_like(X_predict[:, 0:1]), X_predict[:, column_idx]
 
         model = (
             self.tabpfn_clf
