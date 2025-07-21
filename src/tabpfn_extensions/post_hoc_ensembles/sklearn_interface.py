@@ -299,7 +299,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             # For single class, return probabilities of 1.0
             return np.ones((X.shape[0], 1))
         # Convert to pandas dataframe for AutoGluon
-        preds = self.predictor_.predict_proba(pd.DataFrame(X))
+        preds = self.predictor_.predict_proba(pd.DataFrame(X, columns=self._column_names))
         # Convert back to numpy array for sklearn
         return preds.to_numpy()
 
