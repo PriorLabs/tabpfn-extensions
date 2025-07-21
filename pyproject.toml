@@ -24,7 +24,8 @@ authors = [
     { name = "Shi Bin Hoo" },
     { name = "Robin Tibor Schirrmeister" },
     { name = "Frank Hutter", email = "fh@cs.uni-freiburg.de" },
-    { name = "Eddie Bergman" }
+    { name = "Eddie Bergman" },
+    { name = "Klemens Flöge" },
 ]
 readme = "README.md"
 description = "TabPFN: Foundation model for tabular data"
@@ -59,7 +60,11 @@ interpretability = [
 ]
 post_hoc_ensembles = [
     "llvmlite",
-    "hyperopt>=0.2.7"
+    "hyperopt>=0.2.7",
+    "autogluon.common @ git+https://github.com/autogluon/autogluon#subdirectory=common",
+    "autogluon.features @ git+https://github.com/autogluon/autogluon#subdirectory=features",
+    "autogluon.core @ git+https://github.com/autogluon/autogluon#subdirectory=core",
+    "autogluon.tabular @ git+https://github.com/autogluon/autogluon#subdirectory=tabular",
 ]
 hpo = [
     "hyperopt>=0.2.7",
