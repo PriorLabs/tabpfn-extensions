@@ -302,12 +302,11 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             if torch.isnan(impute_X[:, col_idx]).any()
         ]
 
-        for i in tqdm(columns_with_nan):
-            column_idx = all_features[i]
+        for column_idx in tqdm(columns_with_nan):
             y_predict = impute_X[:, column_idx]
 
             if not condition_on_all_features:
-                conditional_idx = all_features[:i] if i > 0 else []
+                conditional_idx = all_features[:column_idx] if column_idx > 0 else []
             else:
                 conditional_idx = list(set(range(X.shape[1])) - {column_idx})
 
@@ -627,9 +626,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 logits = pred["logits"]
                 logits_tensor = logits.clone().detach()
 
-                y_tensor = y_predict.clone().detach().to(logits)
+                y_tensor = y_predict.clone().detach().to(logits.device)
 
-                pred = pred["criterion"].pdf(logits_tensor, y_tensor).to(log_p)
+                pred = pred["criterion"].pdf(logits_tensor, y_tensor).to(logits.device)
 
             # Handle zero or negative probabilities (avoid log(0))
             pred = torch.clamp(pred, min=1e-10)
