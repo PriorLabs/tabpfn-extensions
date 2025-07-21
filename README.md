@@ -117,7 +117,7 @@ graph TD
     task_type -- Unsupervised --> unsupervised_type{"What kind of<br/>unsupervised task?"};
     unsupervised_type --> imputation(Imputation);
     unsupervised_type --> data_gen("Data Generation");
-    unsupervised_type --> density("Density Estimation");
+    unsupervised_type --> density("Density Estimation/Outlier Detection");
     unsupervised_type --> embedding("Get Embeddings");
 
     task_type -- "Prediction Problem" --> text_check{"Contains Text Data?"};
@@ -168,7 +168,7 @@ graph TD
     click api_backend "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Backend" _blank
     click unsupervised_type "https://github.com/PriorLabs/tabpfn-extensions" "TabPFN Extensions" _blank
     click data_gen "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/generate_data.py" "TabPFN Data Generation Example" _blank
-    click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/density_estimation_outlier_detection.py" "TabPFN Density Estimation Example" _blank
+    click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/density_estimation_outlier_detection.py" "TabPFN Density Estimation/Outlier Detection Example" _blank
     click imputation "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/imputation.py" "TabPFN Imputation Example" _blank
     click embedding "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding" "TabPFN Embedding Example" _blank
     click ts_features "https://github.com/PriorLabs/tabpfn-time-series" "TabPFN Time-Series Example" _blank
