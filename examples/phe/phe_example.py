@@ -22,6 +22,8 @@ from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import (
     AutoTabPFNRegressor,
 )
 
+# TODO: Maybe increase time limit
+
 # Binary
 X, y = load_breast_cancer(return_X_y=True)
 X_train, X_test, y_train, y_test = train_test_split(

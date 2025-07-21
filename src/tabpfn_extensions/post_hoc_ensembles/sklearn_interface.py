@@ -60,9 +60,13 @@ class AutoTabPFNBase(BaseEstimator):
             The maximum time to spend on fitting the post hoc ensemble.
         preset: {"default", "custom_hps", "avoid_overfitting"}, default="default"
             The preset to use for the post hoc ensemble.
-        ges_scoring_string : str, default="roc"
-            The scoring string to use for the greedy ensemble search.
-            Allowed values are: {"accuracy", "roc" / "auroc", "f1", "log_loss"}.
+        ges_scoring_string : str, default=None
+            The scoring string to use for the eval_emtric of Autogluon.
+            If None it is automciatlly chosen based on problem type, here
+            are the options:
+            Multiclass: [‘accuracy’, ‘balanced_accuracy’, ‘f1’, ‘f1_macro’, ‘f1_micro’, ‘f1_weighted’, ‘roc_auc’, ‘roc_auc_ovo’, ‘roc_auc_ovr’, ‘average_precision’, ‘precision’, ‘precision_macro’, ‘precision_micro’, ‘precision_weighted’, ‘recall’, ‘recall_macro’, ‘recall_micro’, ‘recall_weighted’, ‘log_loss’, ‘pac_score’, ‘quadratic_kappa’]
+            Binary: [‘accuracy’, ‘balanced_accuracy’, ‘f1’, ‘f1_macro’, ‘f1_micro’, ‘f1_weighted’, ‘roc_auc’, ‘roc_auc_ovo’, ‘roc_auc_ovr’, ‘average_precision’, ‘precision’, ‘precision_macro’, ‘precision_micro’, ‘precision_weighted’, ‘recall’, ‘recall_macro’, ‘recall_micro’, ‘recall_weighted’, ‘log_loss’, ‘pac_score’, ‘quadratic_kappa’]
+            Regression: [‘root_mean_squared_error’, ‘mean_squared_error’, ‘mean_absolute_error’, ‘median_absolute_error’, ‘r2’]
         device : {"cpu", "cuda"}, default="auto"
             The device to use for training and prediction.
         random_state : int, RandomState instance or None, default=None
@@ -89,8 +93,8 @@ class AutoTabPFNBase(BaseEstimator):
     def __init__(
         self,
         *,
-        ges_scoring_string: str,
         max_time: int | None = 60 * 3,
+        ges_scoring_string: str | None = None,
         preset: Literal[
             "best_quality", "high_quality", "good_quality", "medium_quality"
         ] = "medium_quality",
@@ -102,8 +106,8 @@ class AutoTabPFNBase(BaseEstimator):
         phe_fit_args: dict | None = None,
         num_random_configs: int = 200,
     ):
-        self.ges_scoring_string = ges_scoring_string
         self.max_time = max_time
+        self.ges_scoring_string = ges_scoring_string
         self.presets = preset
         self.device = device
         self.random_state = random_state
@@ -221,8 +225,8 @@ class AutoTabPFNBase(BaseEstimator):
 
 
 class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
-    def __init__(self, ges_scoring_string: str = "roc", **kwargs):
-        super().__init__(ges_scoring_string=ges_scoring_string, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
         self._is_classifier = True
 
@@ -305,8 +309,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
 
 class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
-    def __init__(self, ges_scoring_string: str = "mse", **kwargs):
-        super().__init__(ges_scoring_string=ges_scoring_string, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
         self._is_classifier = False
 
