@@ -215,7 +215,7 @@ class TestSearchSpaceCompatibility:
 
             except (TypeError, ValueError, RuntimeError, AssertionError) as e:
                 pytest.fail(
-                    f"Test failed for sample {i+1} ({task_type} task).\n"
+                    f"Test failed for sample {i + 1} ({task_type} task).\n"
                     f"Sampled parameters: model_params: {model_params}, "
                     f"inference_config: {inference_config_params}.\n"
                     f"Error: {type(e).__name__}: {e}"
