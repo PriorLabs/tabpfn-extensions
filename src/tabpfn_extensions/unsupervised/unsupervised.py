@@ -296,13 +296,13 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X_fit = self.X_
         impute_X = copy.deepcopy(X)
 
-        feature_indices_to_impute = [
-            i
-            for i in range(n_features)
-            if torch.isnan(impute_X[:, all_features[i]]).sum() > 0
+        columns_with_nan = [
+            col_idx
+            for col_idx in all_features
+            if torch.isnan(impute_X[:, col_idx]).any()
         ]
 
-        for i in tqdm(feature_indices_to_impute):
+        for i in tqdm(columns_with_nan):
             column_idx = all_features[i]
             y_predict = impute_X[:, column_idx]
 
