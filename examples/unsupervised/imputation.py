@@ -52,15 +52,12 @@ model_unsupervised = unsupervised.TabPFNUnsupervisedModel(
 # --- 4. Fit and Impute ---
 # Fit the model on the complete training data (without missing values)
 print("Fitting the unsupervised model on the training data...")
-model_unsupervised.fit(torch.tensor(X_train, dtype=torch.float32))
-
-# Convert the test set with missing values to a torch tensor
-X_test_missing_tensor = torch.tensor(X_test_missing, dtype=torch.float32)
+model_unsupervised.fit(X_train)
 
 # Perform imputation on the test set
 print("Imputing missing values...")
 X_imputed_tensor = model_unsupervised.impute(
-    X_test_missing_tensor,
+    X_test_missing,
     n_permutations=5,  # Fewer permutations for a quicker example
 )
 
