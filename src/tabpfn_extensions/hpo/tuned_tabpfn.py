@@ -277,29 +277,29 @@ class TunedTabPFNBase(BaseEstimator):
                 else:  # Regression
                     y_pred = model.predict(X_val)
                     if self.metric == MetricType.RMSE:
-                        score = -score_regression(
+                        score = score_regression(
                             "rmse",
                             y_val,
                             y_pred,
-                        )
+                        ) # returns negative value already - minimize
                     elif self.metric == MetricType.MSE:
-                        score = -score_regression(
+                        score = score_regression(
                             "mse",
                             y_val,
                             y_pred,
-                        )
+                        ) # returns negative value already - minimize
                     elif self.metric == MetricType.MAE:
-                        score = -score_regression(
+                        score = score_regression(
                             "mae",
                             y_val,
                             y_pred,
-                        )
+                        ) # returns negative value already - minimize
                     else:  # Default to R2 for regression if metric not MAE/MSE/RMSE
-                        score = -score_regression(
+                        score = score_regression(
                             "r2",
                             y_val,
                             y_pred,
-                        )
+                        ) # returns positive value - maximize
 
                 # Ensure score is not None before negating
                 loss_value = -score if score is not None else float("inf")
