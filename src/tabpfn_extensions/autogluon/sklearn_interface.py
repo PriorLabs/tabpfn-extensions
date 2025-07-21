@@ -5,7 +5,8 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-
+# TODO: Same interface as AutoTabPFN
+# Identical to before
 class _BaseAutoGluonTabPFN:
     """Shared logic between classifier and regressor for TabPFN models powered by AutoGluon.
 
@@ -99,8 +100,13 @@ class _BaseAutoGluonTabPFN:
     def fit(self, X, y):
         """Train a single TabPFN model within *AutoGluon*."""
         from autogluon.tabular import TabularPredictor
-        from tabpfn_extensions.autogluon.model import TabPFNV2Model
         from tabpfn_extensions.autogluon.utils import search_space_func
+
+        #from tabpfn_extensions.autogluon.model import TabPFNV2Model
+
+        #import autogluon.tabular.models.catboost
+        #import autogluon.tabular.models.tabpfnv2
+        from autogluon.tabular.models import TabPFNV2Model
 
         training_df = pd.DataFrame(X).copy()
         training_df["_target_"] = y  # lightweight, avoids name clashes
