@@ -23,10 +23,12 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
+from tabpfn_extensions.utils import get_device
 
 
 MAX_INT = int(np.iinfo(np.int32).max)
 
+# TODO: Convert to Dataclass and use these
 class TaskType(str, Enum):
     BINARY = "binary_classification"
     MULTICLASS = "multiclass_classification"
@@ -43,11 +45,11 @@ class DeviceType(str, Enum):
     CUDA = "cuda"
     AUTO = "auto"
 
+#TODO: Figure out if there is like a get_Scoring_String
+
 
 class AutoTabPFNBase(BaseEstimator):
-    """Automatic Post Hoc Ensemble Classifier for TabPFN models.
-
-    # TODO: Add a Dictionary or a typed intput here
+    """Base class for AutoGluon-powered TabPFN scikit-learn wrappers.
 
     Parameters
     ----------
@@ -70,34 +72,32 @@ class AutoTabPFNBase(BaseEstimator):
             The initialization arguments for the post hoc ensemble predictor.
             See post_hoc_ensembles.pfn_phe.AutoPostHocEnsemblePredictor for more options and all details.
 
-    # TODO: Overwrite these below
     Attributes:
     ----------
-        predictor_ : AutoPostHocEnsemblePredictor
-            The predictor interface used to make predictions, see post_hoc_ensembles.pfn_phe.AutoPostHocEnsemblePredictor for more.
+        predictor_ : TabularPredictor
+            The predictor interface used to make predictions.
         phe_init_args_ : dict
             The optional initialization arguments used for the post hoc ensemble predictor.
     """
 
     def __init__(
         self,
-        max_time: int | None = 30,
+        *,
+        ges_scoring_string: str,
+        max_time: int | None = 60*3,
         preset: Literal[
             "best_quality", "high_quality", "good_quality", "medium_quality"
         ] = "medium_quality",
-        ges_scoring_string: str = "roc",
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
         categorical_feature_indices: list[int] | None = None,
         ignore_pretraining_limits: bool = False,
-        phe_init_args: dict | None = {
-            #'verbosity': 0,
-        },
-        num_random_configs: int = 5,
+        phe_init_args: dict | None = None,
+        num_random_configs: int = 200,
     ):
+        self.ges_scoring_string = ges_scoring_string
         self.max_time = max_time
         self.presets = preset
-        self.ges_scoring_string = ges_scoring_string
         self.device = device
         self.random_state = random_state
         self.categorical_feature_indices = categorical_feature_indices
@@ -107,10 +107,33 @@ class AutoTabPFNBase(BaseEstimator):
         self._predictor: TabularPredictor | None = None
         self.phe_init_args = phe_init_args
 
-    def _more_tags(self):
-        return {
-            "allow_nan": True,
-        }
+        self.use_ensemble_model = True
+
+
+
+    def _get_predictor_init_args(self) -> dict[str, Any]:
+        """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
+        default_args = {"verbosity": 0}
+        user_args = self.phe_init_args or {}
+        return {**default_args, **user_args}
+
+    def _prepare_fit(self, X: np.ndarray, y: np.ndarray, categorical_feature_indices: list[int] | None = None) -> tuple[np.ndarray, np.ndarray]:
+        X, y = validate_data(
+            self,
+            X,
+            y,
+            ensure_all_finite=False,
+        )
+
+        if self.categorical_feature_indices is not None:
+            self.categorical_feature_indices = self.categorical_feature_indices
+
+        # Auto-detect categorical features including text columns
+        if self.categorical_feature_indices is None:
+            from tabpfn_extensions.utils import infer_categorical_features
+            self.categorical_feature_indices = infer_categorical_features(X)
+
+        return X, y
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
@@ -120,13 +143,19 @@ class AutoTabPFNBase(BaseEstimator):
     # TODO: Add better typing for X and y
     # E.g. With numpy and then internally convert to Pandas
     # Or also allow pandas dataframes
-    def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
+    def fit(self, X: np.ndarray, y: np.ndarray):
+        """
+        Fits the model by training an ensemble of TabPFN configurations using AutoGluon.
+        This method should be called from the child class's fit method after validation.
+        """
         from autogluon.tabular import TabularPredictor
         from tabpfn_extensions.post_hoc_ensembles.utils import search_space_func
         from autogluon.tabular.models import TabPFNV2Model
 
-        training_df = pd.DataFrame(X).copy()
-        training_df["_target_"] = y  # lightweight, avoids name clashes
+
+        self._column_names = [f"f{i}" for i in range(X.shape[1])]
+        training_df = pd.DataFrame(X.copy(), columns=self._column_names)
+        training_df["_target_"] = y
 
         problem_type = (
             "binary"
@@ -134,96 +163,47 @@ class AutoTabPFNBase(BaseEstimator):
             else ("multiclass" if self._is_classifier else "regression")
         )
 
-        # TODO: Double Check Code below
-        '''rnd = check_random_state(self.random_state)
-
-        # Torch reproducibility bomb
-        torch.manual_seed(rnd.randint(0, MAX_INT))
-        random.seed(rnd.randint(0, MAX_INT))
-        np.random.seed(rnd.randint(0, MAX_INT))
-
-        # Check for single class
-        self.classes_ = unique_labels(y)
-        self.n_features_in_ = X.shape[1]
-
-        # Single class case - special handling
-        if len(self.classes_) == 1:
-            self.single_class_ = True
-            self.single_class_value_ = self.classes_[0]
-            return self
-
-        # Check for extremely imbalanced classes - handle case with only 1 sample per class
-        class_counts = np.bincount(y.astype(int))
-        if np.min(class_counts[class_counts > 0]) < 2:
-            # Cannot do stratification with less than 2 samples per class
-            # Use a standard TabPFN classifier without ensemble
-            from tabpfn_extensions.utils import TabPFNClassifier, get_device
-
-            self.single_class_ = False
-            self.predictor_ = TabPFNClassifier(
-                device=get_device(self.device),
-                categorical_features_indices=self.categorical_feature_indices,
-            )
-            self.predictor_.fit(X, y)
-            # Store the classes
-            self.classes_ = self.predictor_.classes_
-            self.n_features_in_ = X.shape[1]
-            return self
-
-        # Normal case - multiple classes with sufficient samples per class
-        self.single_class_ = False
-        task_type = TaskType.MULTICLASS if len(self.classes_) > 2 else TaskType.BINARY
-        # Use the device utility for automatic selection
-        from tabpfn_extensions.utils import get_device'''
-
-
-
         self.predictor_ = TabularPredictor(
             label="_target_",
             problem_type=problem_type,
-            **self.phe_init_args,
+            eval_metric=self.ges_scoring_string,
+            **self._get_predictor_init_args(),
         )
 
         task_type = "multiclass" if self._is_classifier else "regression"
 
-        num_configs_to_generate = max(
-            1, self.num_random_configs
-        )  # Ensure at least one config
-
+        # Generate hyperparameter configurations for TabPFN
+        num_configs = max(1, self.num_random_configs)
         tabpfn_configs = search_space_func(
-            task_type=task_type,
-            num_random_configs=num_configs_to_generate,
-            seed=self.random_state,
+            task_type=problem_type,
+            num_random_configs=num_configs,
         )
-
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
+
+        device = get_device(self.device)
+        num_gpus = 1 if device == DeviceType.CUDA else 0
+        print(f"Using {num_gpus} GPUs")
+
         self.predictor_.fit(
             train_data=training_df,
             time_limit=self.max_time,
             presets=self.presets,
             hyperparameters=hyperparameters,
-            #categorical_feature_indices=self.categorical_feature_indices,
+            num_gpus=num_gpus,
         )
 
-        # TODO: Add more arguments to fit above
-        '''self.predictor_ = AutoPostHocEnsemblePredictor(
-            preset=self.preset,
-            task_type=task_type,
-            max_time=self.max_time,
-            ges_scoring_string=self.ges_scoring_string,
-            device=get_device(self.device),
-            bm_random_state=rnd.randint(0, MAX_INT),
-            ges_random_state=rnd.randint(0, MAX_INT),
-            ignore_pretraining_limits=self.ignore_pretraining_limits,
-            **self.phe_init_args_,
-        )'''
 
-        # -- Sklearn required values
         #TODO: Put this back in
+        # -- Sklearn required values
         #self.classes_ = self.predictor_._label_encoder.classes_
         #self.n_features_in_ = self.predictor_.n_features_in_
 
         return self
+
+    def _more_tags(self):
+        return {
+            "allow_nan": True,
+        }
 
 
 
@@ -234,8 +214,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     phe_init_args_: dict
     n_features_in_: int
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, ges_scoring_string: str = "roc", **kwargs):
+        super().__init__(ges_scoring_string=ges_scoring_string, **kwargs)
 
         self._is_classifier = True
 
@@ -244,31 +224,12 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         tags.estimator_type = "classifier"
         return tags
 
-    '''def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
-        X, y = validate_data(
-            self,
-            X,
-            y,
-            ensure_all_finite=False,
-        )
+    def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
 
-        if categorical_feature_indices is not None:
-            self.categorical_feature_indices = categorical_feature_indices
+        X, y = self._prepare_fit(X, y, categorical_feature_indices)
 
-        # Auto-detect categorical features including text columns
-        if self.categorical_feature_indices is None:
-            from tabpfn_extensions.utils import infer_categorical_features
 
-            self.categorical_feature_indices = infer_categorical_features(X)
-
-        self.phe_init_args_ = {} if self.phe_init_args is None else self.phe_init_args
-        rnd = check_random_state(self.random_state)
-
-        # Torch reproducibility bomb
-        torch.manual_seed(rnd.randint(0, MAX_INT))
-        random.seed(rnd.randint(0, MAX_INT))
-        np.random.seed(rnd.randint(0, MAX_INT))
-
+        # TODO: Make sure the logic below works as intended
         # Check for single class
         self.classes_ = unique_labels(y)
         self.n_features_in_ = X.shape[1]
@@ -287,11 +248,10 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             from tabpfn_extensions.utils import TabPFNClassifier, get_device
 
             self.single_class_ = False
-            self.predictor_ = TabPFNClassifier(
-                device=get_device(self.device),
-                categorical_features_indices=self.categorical_feature_indices,
-            )
-            self.predictor_.fit(X, y)
+
+            super().fit(X, y)
+
+
             # Store the classes
             self.classes_ = self.predictor_.classes_
             self.n_features_in_ = X.shape[1]
@@ -300,9 +260,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         # Normal case - multiple classes with sufficient samples per class
         self.single_class_ = False
         task_type = TaskType.MULTICLASS if len(self.classes_) > 2 else TaskType.BINARY
-        # Use the device utility for automatic selection
-        from tabpfn_extensions.utils import get_device
-    '''
+
+        super().fit(X, y)
 
 
     def predict(self, X):
@@ -316,7 +275,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             # For single class, always predict that class
             return np.full(X.shape[0], self.single_class_value_)
         #Convert to pandas dataframe for AutoGluon
-        preds = self.predictor_.predict(pd.DataFrame(X))
+        preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         # Convert back to numpy array for sklearn
         return preds.to_numpy()
 
@@ -342,8 +301,8 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     phe_init_args_: dict
     n_features_in_: int
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, ges_scoring_string: str = "mse", **kwargs):
+        super().__init__(ges_scoring_string=ges_scoring_string, **kwargs)
 
         self._is_classifier = False
 
@@ -357,61 +316,13 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         tags.estimator_type = "regressor"
         return tags
 
-    """def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
-        # Validate input data
+    def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
 
-        # Will raise ValueError if X is empty or invalid
-        # For regressor, ensure y is numeric
-        X, y = validate_data(
-            self,
-            X,
-            y,
-            ensure_all_finite=False,
-        )
+        X, y = self._prepare_fit(X, y, categorical_feature_indices=categorical_feature_indices)
 
-        if categorical_feature_indices is not None:
-            self.categorical_feature_indices = categorical_feature_indices
-
-        # Auto-detect categorical features including text columns
-        if self.categorical_feature_indices is None:
-            from tabpfn_extensions.utils import infer_categorical_features
-
-            self.categorical_feature_indices = infer_categorical_features(X)
-
-        self.phe_init_args_ = {} if self.phe_init_args is None else self.phe_init_args
-        rnd = check_random_state(self.random_state)
-
-        # Torch reproducibility bomb
-        torch.manual_seed(rnd.randint(0, MAX_INT))
-        random.seed(rnd.randint(0, MAX_INT))
-        np.random.seed(rnd.randint(0, MAX_INT))
-
-        # Use the device utility for automatic selection
-        from tabpfn_extensions.utils import get_device
-
-        self.predictor_ = AutoPostHocEnsemblePredictor(
-            preset=self.preset,
-            task_type=TaskType.REGRESSION,
-            max_time=self.max_time,
-            ges_scoring_string=self.ges_scoring_string,
-            device=get_device(self.device),
-            bm_random_state=rnd.randint(0, MAX_INT),
-            ges_random_state=rnd.randint(0, MAX_INT),
-            ignore_pretraining_limits=self.ignore_pretraining_limits,
-            **self.phe_init_args_,
-        )
-
-        self.predictor_.fit(
-            X,
-            y,
-            categorical_feature_indices=self.categorical_feature_indices,
-        )
-
-        # -- Sklearn required values
-        self.n_features_in_ = self.predictor_.n_features_in_
+        super().fit(X, y)
 
         return self
-    """
 
     def predict(self, X):
         check_is_fitted(self)
@@ -421,7 +332,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
             ensure_all_finite=False,
         )
         #Convert to pandas dataframe for AutoGluon
-        preds = self.predictor_.predict(pd.DataFrame(X))
+        preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         # Convert back to numpy array for sklearn
         return preds.to_numpy()
 

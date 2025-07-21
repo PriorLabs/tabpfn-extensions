@@ -29,7 +29,7 @@ def prepare_tabpfnv2_config(raw_config: dict, *, refit_folds: bool = True) -> di
     TypeError: '<=' not supported between instances of 'NoneType' and 'int'
     '''
 
-    #TODO: Fix dt-pfn
+    raw_config["n_estimators"] = 16
     model_type = raw_config.get("model_type")
 
     if model_type == "dt_pfn":
