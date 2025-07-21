@@ -84,6 +84,11 @@ all = [
     "llvmlite>=0.30.0",
     "hyperopt>=0.2.7",
     "setuptools>=67.0.0",
+
+    "autogluon.common @ git+https://github.com/autogluon/autogluon#subdirectory=common",
+    "autogluon.features @ git+https://github.com/autogluon/autogluon#subdirectory=features",
+    "autogluon.core @ git+https://github.com/autogluon/autogluon#subdirectory=core",
+    "autogluon.tabular @ git+https://github.com/autogluon/autogluon#subdirectory=tabular",
 ]
 
 dev = [
