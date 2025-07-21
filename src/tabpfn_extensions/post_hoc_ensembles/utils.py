@@ -8,7 +8,11 @@ from hyperopt.pyll import stochastic
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 
 
-def prepare_tabpfnv2_config(raw_config: dict, *, refit_folds: bool = True) -> dict:
+def prepare_tabpfnv2_config(
+            raw_config: dict, *,
+            refit_folds: bool = True,
+            default_n_estimators: int | None = 16,
+            ) -> dict:
     """Set refit folds to True and convert tuples to lists."""
     raw_config = {
         k: list(v) if isinstance(v, tuple) else v for k, v in raw_config.items()
@@ -17,20 +21,14 @@ def prepare_tabpfnv2_config(raw_config: dict, *, refit_folds: bool = True) -> di
         raw_config["ag_args_ensemble"] = {}
     raw_config["ag_args_ensemble"]["refit_folds"] = True
 
-    # TODO: Look into this, does not seem to be supported by official AG
-    raw_config.pop("max_depth", None)
-
-    """File "/home/klemens_priorlabs_ai/tabpfn-extensions/.venv/lib/python3.10/site-packages/autogluon/tabular/models/tabpfnv2/rfpfn/sklearn_based_random_forest_tabpfn.py", line 137, in fit
-    if n_estimators <= 0:
-    TypeError: '<=' not supported between instances of 'NoneType' and 'int'
-    """
-
-    raw_config["n_estimators"] = 16
+    raw_config["n_estimators"] = default_n_estimators
     model_type = raw_config.get("model_type")
 
     if model_type == "dt_pfn":
         raw_config["n_ensemble_repeats"] = raw_config["n_estimators"]
         raw_config["n_estimators"] = 1
+
+    raw_config.pop("max_depth", None)
 
     return raw_config
 

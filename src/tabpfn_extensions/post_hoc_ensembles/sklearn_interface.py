@@ -191,7 +191,7 @@ class AutoTabPFNBase(BaseEstimator):
         # Generate hyperparameter configurations for TabPFN
         num_configs = max(1, self.num_random_configs)
         tabpfn_configs = search_space_func(
-            task_type=problem_type,
+            task_type=task_type,
             num_random_configs=num_configs,
         )
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
@@ -247,15 +247,17 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
         # Check for extremely imbalanced classes - handle case with only 1 sample per class
         class_counts = np.bincount(y.astype(int))
+        # TODO: Re-Implement this
         if np.min(class_counts[class_counts > 0]) < 2:
-            # Cannot do stratification with less than 2 samples per class
-            # Use a standard TabPFN classifier without ensemble
+
             from tabpfn_extensions.utils import TabPFNClassifier, get_device
 
             self.single_class_ = False
-
-            super().fit(X, y)
-
+            self.predictor_ = TabPFNClassifier(
+                device=get_device(self.device),
+                categorical_features_indices=self.categorical_feature_indices,
+            )
+            self.predictor_.fit(X, y)
             # Store the classes
             self.classes_ = self.predictor_.classes_
             self.n_features_in_ = X.shape[1]
@@ -264,6 +266,10 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         # Normal case - multiple classes with sufficient samples per class
         self.single_class_ = False
         task_type = TaskType.MULTICLASS if len(self.classes_) > 2 else TaskType.BINARY
+
+        # Binary does not accept ROC
+        if task_type == TaskType.BINARY:  # This comparison is failing
+            self.ges_scoring_string = "nll"
 
         super().fit(X, y)
 
@@ -375,4 +381,5 @@ if __name__ == "__main__":
                         continue
                     if raise_on_error:
                         raise e
-     
+                    lst.append((i, x, e))
+                break
