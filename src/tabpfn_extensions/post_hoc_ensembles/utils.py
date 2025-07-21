@@ -30,8 +30,11 @@ def prepare_tabpfnv2_config(raw_config: dict, *, refit_folds: bool = True) -> di
     '''
 
     #TODO: Fix dt-pfn
-    # Is Working fine
-    raw_config["model_type"] = "single"
+    model_type = raw_config.get("model_type")
+
+    if model_type == "dt_pfn":
+        raw_config["n_ensemble_repeats"] = raw_config["n_estimators"]
+        raw_config["n_estimators"] = 1
 
     return raw_config
 

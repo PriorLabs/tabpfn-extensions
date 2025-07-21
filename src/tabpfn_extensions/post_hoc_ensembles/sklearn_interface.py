@@ -90,7 +90,9 @@ class AutoTabPFNBase(BaseEstimator):
         random_state: int | None | np.random.RandomState = None,
         categorical_feature_indices: list[int] | None = None,
         ignore_pretraining_limits: bool = False,
-        phe_init_args: dict | None = {'verbosity': 0},
+        phe_init_args: dict | None = {
+            #'verbosity': 0,
+        },
         num_random_configs: int = 5,
     ):
         self.max_time = max_time
