@@ -10,7 +10,7 @@ dependencies = [
     "pandas>=1.4.0,<3",
     "scikit-learn>=1.2.0,<1.7",
     "scipy>=1.11.1,<2",
-    "tabpfn>=2.1.0",
+    "tabpfn>=2.0.6",
 ]
 
 requires-python = ">=3.9"
