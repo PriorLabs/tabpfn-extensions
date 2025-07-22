@@ -35,8 +35,12 @@ def prepare_tabpfnv2_config(
     # Set TabPFN parameters
     raw_config["n_estimators"] = n_estimators
     raw_config["ignore_pretraining_limits"] = ignore_pretraining_limits
-    if balance_probabilities:
+    #Classification
+    if balance_probabilities is not None:
         raw_config["balance_probabilities"] = balance_probabilities
+    # Regression
+    else:
+        raw_config.pop("balance_probabilities", None)
 
     model_type = raw_config.get("model_type")
 
