@@ -27,7 +27,7 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
     def estimator(self, tabpfn_classifier):
         """Provide a PHE-based TabPFN classifier as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
-        max_time = 15 if FAST_TEST_MODE else 45  # Very limited time for fast testing
+        max_time = 15 if FAST_TEST_MODE else 60  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
         phe_init_args = {}
@@ -36,6 +36,7 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
             "num_bag_sets": 1,  # Minimal value for bagging sets
             "num_stack_levels": 0,  # Disable stacking
             "fit_weighted_ensemble": False,
+            "ag_args_ensemble": {},
         }
 
         return AutoTabPFNClassifier(
@@ -98,7 +99,7 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
     def estimator(self, tabpfn_regressor):
         """Provide a PHE-based TabPFN regressor as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
-        max_time = 15 if FAST_TEST_MODE else 45  # Very limited time for fast testing
+        max_time = 15 if FAST_TEST_MODE else 60  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
         phe_init_args = {"verbosity": 0}
@@ -107,6 +108,7 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
             "num_bag_sets": 1,  # Minimal value for bagging sets
             "num_stack_levels": 0,  # Disable stacking
             "fit_weighted_ensemble": False,
+            "ag_args_ensemble": {},
         }
 
         return AutoTabPFNRegressor(
@@ -123,9 +125,9 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
         pass
 
     # TODO: Enable this test
-    @pytest.mark.skip(
-        reason="AutoTabPFN needs additional work to pass all sklearn estimator checks",
-    )
+    #@pytest.mark.skip(
+    #   reason="AutoTabPFN needs additional work to pass all sklearn estimator checks",
+    #)
     def test_passes_estimator_checks(self, estimator):
         os.environ["SK_COMPATIBLE_PRECISION"] = "True"
         raise_on_error = True

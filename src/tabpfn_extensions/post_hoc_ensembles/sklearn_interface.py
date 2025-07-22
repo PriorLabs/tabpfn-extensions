@@ -226,7 +226,6 @@ class AutoTabPFNBase(BaseEstimator):
         tabpfn_configs = search_space_func(
             task_type=task_type,
             n_ensemble_models=self.n_ensemble_models,
-            seed=self.random_state,
             n_estimators=self.n_estimators,
             balance_probabilities=self.balance_probabilities,
             ignore_pretraining_limits=self.ignore_pretraining_limits,

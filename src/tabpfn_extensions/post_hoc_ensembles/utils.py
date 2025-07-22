@@ -11,10 +11,10 @@ from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 def prepare_tabpfnv2_config(
     raw_config: dict,
     n_estimators: int,
-    balance_probabilities: bool,
+    balance_probabilities: bool | None,
     ignore_pretraining_limits: bool,
     *,
-    refit_folds: bool = True,
+    refit_folds: bool= True,
 ) -> dict:
     """Cleans and prepares a raw TabPFN hyperparameter configuration.
 
