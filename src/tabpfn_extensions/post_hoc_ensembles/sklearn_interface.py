@@ -26,8 +26,6 @@ from tabpfn_extensions.utils import (
     infer_categorical_features,
 )
 
-MAX_INT = int(np.iinfo(np.int32).max)
-
 
 # TODO: Convert to Dataclass and use these
 class TaskType(str, Enum):
@@ -89,10 +87,9 @@ class AutoTabPFNBase(BaseEstimator):
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
         categorical_feature_indices: list[int] | None = None,
-        ignore_pretraining_limits: bool = False,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
-        num_random_configs: int = 200,
+        n_ensemble_models: int = 200,
     ):
         self.max_time = max_time
         self.eval_metric = eval_metric
@@ -100,12 +97,11 @@ class AutoTabPFNBase(BaseEstimator):
         self.device = device
         self.random_state = random_state
         self.categorical_feature_indices = categorical_feature_indices
-        self.ignore_pretraining_limits = ignore_pretraining_limits
-        self.num_random_configs = num_random_configs
-
         self.phe_init_args = phe_init_args
         self.phe_fit_args = phe_fit_args
-        self.use_ensemble_model = True
+        self.n_ensemble_models = n_ensemble_models
+
+        assert n_ensemble_models >= 1, "n_ensemble_models must be >= 1"
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
@@ -117,8 +113,9 @@ class AutoTabPFNBase(BaseEstimator):
         """Constructs the fit arguments for AutoGluon's TabularPredictor."""
         default_args = {
             "num_bag_folds": 5,
-            "num_bag_sets": 5,
+            "num_bag_sets": 8,
             "num_stack_levels": 1,
+            "fit_weighted_ensemble": True,
         }
         user_args = self.phe_fit_args or {}
         return {**default_args, **user_args}
@@ -181,10 +178,9 @@ class AutoTabPFNBase(BaseEstimator):
 
         # Generate hyperparameter configurations for TabPFN Ensemble
         task_type = "multiclass" if self._is_classifier else "regression"
-        num_configs = max(1, self.num_random_configs)
         tabpfn_configs = search_space_func(
             task_type=task_type,
-            num_random_configs=num_configs,
+            num_random_configs=self.n_ensemble_models,
         )
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 

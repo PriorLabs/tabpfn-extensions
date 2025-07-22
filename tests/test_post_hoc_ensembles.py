@@ -27,13 +27,20 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
         max_time = 15 if FAST_TEST_MODE else 30  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
-        # TODO: Put some more arguments here
         phe_init_args = {}
+        phe_fit_args = {
+            "num_bag_folds": None,
+            "num_bag_sets": None,
+            "num_stack_levels": None,
+            "fit_weighted_ensemble": False,
+        }
 
         return AutoTabPFNClassifier(
             max_time=max_time,
             random_state=42,
             phe_init_args=phe_init_args,
+            phe_fit_args=phe_fit_args,
+            n_ensemble_models=5,
         )
 
     @pytest.mark.skip(reason="PHE models take too long for this test")
@@ -60,13 +67,20 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
         max_time = 1 if FAST_TEST_MODE else 5  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
-        # TODO: Put some more arguments here
         phe_init_args = {}
+        phe_fit_args = {
+            "num_bag_folds": None,
+            "num_bag_sets": None,
+            "num_stack_levels": None,
+            "fit_weighted_ensemble": False,
+        }
 
         return AutoTabPFNRegressor(
             max_time=max_time,
             random_state=42,
             phe_init_args=phe_init_args,
+            phe_fit_args=phe_fit_args,
+            n_ensemble_models=5,
         )
 
     @pytest.mark.skip(reason="PHE models take too long for this test")
