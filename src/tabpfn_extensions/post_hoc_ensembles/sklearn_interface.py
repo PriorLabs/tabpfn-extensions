@@ -27,14 +27,10 @@ MAX_INT = int(np.iinfo(np.int32).max)
 
 # TODO: Convert to Dataclass and use these
 class TaskType(str, Enum):
-    BINARY = "binary_classification"
-    MULTICLASS = "multiclass_classification"
+    BINARY = "binary"
+    MULTICLASS = "multiclass"
     REGRESSION = "regression"
 
-
-class PresetType(str, Enum):
-    DEFAULT = "default"
-    AVOID_OVERFITTING = "avoid_overfitting"
 
 
 class DeviceType(str, Enum):
@@ -52,7 +48,7 @@ class AutoTabPFNBase(BaseEstimator):
             The maximum time to spend on fitting the post hoc ensemble.
         preset: {"default", "custom_hps", "avoid_overfitting"}, default="default"
             The preset to use for the post hoc ensemble.
-        ges_scoring_string : str, default=None
+        eval_metric : str, default=None
             The scoring string to use for the eval_emtric of Autogluon.
             If None it is automciatlly chosen based on problem type, here
             are the options, https://auto.gluon.ai/dev/api/autogluon.tabular.models.html
@@ -83,8 +79,8 @@ class AutoTabPFNBase(BaseEstimator):
         self,
         *,
         max_time: int | None = 60 * 3,
-        ges_scoring_string: str | None = None,
-        preset: Literal[
+        eval_metric: str | None = None,
+        presets: Literal[
             "best_quality", "high_quality", "good_quality", "medium_quality"
         ] = "medium_quality",
         device: Literal["cpu", "cuda", "auto"] = "auto",
@@ -96,8 +92,8 @@ class AutoTabPFNBase(BaseEstimator):
         num_random_configs: int = 200,
     ):
         self.max_time = max_time
-        self.ges_scoring_string = ges_scoring_string
-        self.presets = preset
+        self.eval_metric = eval_metric
+        self.presets = presets
         self.device = device
         self.random_state = random_state
         self.categorical_feature_indices = categorical_feature_indices
@@ -110,13 +106,17 @@ class AutoTabPFNBase(BaseEstimator):
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
-        default_args = {"verbosity": 0}
+        default_args = {"verbosity": 5}
         user_args = self.phe_init_args or {}
         return {**default_args, **user_args}
 
     def _get_predictor_fit_args(self) -> dict[str, Any]:
         """Constructs the fit arguments for AutoGluon's TabularPredictor."""
-        default_args = {}
+        default_args = {
+            "num_bag_folds": 5,
+            "num_bag_sets": 5,
+            "num_stack_levels": 1,
+        }
         user_args = self.phe_fit_args or {}
         return {**default_args, **user_args}
 
@@ -166,19 +166,19 @@ class AutoTabPFNBase(BaseEstimator):
         training_df["_target_"] = y
 
         problem_type = (
-            "binary"
+            TaskType.BINARY
             if self._is_classifier and len(np.unique(y)) == 2
-            else ("multiclass" if self._is_classifier else "regression")
+            else (TaskType.MULTICLASS if self._is_classifier else TaskType.REGRESSION)
         )
 
         self.predictor_ = TabularPredictor(
             label="_target_",
             problem_type=problem_type,
-            eval_metric=self.ges_scoring_string,
+            eval_metric=self.eval_metric,
             **self._get_predictor_init_args(),
         )
 
-        task_type = "multiclass" if self._is_classifier else "regression"
+        task_type = problem_type.value
 
         # Generate hyperparameter configurations for TabPFN
         num_configs = max(1, self.num_random_configs)
@@ -222,7 +222,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         tags.estimator_type = "classifier"
         return tags
 
-    def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
+    def fit(self, X: np.ndarray, y: np.ndarray, categorical_feature_indices: list[int] | None = None) -> AutoTabPFNClassifier:
         X, y = self._prepare_fit(X, y, categorical_feature_indices)
 
         # TODO: Make sure the logic below works as intended
@@ -258,13 +258,13 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         task_type = TaskType.MULTICLASS if len(self.classes_) > 2 else TaskType.BINARY
 
         # Binary does not accept ROC
-        if task_type == TaskType.BINARY:  # This comparison is failing
-            self.ges_scoring_string = "nll"
+        #if task_type == TaskType.BINARY:  # This comparison is failing
+        #    self.eval_metric = "nll"
 
         super().fit(X, y)
-        return None
+        return self
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
         check_is_fitted(self)
         X = validate_data(
             self,
@@ -279,7 +279,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         # Convert back to numpy array for sklearn
         return preds.to_numpy()
 
-    def predict_proba(self, X):
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
         check_is_fitted(self)
         X = validate_data(
             self,
@@ -303,7 +303,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
         self._is_classifier = False
 
-    def _more_tags(self):
+    def _more_tags(self) -> dict:
         return {
             "allow_nan": True,
         }
@@ -313,7 +313,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         tags.estimator_type = "regressor"
         return tags
 
-    def fit(self, X, y, categorical_feature_indices: list[int] | None = None):
+    def fit(self, X: np.ndarray, y: np.ndarray, categorical_feature_indices: list[int] | None = None) -> AutoTabPFNRegressor:
         X, y = self._prepare_fit(
             X, y, categorical_feature_indices=categorical_feature_indices
         )
@@ -322,16 +322,14 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
         return self
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
         check_is_fitted(self)
         X = validate_data(
             self,
             X,
             ensure_all_finite=False,
         )
-        # Convert to pandas dataframe for AutoGluon
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
-        # Convert back to numpy array for sklearn
         return preds.to_numpy()
 
 
