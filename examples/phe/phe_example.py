@@ -48,7 +48,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.33,
     random_state=42,
 )
-clf = AutoTabPFNClassifier(max_time=60*3)
+clf = AutoTabPFNClassifier(max_time=60 * 3)
 clf.fit(X_train, y_train)
 prediction_probabilities = clf.predict_proba(X_test)
 predictions = np.argmax(prediction_probabilities, axis=-1)

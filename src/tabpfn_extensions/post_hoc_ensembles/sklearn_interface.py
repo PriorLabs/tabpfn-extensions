@@ -40,39 +40,66 @@ class DeviceType(str, Enum):
 
 
 class AutoTabPFNBase(BaseEstimator):
-    """Base class for AutoGluon-powered TabPFN scikit-learn wrappers.
+    """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN models.
+
+    This class serves as a base for creating powerful classification and regression
+    models by building a post-hoc ensemble of multiple TabPFN configurations using
+    AutoGluon. This approach leverages AutoGluon's robust ensembling strategies to
+    combine predictions from various specialized TabPFN models, often leading to
+    state-of-the-art performance on tabular datasets.
+
+    The implementation is based on the methodology presented in the "TabArena" paper.
 
     Parameters
     ----------
-        max_time : int | None, default=None
-            The maximum time to spend on fitting the post hoc ensemble.
-        preset: {"default", "custom_hps", "avoid_overfitting"}, default="default"
-            The preset to use for the post hoc ensemble.
-        eval_metric : str, default=None
-            The scoring string to use for the eval_emtric of Autogluon.
-            If None it is automciatlly chosen based on problem type, here
-            are the options, https://auto.gluon.ai/dev/api/autogluon.tabular.models.html
-        device : {"cpu", "cuda"}, default="auto"
-            The device to use for training and prediction.
-        random_state : int, RandomState instance or None, default=None
-            Controls both the randomness base models and the post hoc ensembling method.
-        categorical_feature_indices: list[int] or None, default=None
-            The indices of the categorical features in the input data. Can also be passed to `fit()`.
-        ignore_pretraining_limits: bool, default=False
-            Whether to ignore the pretraining limits of the TabPFN base models.
-        phe_init_args : dict | None, default=None
-            The initialization arguments for the post hoc ensemble predictor.
-            See Autogluon TabularPredictor for more options and all details.
-        phe_fit_args : dict | None, default=None
-            The fit arguments for the post hoc ensemble predictor.
-            See Autogluon TabularPredictor for more options and all details.
+    max_time : int | None, default=60*3
+        Maximum time in seconds to train the ensemble. If `None`, training will run until
+        all models are fitted.
+    eval_metric : str | None, default=None
+        The evaluation metric for AutoGluon to optimize. If `None`, a default metric
+        is chosen based on the problem type (e.g., 'accuracy' for classification).
+        For a full list of options, see the AutoGluon documentation.
+    presets : {"best_quality", "high_quality", "good_quality", "medium_quality"}, default="medium_quality"
+        AutoGluon preset to control the trade-off between training time and predictive accuracy.
+    device : {"cpu", "cuda", "auto"}, default="auto"
+        The device to use for training. "auto" will select "cuda" if available, otherwise "cpu".
+    random_state : int | np.random.RandomState | None, default=None
+        Controls the randomness for both base model training and the ensembling process.
+    categorical_feature_indices : list[int] | None, default=None
+        Indices of the categorical features in the input data. If `None`, they will be
+        automatically inferred during `fit()`.
+    phe_init_args : dict | None, default=None
+        Advanced customization arguments passed directly to the `TabularPredictor`
+        constructor in AutoGluon. See the AutoGluon documentation for details.
+    phe_fit_args : dict | None, default=None
+        Advanced customization arguments passed to the `TabularPredictor.fit()` method
+        in AutoGluon. See the AutoGluon documentation for details.
+    n_ensemble_models : int, default=200
+        The number of random TabPFN configurations to generate and include in the
+        AutoGluon model zoo for ensembling.
+    n_estimators : int, default=16
+        The number of internal transformers to ensemble within each individual TabPFN model.
+        Higher values can improve performance but increase resource usage.
+    balance_probabilities : bool, default=False
+        Whether to balance the output probabilities from TabPFN. This can be beneficial
+        for classification tasks with imbalanced classes.
+    ignore_pretraining_limits : bool, default=False
+        If `True`, bypasses TabPFN's built-in limits on dataset size (1024 samples)
+        and feature count (100). **Warning:** Use with caution, as performance is not
+        guaranteed and may be poor when exceeding these limits.
 
-    Attributes:
+    Attributes
     ----------
-        predictor_ : TabularPredictor
-            The predictor interface used to make predictions.
-        phe_init_args_ : dict
-            The optional initialization arguments used for the post hoc ensemble predictor.
+    predictor_ : autogluon.tabular.TabularPredictor
+        The fitted AutoGluon predictor object that manages the ensemble.
+    categorical_feature_indices_ : list[int]
+        The effective list of categorical feature indices used by the model.
+    classes_ : np.ndarray
+        For classifiers, an array of class labels known to the model.
+    n_features_in_ : int
+        The number of features seen during `fit()`.
+    _column_names : list[str]
+        Internal list of feature names used for prediction.
     """
 
     def __init__(
@@ -89,6 +116,9 @@ class AutoTabPFNBase(BaseEstimator):
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 200,
+        n_estimators: int = 16,
+        balance_probabilities: bool = False,
+        ignore_pretraining_limits: bool = False,
     ):
         self.max_time = max_time
         self.eval_metric = eval_metric
@@ -99,6 +129,9 @@ class AutoTabPFNBase(BaseEstimator):
         self.phe_init_args = phe_init_args
         self.phe_fit_args = phe_fit_args
         self.n_ensemble_models = n_ensemble_models
+        self.n_estimators = n_estimators
+        self.balance_probabilities = balance_probabilities
+        self.ignore_pretraining_limits = ignore_pretraining_limits
 
         assert n_ensemble_models >= 1, "n_ensemble_models must be >= 1"
 
@@ -192,7 +225,11 @@ class AutoTabPFNBase(BaseEstimator):
         task_type = "multiclass" if self._is_classifier else "regression"
         tabpfn_configs = search_space_func(
             task_type=task_type,
-            num_random_configs=self.n_ensemble_models,
+            n_ensemble_models=self.n_ensemble_models,
+            seed=self.random_state,
+            n_estimators=self.n_estimators,
+            balance_probabilities=self.balance_probabilities,
+            ignore_pretraining_limits=self.ignore_pretraining_limits,
         )
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
@@ -340,46 +377,3 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         )
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         return preds.to_numpy()
-
-
-if __name__ == "__main__":
-    import os
-
-    from sklearn.utils.estimator_checks import check_estimator
-
-    os.environ["SK_COMPATIBLE_PRECISION"] = "True"
-    raise_on_error = True
-    nan_test = 9
-
-    # Precision issues do not allow for such deterministic behavior as expected, thus retrying certain tests to show it can work.
-    clf_non_deterministic_for_reasons = [
-        31,
-        30,
-    ]
-    reg_non_deterministic_for_reasons = [
-        27,
-        28,
-    ]
-
-    for est, non_deterministic in [
-        (AutoTabPFNClassifier(device="cuda"), clf_non_deterministic_for_reasons),
-        (AutoTabPFNRegressor(device="cuda"), reg_non_deterministic_for_reasons),
-    ]:
-        lst = []
-        for i, x in enumerate(check_estimator(est, generate_only=True)):
-            if (i == nan_test) and ("allow_nan" in x[0]._get_tags()):
-                # sklearn test does not check for the tag!
-                continue
-
-            n_tests = 5
-            while n_tests:
-                try:
-                    x[1](x[0])
-                except Exception as e:
-                    if i in non_deterministic:
-                        n_tests -= 1
-                        continue
-                    if raise_on_error:
-                        raise e
-                    lst.append((i, x, e))
-                break
