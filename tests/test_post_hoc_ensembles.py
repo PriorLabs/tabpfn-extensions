@@ -8,6 +8,8 @@ import os
 import pytest
 
 from conftest import FAST_TEST_MODE
+from sklearn.utils.estimator_checks import check_estimator
+
 from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import (
     AutoTabPFNClassifier,
     AutoTabPFNRegressor,
@@ -64,7 +66,7 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
     def estimator(self, tabpfn_regressor):
         """Provide a PHE-based TabPFN regressor as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
-        max_time = 5 if FAST_TEST_MODE else 10  # Very limited time for fast testing
+        max_time = 15 if FAST_TEST_MODE else 30  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
         phe_init_args = {"verbosity": 0}
@@ -88,9 +90,9 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
         """Skip test with various datasets as it takes too long for PHE."""
         pass
 
-    @pytest.mark.skip(
-        reason="AutoTabPFN needs additional work to pass all sklearn estimator checks",
-    )
+    #@pytest.mark.skip(
+    #    reason="AutoTabPFN needs additional work to pass all sklearn estimator checks",
+    #)
     def test_passes_estimator_checks(self, estimator):
         os.environ["SK_COMPATIBLE_PRECISION"] = "True"
         raise_on_error = True
