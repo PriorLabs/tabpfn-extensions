@@ -73,6 +73,7 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
             "num_bag_sets": None,
             "num_stack_levels": None,
             "fit_weighted_ensemble": False,
+            "ag_args_ensemble": {},
         }
 
         return AutoTabPFNRegressor(

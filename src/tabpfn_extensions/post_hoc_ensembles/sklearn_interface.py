@@ -26,8 +26,6 @@ from tabpfn_extensions.utils import (
     infer_categorical_features,
 )
 
-
-# TODO: Convert to Dataclass and use these
 class TaskType(str, Enum):
     BINARY = "binary"
     MULTICLASS = "multiclass"
@@ -116,22 +114,31 @@ class AutoTabPFNBase(BaseEstimator):
             "num_bag_sets": 8,
             "num_stack_levels": 1,
             "fit_weighted_ensemble": True,
+            "ag_args_ensemble": {"fit_strategy": "parallel"},
         }
         user_args = self.phe_fit_args or {}
         return {**default_args, **user_args}
 
     def _prepare_fit(
         self,
-        X: np.ndarray,
-        y: np.ndarray,
+        X: pd.DataFrame | np.ndarray,
+        y: pd.Series | np.ndarray,
         categorical_feature_indices: list[int] | None = None,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[pd.DataFrame | np.ndarray, pd.Series | np.ndarray]:
+
+        original_columns = None
+        if isinstance(X, pd.DataFrame):
+            original_columns = X.columns.tolist()
+
         X, y = validate_data(
             self,
             X,
             y,
             ensure_all_finite=False,
         )
+
+        if original_columns is not None:
+            X = pd.DataFrame(X, columns=original_columns)
 
         if self.categorical_feature_indices is not None:
             self.categorical_feature_indices = self.categorical_feature_indices
@@ -159,8 +166,13 @@ class AutoTabPFNBase(BaseEstimator):
 
         from tabpfn_extensions.post_hoc_ensembles.utils import search_space_func
 
-        self._column_names = [f"f{i}" for i in range(X.shape[1])]
-        training_df = pd.DataFrame(X.copy(), columns=self._column_names)
+        if isinstance(X, pd.DataFrame):
+            training_df = X.copy()
+            self._column_names = X.columns.tolist()
+        else:
+            self._column_names = [f"f{i}" for i in range(X.shape[1])]
+            training_df = pd.DataFrame(X, columns=self._column_names)
+
         training_df["_target_"] = y
 
         problem_type = (
@@ -184,6 +196,7 @@ class AutoTabPFNBase(BaseEstimator):
         )
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
+        #TODO: Code limited to 1 GPU, infer dynamically
         device = get_device(self.device)
         num_gpus = 1 if device == DeviceType.CUDA else 0
 
@@ -220,8 +233,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
     def fit(
         self,
-        X: np.ndarray,
-        y: np.ndarray,
+        X: pd.DataFrame | np.ndarray,
+        y: pd.Series | np.ndarray,
         categorical_feature_indices: list[int] | None = None,
     ) -> AutoTabPFNClassifier:
         X, y = self._prepare_fit(X, y, categorical_feature_indices)
@@ -259,7 +272,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         super().fit(X, y)
         return self
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
         X = validate_data(
             self,
@@ -274,7 +287,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         # Convert back to numpy array for sklearn
         return preds.to_numpy()
 
-    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+    def predict_proba(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
         X = validate_data(
             self,
@@ -284,11 +297,10 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         if hasattr(self, "single_class_") and self.single_class_:
             # For single class, return probabilities of 1.0
             return np.ones((X.shape[0], 1))
-        # Convert to pandas dataframe for AutoGluon
+
         preds = self.predictor_.predict_proba(
             pd.DataFrame(X, columns=self._column_names)
         )
-        # Convert back to numpy array for sklearn
         return preds.to_numpy()
 
 
@@ -310,19 +322,18 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
     def fit(
         self,
-        X: np.ndarray,
-        y: np.ndarray,
+        X: pd.DataFrame | np.ndarray,
+        y: pd.Series | np.ndarray,
         categorical_feature_indices: list[int] | None = None,
     ) -> AutoTabPFNRegressor:
         X, y = self._prepare_fit(
             X, y, categorical_feature_indices=categorical_feature_indices
         )
-
         super().fit(X, y)
 
         return self
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
         X = validate_data(
             self,
