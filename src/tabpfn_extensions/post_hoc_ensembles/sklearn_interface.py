@@ -20,7 +20,11 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
-from tabpfn_extensions.utils import get_device
+from tabpfn_extensions.utils import (
+    TabPFNClassifier,
+    get_device,
+    infer_categorical_features,
+)
 
 MAX_INT = int(np.iinfo(np.int32).max)
 
@@ -30,7 +34,6 @@ class TaskType(str, Enum):
     BINARY = "binary"
     MULTICLASS = "multiclass"
     REGRESSION = "regression"
-
 
 
 class DeviceType(str, Enum):
@@ -138,8 +141,6 @@ class AutoTabPFNBase(BaseEstimator):
 
         # Auto-detect categorical features including text columns
         if self.categorical_feature_indices is None:
-            from tabpfn_extensions.utils import infer_categorical_features
-
             self.categorical_feature_indices = infer_categorical_features(X)
 
         return X, y
@@ -178,9 +179,8 @@ class AutoTabPFNBase(BaseEstimator):
             **self._get_predictor_init_args(),
         )
 
-        task_type = problem_type.value
-
-        # Generate hyperparameter configurations for TabPFN
+        # Generate hyperparameter configurations for TabPFN Ensemble
+        task_type = "multiclass" if self._is_classifier else "regression"
         num_configs = max(1, self.num_random_configs)
         tabpfn_configs = search_space_func(
             task_type=task_type,
@@ -222,7 +222,12 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         tags.estimator_type = "classifier"
         return tags
 
-    def fit(self, X: np.ndarray, y: np.ndarray, categorical_feature_indices: list[int] | None = None) -> AutoTabPFNClassifier:
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        categorical_feature_indices: list[int] | None = None,
+    ) -> AutoTabPFNClassifier:
         X, y = self._prepare_fit(X, y, categorical_feature_indices)
 
         # TODO: Make sure the logic below works as intended
@@ -240,8 +245,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         class_counts = np.bincount(y.astype(int))
         # TODO: Re-Implement this
         if np.min(class_counts[class_counts > 0]) < 2:
-            from tabpfn_extensions.utils import TabPFNClassifier, get_device
-
             self.single_class_ = False
             self.predictor_ = TabPFNClassifier(
                 device=get_device(self.device),
@@ -255,11 +258,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
         # Normal case - multiple classes with sufficient samples per class
         self.single_class_ = False
-        task_type = TaskType.MULTICLASS if len(self.classes_) > 2 else TaskType.BINARY
-
-        # Binary does not accept ROC
-        #if task_type == TaskType.BINARY:  # This comparison is failing
-        #    self.eval_metric = "nll"
+        TaskType.MULTICLASS if len(self.classes_) > 2 else TaskType.BINARY
 
         super().fit(X, y)
         return self
@@ -313,7 +312,12 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         tags.estimator_type = "regressor"
         return tags
 
-    def fit(self, X: np.ndarray, y: np.ndarray, categorical_feature_indices: list[int] | None = None) -> AutoTabPFNRegressor:
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        categorical_feature_indices: list[int] | None = None,
+    ) -> AutoTabPFNRegressor:
         X, y = self._prepare_fit(
             X, y, categorical_feature_indices=categorical_feature_indices
         )

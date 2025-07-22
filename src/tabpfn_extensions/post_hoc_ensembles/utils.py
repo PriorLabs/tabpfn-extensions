@@ -46,7 +46,6 @@ def search_space_func(
     """
     search_space = get_param_grid_hyperopt(task_type=task_type)
     rng = np.random.default_rng(seed)
-    stochastic.sample(search_space, rng=rng)
     return [
         prepare_tabpfnv2_config(dict(stochastic.sample(search_space, rng=rng)))
         for _ in range(num_random_configs)
