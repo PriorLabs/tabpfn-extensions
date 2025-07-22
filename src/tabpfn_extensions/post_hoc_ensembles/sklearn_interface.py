@@ -140,12 +140,15 @@ class AutoTabPFNBase(BaseEstimator):
         if original_columns is not None:
             X = pd.DataFrame(X, columns=original_columns)
 
-        if self.categorical_feature_indices is not None:
-            self.categorical_feature_indices = self.categorical_feature_indices
+        effective_cat_indices = categorical_feature_indices
+        if effective_cat_indices is None:
+            effective_cat_indices = self.categorical_feature_indices
 
-        # Auto-detect categorical features including text columns
-        if self.categorical_feature_indices is None:
-            self.categorical_feature_indices = infer_categorical_features(X)
+        # Auto-detect if still not specified and store in a new "fitted" attribute
+        if effective_cat_indices is None:
+            self.categorical_feature_indices_ = infer_categorical_features(X)
+        else:
+            self.categorical_feature_indices_ = effective_cat_indices
 
         return X, y
 
@@ -157,7 +160,7 @@ class AutoTabPFNBase(BaseEstimator):
     # TODO: Add better typing for X and y
     # E.g. With numpy and then internally convert to Pandas
     # Or also allow pandas dataframes
-    def fit(self, X: np.ndarray, y: np.ndarray):
+    def fit(self, X: np.ndarray | pd.DataFrame, y: np.ndarray | pd.Series):
         """Fits the model by training an ensemble of TabPFN configurations using AutoGluon.
         This method should be called from the child class's fit method after validation.
         """
@@ -257,7 +260,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             self.single_class_ = False
             self.predictor_ = TabPFNClassifier(
                 device=get_device(self.device),
-                categorical_features_indices=self.categorical_feature_indices,
+                categorical_features_indices=self.categorical_feature_indices_,
             )
             self.predictor_.fit(X, y)
             # Store the classes

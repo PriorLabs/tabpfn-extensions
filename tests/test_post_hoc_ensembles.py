@@ -64,16 +64,17 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
     def estimator(self, tabpfn_regressor):
         """Provide a PHE-based TabPFN regressor as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
-        max_time = 5 if FAST_TEST_MODE else 15  # Very limited time for fast testing
+        max_time = 5 if FAST_TEST_MODE else 45  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
-        phe_init_args = {}
+        phe_init_args = {
+            "verbosity": 0
+        }
         phe_fit_args = {
-            "num_bag_folds": None,
-            "num_bag_sets": None,
-            "num_stack_levels": None,
+            "num_bag_folds": 0,
+            "num_bag_sets": 0,
+            "num_stack_levels": 0,
             "fit_weighted_ensemble": False,
-            "ag_args_ensemble": {},
         }
 
         return AutoTabPFNRegressor(
