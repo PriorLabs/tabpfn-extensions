@@ -224,6 +224,11 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             TabPFNUnsupervisedModel
                 Fitted model instance (self).
         """
+        if isinstance(X, np.ndarray):
+            X = torch.tensor(X, dtype=torch.float32)
+        elif isinstance(X, pd.DataFrame):
+            X = torch.tensor(X.values, dtype=torch.float32)
+
         self.X_ = copy.deepcopy(X)
 
         # Ensure y is not None and doesn't contain NaN values
@@ -291,18 +296,19 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X_fit = self.X_
         impute_X = copy.deepcopy(X)
 
-        for i in tqdm(range(len(all_features))):
-            column_idx = all_features[i]
+        columns_with_nan = [
+            col_idx
+            for col_idx in all_features
+            if torch.isnan(impute_X[:, col_idx]).any()
+        ]
 
-            if not condition_on_all_features:
-                conditional_idx = all_features[:i] if i > 0 else []
-            else:
-                conditional_idx = list(set(range(X.shape[1])) - {column_idx})
-
+        for column_idx in tqdm(columns_with_nan):
             y_predict = impute_X[:, column_idx]
 
-            if torch.isnan(y_predict).sum() == 0:
-                continue
+            if not condition_on_all_features:
+                conditional_idx = all_features[:column_idx] if column_idx > 0 else []
+            else:
+                conditional_idx = list(set(range(X.shape[1])) - {column_idx})
 
             X_where_y_is_nan = impute_X[torch.isnan(y_predict)]
             X_where_y_is_nan = X_where_y_is_nan.reshape(-1, impute_X.shape[1])
@@ -620,9 +626,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 logits = pred["logits"]
                 logits_tensor = logits.clone().detach()
 
-                y_tensor = y_predict.clone().detach().to(logits)
+                y_tensor = y_predict.clone().detach().to(logits.device)
 
-                pred = pred["criterion"].pdf(logits_tensor, y_tensor).to(log_p)
+                pred = pred["criterion"].pdf(logits_tensor, y_tensor).to(log_p.device)
 
             # Handle zero or negative probabilities (avoid log(0))
             pred = torch.clamp(pred, min=1e-10)
