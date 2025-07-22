@@ -61,10 +61,10 @@ interpretability = [
 post_hoc_ensembles = [
     "llvmlite",
     "hyperopt>=0.2.7",
-    "autogluon.common @ git+https://github.com/autogluon/autogluon#subdirectory=common",
-    "autogluon.features @ git+https://github.com/autogluon/autogluon#subdirectory=features",
-    "autogluon.core @ git+https://github.com/autogluon/autogluon#subdirectory=core",
-    "autogluon.tabular @ git+https://github.com/autogluon/autogluon#subdirectory=tabular",
+    "autogluon.common @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=common",
+    "autogluon.features @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=features",
+    "autogluon.core @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=core",
+    "autogluon.tabular @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=tabular"
 ]
 hpo = [
     "hyperopt>=0.2.7",
@@ -85,10 +85,10 @@ all = [
     "hyperopt>=0.2.7",
     "setuptools>=67.0.0",
 
-    "autogluon.common @ git+https://github.com/autogluon/autogluon#subdirectory=common",
-    "autogluon.features @ git+https://github.com/autogluon/autogluon#subdirectory=features",
-    "autogluon.core @ git+https://github.com/autogluon/autogluon#subdirectory=core",
-    "autogluon.tabular @ git+https://github.com/autogluon/autogluon#subdirectory=tabular",
+    "autogluon.common @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=common",
+    "autogluon.features @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=features",
+    "autogluon.core @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=core",
+    "autogluon.tabular @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=tabular"
 ]
 
 dev = [
