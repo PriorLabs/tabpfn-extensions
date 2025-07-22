@@ -14,7 +14,7 @@ def prepare_tabpfnv2_config(
     balance_probabilities: bool | None,
     ignore_pretraining_limits: bool,
     *,
-    refit_folds: bool= True,
+    refit_folds: bool = True,
 ) -> dict:
     """Cleans and prepares a raw TabPFN hyperparameter configuration.
 
