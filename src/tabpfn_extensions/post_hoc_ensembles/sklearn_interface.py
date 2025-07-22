@@ -26,6 +26,7 @@ from tabpfn_extensions.utils import (
     infer_categorical_features,
 )
 
+
 class TaskType(str, Enum):
     BINARY = "binary"
     MULTICLASS = "multiclass"
@@ -125,7 +126,6 @@ class AutoTabPFNBase(BaseEstimator):
         y: pd.Series | np.ndarray,
         categorical_feature_indices: list[int] | None = None,
     ) -> tuple[pd.DataFrame | np.ndarray, pd.Series | np.ndarray]:
-
         original_columns = None
         if isinstance(X, pd.DataFrame):
             original_columns = X.columns.tolist()
@@ -157,9 +157,6 @@ class AutoTabPFNBase(BaseEstimator):
         tags.input_tags.allow_nan = True
         return tags
 
-    # TODO: Add better typing for X and y
-    # E.g. With numpy and then internally convert to Pandas
-    # Or also allow pandas dataframes
     def fit(self, X: np.ndarray | pd.DataFrame, y: np.ndarray | pd.Series):
         """Fits the model by training an ensemble of TabPFN configurations using AutoGluon.
         This method should be called from the child class's fit method after validation.
@@ -199,7 +196,7 @@ class AutoTabPFNBase(BaseEstimator):
         )
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
-        #TODO: Code limited to 1 GPU, infer dynamically
+        # TODO: Code limited to 1 GPU, infer dynamically
         device = get_device(self.device)
         num_gpus = 1 if device == DeviceType.CUDA else 0
 
@@ -212,8 +209,11 @@ class AutoTabPFNBase(BaseEstimator):
             **self._get_predictor_fit_args(),
         )
 
-        # TODO: Put the Sklearn required values for the classes
-        # and number of features input feature back in here
+        # Set sklearn required attributes from the fitted predictor
+        self.n_features_in_ = len(self.predictor_.features())
+        if self._is_classifier:
+            # Storing the classes_ in the order AutoGluon uses them
+            self.classes_ = self.predictor_.class_labels
 
         return self
 
@@ -242,20 +242,16 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     ) -> AutoTabPFNClassifier:
         X, y = self._prepare_fit(X, y, categorical_feature_indices)
 
-        # TODO: Make sure the logic below works as intended
-        # Check for single class
-        self.classes_ = unique_labels(y)
-        self.n_features_in_ = X.shape[1]
-
         # Single class case - special handling
-        if len(self.classes_) == 1:
+        if len(unique_labels(y)) == 1:
             self.single_class_ = True
+            self.classes_ = unique_labels(y)
             self.single_class_value_ = self.classes_[0]
+            self.n_features_in_ = X.shape[1]
             return self
 
         # Check for extremely imbalanced classes - handle case with only 1 sample per class
         class_counts = np.bincount(y.astype(int))
-        # TODO: Re-Implement this
         if np.min(class_counts[class_counts > 0]) < 2:
             self.single_class_ = False
             self.predictor_ = TabPFNClassifier(
@@ -270,7 +266,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
         # Normal case - multiple classes with sufficient samples per class
         self.single_class_ = False
-        TaskType.MULTICLASS if len(self.classes_) > 2 else TaskType.BINARY
 
         super().fit(X, y)
         return self

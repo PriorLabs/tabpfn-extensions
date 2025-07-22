@@ -67,9 +67,7 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
         max_time = 5 if FAST_TEST_MODE else 45  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
-        phe_init_args = {
-            "verbosity": 0
-        }
+        phe_init_args = {"verbosity": 0}
         phe_fit_args = {
             "num_bag_folds": 0,
             "num_bag_sets": 0,
