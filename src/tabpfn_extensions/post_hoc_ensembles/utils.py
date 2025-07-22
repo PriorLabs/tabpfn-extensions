@@ -34,8 +34,9 @@ def prepare_tabpfnv2_config(
 
     # Set TabPFN parameters
     raw_config["n_estimators"] = n_estimators
-    raw_config["balance_probabilities"] = balance_probabilities
     raw_config["ignore_pretraining_limits"] = ignore_pretraining_limits
+    if balance_probabilities:
+        raw_config["balance_probabilities"] = balance_probabilities
 
     model_type = raw_config.get("model_type")
 
@@ -51,9 +52,9 @@ def prepare_tabpfnv2_config(
 def search_space_func(
     task_type: Literal["regression", "multiclass"],
     n_estimators: int,
-    balance_probabilities: bool,
     ignore_pretraining_limits: bool,
     n_ensemble_models: int,
+    balance_probabilities: bool | None = None,
     seed: int = 42,
 ) -> list[dict]:
     """Generate a list of random configurations for TabPFNv2 from its search space.
@@ -62,6 +63,9 @@ def search_space_func(
     """
     assert n_ensemble_models > 0, "n_ensemble_models must be > 0"
     assert n_estimators > 0, "n_estimators must be > 0"
+
+    if task_type == "regression":
+        balance_probabilities = None
 
     search_space = get_param_grid_hyperopt(task_type=task_type)
     rng = np.random.default_rng(seed)

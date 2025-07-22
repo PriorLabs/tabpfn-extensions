@@ -88,7 +88,7 @@ class AutoTabPFNBase(BaseEstimator):
         and feature count (100). **Warning:** Use with caution, as performance is not
         guaranteed and may be poor when exceeding these limits.
 
-    Attributes
+    Attributes:
     ----------
     predictor_ : autogluon.tabular.TabularPredictor
         The fitted AutoGluon predictor object that manages the ensemble.
@@ -261,59 +261,54 @@ class AutoTabPFNBase(BaseEstimator):
 
 
 class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
-    """The implementation is based on the methodology presented in the "TabArena" paper.
+    """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN classifiers.
+
+    This model creates a post-hoc ensemble of multiple TabPFN configurations using
+    AutoGluon, leveraging its ensembling strategies for state-of-the-art performance.
+    It is designed for binary and multi-class classification tasks.
+
+    The implementation is based on the methodology from the "TabArena" paper.
 
     Parameters
     ----------
-    max_time : int | None, default=60*3
-        Maximum time in seconds to train the ensemble. If `None`, training will run until
-        all models are fitted.
+    max_time : int | None, default=180
+        Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
-        The evaluation metric for AutoGluon to optimize. If `None`, a default metric
-        is chosen based on the problem type (e.g., 'accuracy' for classification).
-        For a full list of options, see the AutoGluon documentation.
+        Metric for AutoGluon to optimize. Defaults to 'accuracy'.
     presets : {"best_quality", "high_quality", "good_quality", "medium_quality"}, default="medium_quality"
-        AutoGluon preset to control the trade-off between training time and predictive accuracy.
+        AutoGluon preset to control the quality-time trade-off.
     device : {"cpu", "cuda", "auto"}, default="auto"
-        The device to use for training. "auto" will select "cuda" if available, otherwise "cpu".
+        Device for training. "auto" selects "cuda" if available.
     random_state : int | np.random.RandomState | None, default=None
-        Controls the randomness for both base model training and the ensembling process.
+        Controls randomness for reproducibility.
     categorical_feature_indices : list[int] | None, default=None
-        Indices of the categorical features in the input data. If `None`, they will be
-        automatically inferred during `fit()`.
+        Indices of categorical features. If `None`, they are inferred automatically.
     phe_init_args : dict | None, default=None
-        Advanced customization arguments passed directly to the `TabularPredictor`
-        constructor in AutoGluon. See the AutoGluon documentation for details.
+        Advanced arguments for AutoGluon's `TabularPredictor` constructor.
     phe_fit_args : dict | None, default=None
-        Advanced customization arguments passed to the `TabularPredictor.fit()` method
-        in AutoGluon. See the AutoGluon documentation for details.
+        Advanced arguments for AutoGluon's `TabularPredictor.fit()` method.
     n_ensemble_models : int, default=200
-        The number of random TabPFN configurations to generate and include in the
-        AutoGluon model zoo for ensembling.
+        Number of random TabPFN configurations to generate for the ensemble.
     n_estimators : int, default=16
-        The number of internal transformers to ensemble within each individual TabPFN model.
-        Higher values can improve performance but increase resource usage.
+        Number of internal transformers per TabPFN model.
     balance_probabilities : bool, default=False
-        Whether to balance the output probabilities from TabPFN. This can be beneficial
-        for classification tasks with imbalanced classes.
+        Whether to balance output probabilities, useful for imbalanced datasets.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses TabPFN's built-in limits on dataset size (1024 samples)
-        and feature count (100). **Warning:** Use with caution, as performance is not
-        guaranteed and may be poor when exceeding these limits.
+        If `True`, bypasses TabPFN's default sample (1024) and feature (100) limits.
+        **Warning:** Performance is not guaranteed beyond these limits.
 
-    Attributes
+    Attributes:
     ----------
     predictor_ : autogluon.tabular.TabularPredictor
-        The fitted AutoGluon predictor object that manages the ensemble.
+        The fitted AutoGluon predictor managing the ensemble.
     categorical_feature_indices_ : list[int]
         The effective list of categorical feature indices used by the model.
     classes_ : np.ndarray
-        For classifiers, an array of class labels known to the model.
+        An array of class labels known to the classifier.
     n_features_in_ : int
         The number of features seen during `fit()`.
-    _column_names : list[str]
-        Internal list of feature names used for prediction.
     """
+
     def __init__(
         self,
         *,
@@ -332,20 +327,20 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
-        self.max_time = max_time
-        self.eval_metric = eval_metric
-        self.presets = presets
-        self.device = device
-        self.random_state = random_state
-        self.categorical_feature_indices = categorical_feature_indices
-        self.phe_init_args = phe_init_args
-        self.phe_fit_args = phe_fit_args
-        self.n_ensemble_models = n_ensemble_models
-        self.n_estimators = n_estimators
-        self.balance_probabilities = balance_probabilities
-        self.ignore_pretraining_limits = ignore_pretraining_limits
-
-        assert n_ensemble_models >= 1, "n_ensemble_models must be >= 1"
+        super().__init__(
+            max_time=max_time,
+            eval_metric=eval_metric,
+            presets=presets,
+            device=device,
+            random_state=random_state,
+            categorical_feature_indices=categorical_feature_indices,
+            phe_init_args=phe_init_args,
+            phe_fit_args=phe_fit_args,
+            n_ensemble_models=n_ensemble_models,
+            n_estimators=n_estimators,
+            balance_probabilities=balance_probabilities,
+            ignore_pretraining_limits=ignore_pretraining_limits,
+        )
 
         self._is_classifier = True
 
@@ -423,59 +418,50 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
 
 class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
-    """The implementation is based on the methodology presented in the "TabArena" paper.
+    """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN regressors.
+
+    This model creates a post-hoc ensemble of multiple TabPFN configurations using
+    AutoGluon, leveraging its ensembling strategies for state-of-the-art performance.
+    It is designed for regression tasks.
+
+    The implementation is based on the methodology from the "TabArena" paper.
 
     Parameters
     ----------
-    max_time : int | None, default=60*3
-        Maximum time in seconds to train the ensemble. If `None`, training will run until
-        all models are fitted.
+    max_time : int | None, default=180
+        Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
-        The evaluation metric for AutoGluon to optimize. If `None`, a default metric
-        is chosen based on the problem type (e.g., 'accuracy' for classification).
-        For a full list of options, see the AutoGluon documentation.
+        Metric for AutoGluon to optimize. Defaults to 'root_mean_squared_error'.
     presets : {"best_quality", "high_quality", "good_quality", "medium_quality"}, default="medium_quality"
-        AutoGluon preset to control the trade-off between training time and predictive accuracy.
+        AutoGluon preset to control the quality-time trade-off.
     device : {"cpu", "cuda", "auto"}, default="auto"
-        The device to use for training. "auto" will select "cuda" if available, otherwise "cpu".
+        Device for training. "auto" selects "cuda" if available.
     random_state : int | np.random.RandomState | None, default=None
-        Controls the randomness for both base model training and the ensembling process.
+        Controls randomness for reproducibility.
     categorical_feature_indices : list[int] | None, default=None
-        Indices of the categorical features in the input data. If `None`, they will be
-        automatically inferred during `fit()`.
+        Indices of categorical features. If `None`, they are inferred automatically.
     phe_init_args : dict | None, default=None
-        Advanced customization arguments passed directly to the `TabularPredictor`
-        constructor in AutoGluon. See the AutoGluon documentation for details.
+        Advanced arguments for AutoGluon's `TabularPredictor` constructor.
     phe_fit_args : dict | None, default=None
-        Advanced customization arguments passed to the `TabularPredictor.fit()` method
-        in AutoGluon. See the AutoGluon documentation for details.
+        Advanced arguments for AutoGluon's `TabularPredictor.fit()` method.
     n_ensemble_models : int, default=200
-        The number of random TabPFN configurations to generate and include in the
-        AutoGluon model zoo for ensembling.
+        Number of random TabPFN configurations to generate for the ensemble.
     n_estimators : int, default=16
-        The number of internal transformers to ensemble within each individual TabPFN model.
-        Higher values can improve performance but increase resource usage.
-    balance_probabilities : bool, default=False
-        Whether to balance the output probabilities from TabPFN. This can be beneficial
-        for classification tasks with imbalanced classes.
+        Number of internal transformers per TabPFN model.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses TabPFN's built-in limits on dataset size (1024 samples)
-        and feature count (100). **Warning:** Use with caution, as performance is not
-        guaranteed and may be poor when exceeding these limits.
+        If `True`, bypasses TabPFN's default sample (1024) and feature (100) limits.
+        **Warning:** Performance is not guaranteed beyond these limits.
 
-    Attributes
+    Attributes:
     ----------
     predictor_ : autogluon.tabular.TabularPredictor
-        The fitted AutoGluon predictor object that manages the ensemble.
+        The fitted AutoGluon predictor managing the ensemble.
     categorical_feature_indices_ : list[int]
         The effective list of categorical feature indices used by the model.
-    classes_ : np.ndarray
-        For classifiers, an array of class labels known to the model.
     n_features_in_ : int
         The number of features seen during `fit()`.
-    _column_names : list[str]
-        Internal list of feature names used for prediction.
     """
+
     def __init__(
         self,
         *,
@@ -491,23 +477,21 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 200,
         n_estimators: int = 16,
-        balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
-        self.max_time = max_time
-        self.eval_metric = eval_metric
-        self.presets = presets
-        self.device = device
-        self.random_state = random_state
-        self.categorical_feature_indices = categorical_feature_indices
-        self.phe_init_args = phe_init_args
-        self.phe_fit_args = phe_fit_args
-        self.n_ensemble_models = n_ensemble_models
-        self.n_estimators = n_estimators
-        self.balance_probabilities = balance_probabilities
-        self.ignore_pretraining_limits = ignore_pretraining_limits
-
-        assert n_ensemble_models >= 1, "n_ensemble_models must be >= 1"
+        super().__init__(
+            max_time=max_time,
+            eval_metric=eval_metric,
+            presets=presets,
+            device=device,
+            random_state=random_state,
+            categorical_feature_indices=categorical_feature_indices,
+            phe_init_args=phe_init_args,
+            phe_fit_args=phe_fit_args,
+            n_ensemble_models=n_ensemble_models,
+            n_estimators=n_estimators,
+            ignore_pretraining_limits=ignore_pretraining_limits,
+        )
 
         self._is_classifier = False
 
