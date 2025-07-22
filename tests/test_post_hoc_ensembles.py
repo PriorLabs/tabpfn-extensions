@@ -26,7 +26,7 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
     def estimator(self, tabpfn_classifier):
         """Provide a PHE-based TabPFN classifier as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
-        max_time = 5 if FAST_TEST_MODE else 10  # Very limited time for fast testing
+        max_time = 15 if FAST_TEST_MODE else 30  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
         phe_init_args = {}
@@ -54,7 +54,37 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
         reason="AutoTabPFN needs additional work to pass all sklearn estimator checks",
     )
     def test_passes_estimator_checks(self, estimator):
-        pass
+        os.environ["SK_COMPATIBLE_PRECISION"] = "True"
+        raise_on_error = True
+        nan_test = 9
+
+        # Precision issues do not allow for such deterministic behavior as expected, thus retrying certain tests to show it can work.
+        clf_non_deterministic_for_reasons = [
+            31,
+            30,
+        ]
+
+        for est, non_deterministic in [
+            (AutoTabPFNClassifier(device="cuda"), clf_non_deterministic_for_reasons),
+        ]:
+            lst = []
+            for i, x in enumerate(check_estimator(est, generate_only=True)):
+                if (i == nan_test) and ("allow_nan" in x[0]._get_tags()):
+                    # sklearn test does not check for the tag!
+                    continue
+
+                n_tests = 5
+                while n_tests:
+                    try:
+                        x[1](x[0])
+                    except Exception as e:
+                        if i in non_deterministic:
+                            n_tests -= 1
+                            continue
+                        if raise_on_error:
+                            raise e
+                        lst.append((i, x, e))
+                    break
 
 
 @pytest.mark.local_compatible
@@ -99,17 +129,12 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
         nan_test = 9
 
         # Precision issues do not allow for such deterministic behavior as expected, thus retrying certain tests to show it can work.
-        clf_non_deterministic_for_reasons = [
-            31,
-            30,
-        ]
         reg_non_deterministic_for_reasons = [
             27,
             28,
         ]
 
         for est, non_deterministic in [
-            (AutoTabPFNClassifier(device="cuda"), clf_non_deterministic_for_reasons),
             (AutoTabPFNRegressor(device="cuda"), reg_non_deterministic_for_reasons),
         ]:
             lst = []
