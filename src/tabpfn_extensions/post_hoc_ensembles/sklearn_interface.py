@@ -3,8 +3,7 @@
 
 """TabPFN implementation in AutoGluon taken from TabArena: A Living Benchmark for Machine Learning on Tabular Data,
 Nick Erickson, Lennart Purucker, Andrej Tschalzev, David Holzmüller, Prateek Mutalik Desai, David Salinas,
-Frank Hutter, Preprint., 2025,
-
+Frank Hutter, Preprint., 2025.
 """
 
 from __future__ import annotations
