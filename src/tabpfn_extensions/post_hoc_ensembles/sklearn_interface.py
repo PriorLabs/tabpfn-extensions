@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
+import torch
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import check_is_fitted
@@ -34,8 +35,8 @@ class TaskType(str, Enum):
 
 
 class DeviceType(str, Enum):
-    CPU = "cpu"
     CUDA = "cuda"
+    CPU = "cpu"
     AUTO = "auto"
 
 
@@ -120,6 +121,12 @@ class AutoTabPFNBase(BaseEstimator):
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
+        if n_ensemble_models <= 1:
+            raise ValueError(f"n_ensemble_models must be > 1, got {n_ensemble_models}")
+
+        if max_time is not None and max_time <= 0:
+            raise ValueError("max_time must be a positive integer or None.")
+
         self.max_time = max_time
         self.eval_metric = eval_metric
         self.presets = presets
@@ -132,8 +139,6 @@ class AutoTabPFNBase(BaseEstimator):
         self.n_estimators = n_estimators
         self.balance_probabilities = balance_probabilities
         self.ignore_pretraining_limits = ignore_pretraining_limits
-
-        assert n_ensemble_models >= 1, "n_ensemble_models must be >= 1"
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
@@ -232,9 +237,10 @@ class AutoTabPFNBase(BaseEstimator):
         )
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
-        # TODO: Code limited to 1 GPU, infer dynamically
-        device = get_device(self.device)
-        num_gpus = 1 if device == DeviceType.CUDA else 0
+        # Set GPU count
+        num_gpus = 0
+        if self.device == DeviceType.CUDA:
+            num_gpus = torch.cuda.device_count()
 
         self.predictor_.fit(
             train_data=training_df,
