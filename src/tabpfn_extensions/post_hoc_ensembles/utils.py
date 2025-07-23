@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from hyperopt.pyll import stochastic
@@ -9,71 +9,117 @@ from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 
 
 def prepare_tabpfnv2_config(
-    raw_config: dict,
+    raw_config: dict[str, Any],
     n_estimators: int,
     balance_probabilities: bool | None,
     ignore_pretraining_limits: bool,
     *,
     refit_folds: bool = True,
-) -> dict:
-    """Cleans and prepares a raw TabPFN hyperparameter configuration.
+) -> dict[str, Any]:
+    """Prepare a raw TabPFN hyperparameter configuration for TabPFNv2.
 
-    This function performs several steps:
-    - Converts tuple values to lists for compatibility.
-    - Ensures 'refit_folds' is set to True in 'ag_args_ensemble'.
-    - Sets 'n_estimators' to a specified value.
-    - Applies special logic for 'dt_pfn' model type.
-    - Removes the 'max_depth' key if it exists.
+    This function:
+    - Converts tuple values into lists for JSON compatibility.
+    - Ensures the `ag_args_ensemble` dict exists and applies `refit_folds`.
+    - Sets `n_estimators` and `ignore_pretraining_limits` flags.
+    - Applies or removes `balance_probabilities`.
+    - Handles the special case when `model_type == 'dt_pfn'`.
+    - Removes the deprecated `max_depth` key if present.
+
+    Parameters
+    ----------
+    raw_config : Dict[str, Any]
+        Hyperparameter dict sampled from Hyperopt.
+    n_estimators : int
+        Number of estimators in the ensemble (must be ≥ 1).
+    balance_probabilities : Optional[bool]
+        If True/False, set for classification; if None, removed (regression).
+    ignore_pretraining_limits : bool
+        Whether to bypass default pretraining limits.
+    refit_folds : bool, optional
+        Whether each fold should be refit (default is True).
+
+    Returns:
+    -------
+    Dict[str, Any]
+        A cleaned and fully-specified TabPFNv2 config.
     """
-    raw_config = {
-        k: list(v) if isinstance(v, tuple) else v for k, v in raw_config.items()
-    }
-    if "ag_args_ensemble" not in raw_config:
-        raw_config["ag_args_ensemble"] = {}
-    raw_config["ag_args_ensemble"]["refit_folds"] = True
+    # Shallow copy and tuple-to-list conversion
+    config = {k: list(v) if isinstance(v, tuple) else v for k, v in raw_config.items()}
 
-    # Set TabPFN parameters
-    raw_config["n_estimators"] = n_estimators
-    raw_config["ignore_pretraining_limits"] = ignore_pretraining_limits
-    #Classification
+    # Ensure ensemble args exist
+    ensemble_args = config.setdefault("ag_args_ensemble", {})
+    ensemble_args["refit_folds"] = refit_folds
+
+    # Set core parameters
+    config["n_estimators"] = n_estimators
+    config["ignore_pretraining_limits"] = ignore_pretraining_limits
+
+    # Classification vs. regression
     if balance_probabilities is not None:
-        raw_config["balance_probabilities"] = balance_probabilities
-    # Regression
+        config["balance_probabilities"] = balance_probabilities
     else:
-        raw_config.pop("balance_probabilities", None)
+        config.pop("balance_probabilities", None)
 
-    model_type = raw_config.get("model_type")
+    # Special case for dt_pfn
+    if config.get("model_type") == "dt_pfn":
+        config["n_ensemble_repeats"] = config["n_estimators"]
+        config["n_estimators"] = 1
 
-    if model_type == "dt_pfn":
-        raw_config["n_ensemble_repeats"] = raw_config["n_estimators"]
-        raw_config["n_estimators"] = 1
+    # Remove deprecated keys
+    config.pop("max_depth", None)
 
-    raw_config.pop("max_depth", None)
-
-    return raw_config
+    return config
 
 
 def search_space_func(
     task_type: Literal["regression", "multiclass"],
+    n_ensemble_models: int,
     n_estimators: int,
     ignore_pretraining_limits: bool,
-    n_ensemble_models: int,
     balance_probabilities: bool | None = None,
     seed: int = 42,
-) -> list[dict]:
-    """Generate a list of random configurations for TabPFNv2 from its search space.
+) -> list[dict[str, Any]]:
+    """Sample and prepare multiple TabPFNv2 hyperparameter sets.
 
-    These configurations can be used by AutoGluon to construct an ensemble model.
+    Each dict in the returned list is ready for AutoGluon ensemble building.
+
+    Parameters
+    ----------
+    task_type : Literal["regression", "multiclass"]
+        Task type; regression will drop probability balancing.
+    n_ensemble_models : int
+        Number of configs to generate (must be > 1).
+    n_estimators : int
+        Estimators per model (must be > 0).
+    ignore_pretraining_limits : bool
+        Whether to bypass default pretraining limits.
+    balance_probabilities : Optional[bool], optional
+        Classification probability balancing; ignored for regression.
+    seed : int, optional
+        RNG seed for reproducibility (default is 42).
+
+    Returns:
+    -------
+    List[Dict[str, Any]]
+        A list of cleaned TabPFNv2 configurations.
+
+    Raises:
+    ------
+    ValueError
+        If `n_ensemble_models <= 1` or `n_estimators <= 0`.
     """
-    assert n_ensemble_models > 0, "n_ensemble_models must be > 0"
-    assert n_estimators > 0, "n_estimators must be > 0"
+    if n_ensemble_models <= 1:
+        raise ValueError(f"n_ensemble_models must be >1 (got {n_ensemble_models})")
+    if n_estimators <= 0:
+        raise ValueError(f"n_estimators must be >0 (got {n_estimators})")
 
     if task_type == "regression":
         balance_probabilities = None
 
     search_space = get_param_grid_hyperopt(task_type=task_type)
     rng = np.random.default_rng(seed)
-    return [
+    tabpfn_configs = [
         prepare_tabpfnv2_config(
             raw_config=dict(stochastic.sample(search_space, rng=rng)),
             n_estimators=n_estimators,
@@ -82,3 +128,7 @@ def search_space_func(
         )
         for _ in range(n_ensemble_models)
     ]
+
+    assert len(tabpfn_configs) > 0
+
+    return tabpfn_configs

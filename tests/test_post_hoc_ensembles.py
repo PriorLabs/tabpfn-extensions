@@ -51,7 +51,7 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
     def estimator(self, tabpfn_classifier):
         """Provide a PHE-based TabPFN classifier as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
-        max_time = 15 if FAST_TEST_MODE else 60 * 2 # Very limited time for fast testing
+        max_time = 15 if FAST_TEST_MODE else 30  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
         phe_init_args = {}
@@ -96,7 +96,7 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
     def estimator(self, tabpfn_regressor):
         """Provide a PHE-based TabPFN regressor as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
-        max_time = 15 if FAST_TEST_MODE else 60 * 2  # Very limited time for fast testing
+        max_time = 15 if FAST_TEST_MODE else 30  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
         phe_init_args = {"verbosity": 4}
