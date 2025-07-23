@@ -51,7 +51,7 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
     def estimator(self, tabpfn_classifier):
         """Provide a PHE-based TabPFN classifier as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
-        max_time = 15 if FAST_TEST_MODE else 60  # Very limited time for fast testing
+        max_time = 15 if FAST_TEST_MODE else 60 * 2 # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
         phe_init_args = {}
@@ -68,7 +68,7 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
             random_state=42,
             phe_init_args=phe_init_args,
             phe_fit_args=phe_fit_args,
-            n_ensemble_models=1,
+            n_ensemble_models=3,
         )
 
     @pytest.mark.skip(reason="PHE models take too long for this test")
@@ -96,10 +96,10 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
     def estimator(self, tabpfn_regressor):
         """Provide a PHE-based TabPFN regressor as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
-        max_time = 15 if FAST_TEST_MODE else 60  # Very limited time for fast testing
+        max_time = 15 if FAST_TEST_MODE else 60 * 2  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
-        phe_init_args = {"verbosity": 0}
+        phe_init_args = {"verbosity": 4}
         phe_fit_args = {
             "num_bag_folds": 0,  # Disable bagging
             "num_bag_sets": 1,  # Minimal value for bagging sets
@@ -113,7 +113,7 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
             random_state=42,
             phe_init_args=phe_init_args,
             phe_fit_args=phe_fit_args,
-            n_ensemble_models=1,
+            n_ensemble_models=3,
         )
 
     @pytest.mark.skip(reason="PHE models take too long for this test")
