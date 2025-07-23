@@ -61,6 +61,8 @@ interpretability = [
 post_hoc_ensembles = [
     "llvmlite",
     "hyperopt>=0.2.7",
+    # Pinned to a specific autogluon commit to get access to AutoGluon TabPFN.
+    # TODO: Move to a released version once autogluon 1.4 is available.
     "autogluon.common @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=common",
     "autogluon.features @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=features",
     "autogluon.core @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=core",

@@ -1,11 +1,10 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
 
-"""Implementation taken from TabArena: A Living Benchmark for Machine Learning on Tabular Data,
+"""TabPFN implementation in AutoGluon taken from TabArena: A Living Benchmark for Machine Learning on Tabular Data,
 Nick Erickson, Lennart Purucker, Andrej Tschalzev, David Holzmüller, Prateek Mutalik Desai, David Salinas,
 Frank Hutter, Preprint., 2025,
 
-Original Code: https://github.com/autogluon/tabrepo/tree/main/tabrepo/benchmark/models/ag/tabpfnv2
 """
 
 from __future__ import annotations
