@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
+from sklearn.utils import check_random_state
 from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import check_is_fitted
 
@@ -227,13 +228,17 @@ class AutoTabPFNBase(BaseEstimator):
         )
 
         # Generate hyperparameter configurations for TabPFN Ensemble
+
         task_type = "multiclass" if self._is_classifier else "regression"
+        rng = check_random_state(self.random_state)
+        seed = rng.randint(np.iinfo(np.int32).max)
         tabpfn_configs = search_space_func(
             task_type=task_type,
             n_ensemble_models=self.n_ensemble_models,
             n_estimators=self.n_estimators,
             balance_probabilities=self.balance_probabilities,
             ignore_pretraining_limits=self.ignore_pretraining_limits,
+            seed=seed,
         )
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
