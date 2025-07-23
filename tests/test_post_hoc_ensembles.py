@@ -51,10 +51,13 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
     def estimator(self, tabpfn_classifier):
         """Provide a PHE-based TabPFN classifier as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
+        # NOTE: If max_time is set too low, AutoGluon will fail to fit any models during
+        # the fit() call. This is especially true when building a TabPFN-only ensemble
+        # and can be hard to debug as it may only fail on certain CI hardware.
         max_time = 10 if FAST_TEST_MODE else 20  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
-        phe_init_args = {}
+        phe_init_args = {"verbosity": 1}
         phe_fit_args = {
             "num_bag_folds": 0,  # Disable bagging
             "num_bag_sets": 1,  # Minimal value for bagging sets
@@ -96,10 +99,13 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
     def estimator(self, tabpfn_regressor):
         """Provide a PHE-based TabPFN regressor as the estimator."""
         # For PHE, we can make tests faster by limiting time and using minimal models
+        # NOTE: If max_time is set too low, AutoGluon will fail to fit any models during
+        # the fit() call. This is especially true when building a TabPFN-only ensemble
+        # and can be hard to debug as it may only fail on certain CI hardware.
         max_time = 10 if FAST_TEST_MODE else 20  # Very limited time for fast testing
 
         # Minimize the model portfolio for faster testing
-        phe_init_args = {"verbosity": 4}
+        phe_init_args = {"verbosity": 1}
         phe_fit_args = {
             "num_bag_folds": 0,  # Disable bagging
             "num_bag_sets": 1,  # Minimal value for bagging sets
