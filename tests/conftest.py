@@ -100,6 +100,14 @@ except ImportError as e:
 except (AttributeError, ModuleNotFoundError, ValueError) as e:
     print("Error when importing tabpfn_client:", e)
 
+# Check if autogluon is installed
+try:
+    import autogluon.tabular
+
+    HAS_AUTOGLUON = True
+except ImportError:
+    HAS_AUTOGLUON = False
+
 
 # Add command-line options
 def pytest_addoption(parser):

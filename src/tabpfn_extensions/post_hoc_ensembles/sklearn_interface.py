@@ -242,8 +242,16 @@ class AutoTabPFNBase(BaseEstimator):
                 seed=seed,
             )
             hyperparameters = {TabPFNV2Model: tabpfn_configs}
+
         elif self.n_ensemble_models == 1:
-            hyperparameters = {TabPFNV2Model: {}}
+            single_config = {
+                "n_estimators": self.n_estimators,
+                "ignore_pretraining_limits": self.ignore_pretraining_limits,
+                "balance_probabilities": self.balance_probabilities,
+                "ignore_pretraining_limits": self.ignore_pretraining_limits,
+            }
+            hyperparameters = {TabPFNV2Model: single_config}
+
         else:
             raise ValueError(f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}")
 
@@ -324,10 +332,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         The number of features seen during `fit()`.
     """
 
-    @classmethod
-    def _get_class_tags(cls):
-        return {"handles_text": False}
-
     def __init__(
         self,
         *,
@@ -385,8 +389,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             return self
 
         # Check for extremely imbalanced classes - handle case with only 1 sample per class
-        y_codes, _ = pd.factorize(y)
-        class_counts = np.bincount(y_codes)
+        class_counts = np.bincount(y.astype(int))
         if np.min(class_counts[class_counts > 0]) < 2:
             self.single_class_ = False
             self.predictor_ = TabPFNClassifier(

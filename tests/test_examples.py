@@ -54,6 +54,9 @@ def get_example_files() -> list[dict]:
     # These directories/files need the full TabPFN package and won't work with client
     REQUIRES_TABPFN_DIRS = ["embedding/"]
 
+    # These examples require autogluon and won't work with tabpfn-client only
+    REQUIRES_AUTOGLUON_EXAMPLES = ["distillation_example.py"]
+
     # Large dataset examples are always expected to timeout,
     # even if --run-examples is provided
     ALWAYS_TIMEOUT_PATTERNS = ["large_datasets_example.py"]
@@ -72,6 +75,7 @@ def get_example_files() -> list[dict]:
             "name": file_name,
             # Default classification - most examples work with both implementations
             "requires_tabpfn": False,  # By default, examples work with either implementation
+            "requires_autogluon": file_name in REQUIRES_AUTOGLUON_EXAMPLES, # By default, examples do not require autogluon
             "fast": file_name in FAST_EXAMPLES,  # Only listed examples are fast
             "slow": file_name not in FAST_EXAMPLES,  # All others are slow
             "always_timeout": any(
@@ -129,7 +133,7 @@ def test_example(request, example_file):
         request: PyTest request fixture
         example_file: Dictionary with example file metadata
     """
-    from conftest import HAS_TABPFN, TABPFN_SOURCE
+    from conftest import HAS_TABPFN, TABPFN_SOURCE, HAS_AUTOGLUON
 
     file_name = example_file["name"]
     file_path = example_file["path"]
@@ -151,6 +155,12 @@ def test_example(request, example_file):
             pytest.skip(
                 f"Example {file_name} requires TabPFN package, not compatible with client",
             )
+
+    # Skip if backend not available
+    if example_file["requires_autogluon"] and not HAS_AUTOGLUON:
+        pytest.skip(
+            f"Example {file_name} requires autogluon, but it's not installed",
+        )
 
     try:
         # Handle slow examples (including large datasets) differently
