@@ -146,3 +146,7 @@ sftp_freiburg.json
 *.py.new
 commit_messages.txt
 CLAUDE.md
+
+# AutoGluon models and .csv files (for running the distillation example)
+AutogluonModels/
+*.csv

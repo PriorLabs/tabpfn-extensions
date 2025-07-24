@@ -109,8 +109,8 @@ def search_space_func(
     ValueError
         If `n_ensemble_models <= 1` or `n_estimators <= 0`.
     """
-    if n_ensemble_models <= 1:
-        raise ValueError(f"n_ensemble_models must be >1 (got {n_ensemble_models})")
+    # if n_ensemble_models <= 1:
+    #     raise ValueError(f"n_ensemble_models must be >1 (got {n_ensemble_models})")
     if n_estimators <= 0:
         raise ValueError(f"n_estimators must be >0 (got {n_estimators})")
 

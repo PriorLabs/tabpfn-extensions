@@ -120,8 +120,9 @@ class AutoTabPFNBase(BaseEstimator):
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
-        if n_ensemble_models <= 1:
-            raise ValueError(f"n_ensemble_models must be > 1, got {n_ensemble_models}")
+    
+        if n_ensemble_models < 1:
+            raise ValueError(f"n_ensemble_models must be >= 1, got {n_ensemble_models}")
 
         if max_time is not None and max_time <= 0:
             raise ValueError("max_time must be a positive integer or None.")
@@ -228,17 +229,23 @@ class AutoTabPFNBase(BaseEstimator):
         # Generate hyperparameter configurations for TabPFN Ensemble
 
         task_type = "multiclass" if self._is_classifier else "regression"
-        rng = check_random_state(self.random_state)
-        seed = rng.randint(np.iinfo(np.int32).max)
-        tabpfn_configs = search_space_func(
-            task_type=task_type,
-            n_ensemble_models=self.n_ensemble_models,
-            n_estimators=self.n_estimators,
-            balance_probabilities=self.balance_probabilities,
-            ignore_pretraining_limits=self.ignore_pretraining_limits,
-            seed=seed,
-        )
-        hyperparameters = {TabPFNV2Model: tabpfn_configs}
+
+        if self.n_ensemble_models > 1:
+            rng = check_random_state(self.random_state)
+            seed = rng.randint(np.iinfo(np.int32).max)
+            tabpfn_configs = search_space_func(
+                task_type=task_type,
+                n_ensemble_models=self.n_ensemble_models,
+                n_estimators=self.n_estimators,
+                balance_probabilities=self.balance_probabilities,
+                ignore_pretraining_limits=self.ignore_pretraining_limits,
+                seed=seed,
+            )
+            hyperparameters = {TabPFNV2Model: tabpfn_configs}
+        elif self.n_ensemble_models == 1:
+            hyperparameters = {TabPFNV2Model: {}}
+        else:
+            raise ValueError(f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}")
 
         # Set GPU count
         num_gpus = 0
@@ -317,6 +324,10 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         The number of features seen during `fit()`.
     """
 
+    @classmethod
+    def _get_class_tags(cls):
+        return {"handles_text": False}
+
     def __init__(
         self,
         *,
@@ -374,7 +385,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             return self
 
         # Check for extremely imbalanced classes - handle case with only 1 sample per class
-        class_counts = np.bincount(y.astype(int))
+        y_codes, _ = pd.factorize(y)
+        class_counts = np.bincount(y_codes)
         if np.min(class_counts[class_counts > 0]) < 2:
             self.single_class_ = False
             self.predictor_ = TabPFNClassifier(
