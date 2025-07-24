@@ -84,8 +84,8 @@ class AutoTabPFNBase(BaseEstimator):
         Whether to balance the output probabilities from TabPFN. This can be beneficial
         for classification tasks with imbalanced classes.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses TabPFN's built-in limits on dataset size (1024 samples)
-        and feature count (100). **Warning:** Use with caution, as performance is not
+        If `True`, bypasses TabPFN's built-in limits on dataset size (10000 samples)
+        and feature count (500). **Warning:** Use with caution, as performance is not
         guaranteed and may be poor when exceeding these limits.
 
     Attributes:
