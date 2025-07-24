@@ -1,4 +1,4 @@
-# AutoGluon-Powered TabPFN Ensembles
+# AutoTabPFN Ensembles
 
 This repository provides an AutoGluon-powered system for building robust, high-performance Post-Hoc Ensembles (PHE) of TabPFN models. It automates the process of hyperparameter tuning and ensembling to achieve state-of-the-art results on tabular data tasks.
 
