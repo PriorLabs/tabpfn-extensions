@@ -246,7 +246,6 @@ class AutoTabPFNBase(BaseEstimator):
         elif self.n_ensemble_models == 1:
             single_config = {
                 "n_estimators": self.n_estimators,
-                "ignore_pretraining_limits": self.ignore_pretraining_limits,
                 "balance_probabilities": self.balance_probabilities,
                 "ignore_pretraining_limits": self.ignore_pretraining_limits,
             }
