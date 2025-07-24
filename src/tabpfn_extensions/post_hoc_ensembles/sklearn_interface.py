@@ -302,8 +302,9 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     balance_probabilities : bool, default=False
         Whether to balance output probabilities, useful for imbalanced datasets.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses TabPFN's default sample (1024) and feature (100) limits.
-        **Warning:** Performance is not guaranteed beyond these limits.
+        If `True`, bypasses TabPFN's built-in limits on dataset size (10000 samples)
+        and feature count (500). **Warning:** Use with caution, as performance is not
+        guaranteed and may be poor when exceeding these limits.
 
     Attributes:
     ----------
@@ -457,8 +458,9 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     n_estimators : int, default=16
         Number of internal transformers per TabPFN model.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses TabPFN's default sample (1024) and feature (100) limits.
-        **Warning:** Performance is not guaranteed beyond these limits.
+        If `True`, bypasses TabPFN's built-in limits on dataset size (10000 samples)
+        and feature count (500). **Warning:** Use with caution, as performance is not
+        guaranteed and may be poor when exceeding these limits.
 
     Attributes:
     ----------
