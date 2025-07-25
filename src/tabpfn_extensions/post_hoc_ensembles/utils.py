@@ -43,6 +43,11 @@ def prepare_tabpfnv2_config(
     -------
     Dict[str, Any]
         A cleaned and fully-specified TabPFNv2 config.
+
+    -------
+
+    Note: RF-PFN is not supported at the moment and we
+    disable its relevant parameters here.
     """
     # Shallow copy and tuple-to-list conversion
     config = {k: list(v) if isinstance(v, tuple) else v for k, v in raw_config.items()}
@@ -65,6 +70,9 @@ def prepare_tabpfnv2_config(
     if config.get("model_type") == "dt_pfn":
         config["n_ensemble_repeats"] = config["n_estimators"]
         config["n_estimators"] = 1
+
+    # TODO: Enable RF-PFN at some point
+    config["model_type"] = "single"
 
     # Remove deprecated keys
     config.pop("max_depth", None)

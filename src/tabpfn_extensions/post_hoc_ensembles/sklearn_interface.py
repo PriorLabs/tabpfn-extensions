@@ -129,7 +129,7 @@ class AutoTabPFNBase(BaseEstimator):
         self.max_time = max_time
         self.eval_metric = eval_metric
         self.presets = presets
-        self.device = device
+        self.device = get_device(device)
         self.random_state = random_state
         self.categorical_feature_indices = categorical_feature_indices
         self.phe_init_args = phe_init_args
@@ -379,7 +379,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         if np.min(class_counts[class_counts > 0]) < 2:
             self.single_class_ = False
             self.predictor_ = TabPFNClassifier(
-                device=get_device(self.device),
+                device=self.device,
                 categorical_features_indices=self.categorical_feature_indices_,
             )
             self.predictor_.fit(X, y)
