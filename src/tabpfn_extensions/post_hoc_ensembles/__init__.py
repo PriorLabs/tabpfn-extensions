@@ -29,7 +29,7 @@ else:
     # Define a helpful error message to be reused.
     _error_msg = (
         "autogluon.tabular is not installed, which is required by this class. "
-        'Please install with: pip install "tabpfen-extensions[post_hoc_ensembles]"'
+        'Please install with: pip install "tabpfn-extensions[post_hoc_ensembles]"'
     )
 
     # Create a stub class that raises an error only when instantiated.
