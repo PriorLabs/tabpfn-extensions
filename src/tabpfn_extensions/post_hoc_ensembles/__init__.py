@@ -26,23 +26,21 @@ else:
         stacklevel=2,
     )
 
-    # Define a helpful error message to be reused.
     _error_msg = (
         "autogluon.tabular is not installed, which is required by this class. "
         'Please install with: pip install "tabpfn-extensions[post_hoc_ensembles]"'
     )
 
-    # Create a stub class that raises an error only when instantiated.
     class AutoTabPFNClassifier:
+        """Stub for AutoTabPFNClassifier when autogluon.tabular is not installed."""
         def __init__(self, *args, **kwargs):
             raise ImportError(_error_msg)
 
-    # Do the same for the regressor for consistency.
     class AutoTabPFNRegressor:
+        """Stub for AutoTabPFNClassifier when autogluon.tabular is not installed."""
         def __init__(self, *args, **kwargs):
             raise ImportError(_error_msg)
 
-    # Now, export the names of the stubs and the availability flag.
     __all__ = [
         "AutoTabPFNClassifier",
         "AutoTabPFNRegressor",
