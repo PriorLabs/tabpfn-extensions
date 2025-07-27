@@ -38,7 +38,7 @@ else:
             raise ImportError(_error_msg)
 
     class AutoTabPFNRegressor:
-        """Stub for AutoTabPFNClassifier when autogluon.tabular is not installed."""
+        """Stub for AutoTabPFNRegressor when autogluon.tabular is not installed."""
 
         def __init__(self, *args, **kwargs):
             raise ImportError(_error_msg)
