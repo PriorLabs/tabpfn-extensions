@@ -2,10 +2,11 @@ import importlib.util
 import warnings
 
 # Check if the optional dependency 'autogluon.tabular' is installed.
-AUTOGLUON_TABULAR_AVAILABLE = (
-  importlib.util.find_spec("autogluon") is not None and
-  importlib.util.find_spec("autogluon.tabular") is not None
-)
+try:
+    importlib.util.find_spec("autogluon.tabular")
+    AUTOGLUON_TABULAR_AVAILABLE = importlib.util.find_spec("autogluon.tabular") is not None
+except ModuleNotFoundError:
+    AUTOGLUON_TABULAR_AVAILABLE = False
 
 if AUTOGLUON_TABULAR_AVAILABLE:
     # If it's installed, import and expose the relevant classes.
