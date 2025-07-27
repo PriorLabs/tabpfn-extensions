@@ -66,13 +66,13 @@ def prepare_tabpfnv2_config(
     else:
         config.pop("balance_probabilities", None)
 
+    # TODO: Enable RF-PFN at some point
+    config["model_type"] = "single"
+
     # Special case for dt_pfn
     if config.get("model_type") == "dt_pfn":
         config["n_ensemble_repeats"] = config["n_estimators"]
         config["n_estimators"] = 1
-
-    # TODO: Enable RF-PFN at some point
-    config["model_type"] = "single"
 
     # Remove deprecated keys
     config.pop("max_depth", None)

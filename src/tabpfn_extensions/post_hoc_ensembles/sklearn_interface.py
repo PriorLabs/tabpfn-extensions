@@ -8,6 +8,7 @@ Frank Hutter, Preprint., 2025.
 
 from __future__ import annotations
 
+import datetime
 from enum import Enum
 from typing import Any, Literal
 
@@ -141,7 +142,8 @@ class AutoTabPFNBase(BaseEstimator):
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
-        default_args = {"verbosity": 5}
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_args = {"verbosity": 2, "path": f"TabPFNModels/m-{timestamp}"}
         user_args = self.phe_init_args or {}
         return {**default_args, **user_args}
 
