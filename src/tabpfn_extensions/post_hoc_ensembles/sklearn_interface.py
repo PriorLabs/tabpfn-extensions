@@ -334,7 +334,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 200,
-        n_estimators: int = 16,
+        n_estimators: int = 2,
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
