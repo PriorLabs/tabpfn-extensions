@@ -70,6 +70,7 @@ def prepare_tabpfnv2_config(
     config["model_type"] = "single"
 
     # Special case for dt_pfn
+    # TODO: This code is unused until we support RF-PFN
     if config.get("model_type") == "dt_pfn":
         config["n_ensemble_repeats"] = config["n_estimators"]
         config["n_estimators"] = 1
