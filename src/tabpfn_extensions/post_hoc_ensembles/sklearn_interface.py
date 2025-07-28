@@ -8,6 +8,7 @@ Frank Hutter, Preprint., 2025.
 
 from __future__ import annotations
 
+import datetime
 from enum import Enum
 from typing import Any, Literal
 
@@ -84,8 +85,8 @@ class AutoTabPFNBase(BaseEstimator):
         Whether to balance the output probabilities from TabPFN. This can be beneficial
         for classification tasks with imbalanced classes.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses TabPFN's built-in limits on dataset size (1024 samples)
-        and feature count (100). **Warning:** Use with caution, as performance is not
+        If `True`, bypasses TabPFN's built-in limits on dataset size (10000 samples)
+        and feature count (500). **Warning:** Use with caution, as performance is not
         guaranteed and may be poor when exceeding these limits.
 
     Attributes:
@@ -129,7 +130,7 @@ class AutoTabPFNBase(BaseEstimator):
         self.max_time = max_time
         self.eval_metric = eval_metric
         self.presets = presets
-        self.device = device
+        self.device = get_device(device)
         self.random_state = random_state
         self.categorical_feature_indices = categorical_feature_indices
         self.phe_init_args = phe_init_args
@@ -141,7 +142,8 @@ class AutoTabPFNBase(BaseEstimator):
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
-        default_args = {"verbosity": 5}
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_args = {"verbosity": 2, "path": f"TabPFNModels/m-{timestamp}"}
         user_args = self.phe_init_args or {}
         return {**default_args, **user_args}
 
@@ -317,8 +319,9 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     balance_probabilities : bool, default=False
         Whether to balance output probabilities, useful for imbalanced datasets.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses TabPFN's default sample (1024) and feature (100) limits.
-        **Warning:** Performance is not guaranteed beyond these limits.
+        If `True`, bypasses TabPFN's built-in limits on dataset size (10000 samples)
+        and feature count (500). **Warning:** Use with caution, as performance is not
+        guaranteed and may be poor when exceeding these limits.
 
     Attributes:
     ----------
@@ -346,7 +349,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 200,
-        n_estimators: int = 16,
+        n_estimators: int = 2,
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
@@ -393,7 +396,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         if np.min(class_counts[class_counts > 0]) < 2:
             self.single_class_ = False
             self.predictor_ = TabPFNClassifier(
-                device=get_device(self.device),
+                device=self.device,
                 categorical_features_indices=self.categorical_feature_indices_,
             )
             self.predictor_.fit(X, y)
@@ -472,8 +475,9 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     n_estimators : int, default=16
         Number of internal transformers per TabPFN model.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses TabPFN's default sample (1024) and feature (100) limits.
-        **Warning:** Performance is not guaranteed beyond these limits.
+        If `True`, bypasses TabPFN's built-in limits on dataset size (10000 samples)
+        and feature count (500). **Warning:** Use with caution, as performance is not
+        guaranteed and may be poor when exceeding these limits.
 
     Attributes:
     ----------
