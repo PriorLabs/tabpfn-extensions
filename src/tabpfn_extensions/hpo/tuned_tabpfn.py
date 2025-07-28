@@ -211,9 +211,9 @@ class TunedTabPFNBase(BaseEstimator):
             }
             model_params["inference_config"] = inference_config
             # Use device utility for automatic selection
-            from tabpfn_extensions.utils import get_device
+            from tabpfn_extensions.utils import infer_device_and_type
 
-            model_params["device"] = get_device(self.device)
+            model_params["device"] = infer_device_and_type(self.device)
             model_params["random_state"] = rng.randint(0, 2**31 - 1)
 
             # Handle model type selection

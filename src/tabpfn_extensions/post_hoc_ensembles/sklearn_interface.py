@@ -22,10 +22,9 @@ from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 from tabpfn_extensions.utils import (
-    get_device,
     infer_categorical_features,
+    infer_device_and_type
 )
-
 
 class TaskType(str, Enum):
     BINARY = "binary"
@@ -115,16 +114,10 @@ class AutoTabPFNBase(BaseEstimator):
         n_estimators: int = 8,
         ignore_pretraining_limits: bool = False,
     ):
-        if n_ensemble_models <= 1:
-            raise ValueError(f"n_ensemble_models must be > 1, got {n_ensemble_models}")
-
-        if max_time is not None and max_time <= 0:
-            raise ValueError("max_time must be a positive integer or None.")
-
         self.max_time = max_time
         self.eval_metric = eval_metric
         self.presets = presets
-        self.device = get_device(device)
+        self.device = device
         if isinstance(random_state, np.random.Generator):
             random_state = random_state.integers(np.iinfo(np.int32).max)
         self.random_state = random_state
@@ -159,6 +152,14 @@ class AutoTabPFNBase(BaseEstimator):
         y: pd.Series | np.ndarray,
         categorical_feature_indices: list[int] | None = None,
     ) -> tuple[pd.DataFrame | np.ndarray, pd.Series | np.ndarray]:
+        self.device_ = infer_device_and_type(self.device)
+        if self.n_ensemble_models <= 1:
+            raise ValueError(
+                f"n_ensemble_models must be > 1, got {self.n_ensemble_models}"
+            )
+        if self.max_time is not None and self.max_time <= 0:
+            raise ValueError("max_time must be a positive integer or None.")
+
         original_columns = None
         if isinstance(X, pd.DataFrame):
             original_columns = X.columns.tolist()
@@ -239,7 +240,7 @@ class AutoTabPFNBase(BaseEstimator):
 
         # Set GPU count
         num_gpus = 0
-        if self.device == DeviceType.CUDA:
+        if self.device_ == DeviceType.CUDA:
             num_gpus = torch.cuda.device_count()
 
         self.predictor_.fit(
@@ -263,6 +264,7 @@ class AutoTabPFNBase(BaseEstimator):
     def _more_tags(self):
         return {
             "allow_nan": True,
+            "non_deterministic": True
         }
 
 
@@ -389,6 +391,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             self,
             X,
             ensure_all_finite=False,
+            reset=False,
         )
         if hasattr(self, "single_class_") and self.single_class_:
             return np.full(X.shape[0], self.single_class_value_)
@@ -403,6 +406,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             self,
             X,
             ensure_all_finite=False,
+            reset=False,
         )
         if hasattr(self, "single_class_") and self.single_class_:
             # Return correct (n_samples, n_classes) shape
@@ -505,6 +509,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     def _more_tags(self) -> dict:
         return {
             "allow_nan": True,
+            "non_deterministic": True
         }
 
     def __sklearn_tags__(self):
@@ -531,6 +536,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
             self,
             X,
             ensure_all_finite=False,
+            reset=False,
         )
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         return preds.to_numpy()
