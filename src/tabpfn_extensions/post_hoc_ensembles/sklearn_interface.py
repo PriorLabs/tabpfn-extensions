@@ -120,7 +120,6 @@ class AutoTabPFNBase(BaseEstimator):
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
-    
         if n_ensemble_models < 1:
             raise ValueError(f"n_ensemble_models must be >= 1, got {n_ensemble_models}")
 
@@ -252,7 +251,9 @@ class AutoTabPFNBase(BaseEstimator):
             hyperparameters = {TabPFNV2Model: single_config}
 
         else:
-            raise ValueError(f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}")
+            raise ValueError(
+                f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}"
+            )
 
         # Set GPU count
         num_gpus = 0

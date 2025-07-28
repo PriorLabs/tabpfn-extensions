@@ -75,7 +75,8 @@ def get_example_files() -> list[dict]:
             "name": file_name,
             # Default classification - most examples work with both implementations
             "requires_tabpfn": False,  # By default, examples work with either implementation
-            "requires_autogluon": file_name in REQUIRES_AUTOGLUON_EXAMPLES, # By default, examples do not require autogluon
+            "requires_autogluon": file_name
+            in REQUIRES_AUTOGLUON_EXAMPLES,  # By default, examples do not require autogluon
             "fast": file_name in FAST_EXAMPLES,  # Only listed examples are fast
             "slow": file_name not in FAST_EXAMPLES,  # All others are slow
             "always_timeout": any(
