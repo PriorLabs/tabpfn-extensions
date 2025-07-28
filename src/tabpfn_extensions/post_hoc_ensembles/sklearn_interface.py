@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
-from sklearn.preprocessing import LabelEncoder  # NECESSARY
+from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
 
