@@ -53,7 +53,7 @@ class AutoTabPFNBase(BaseEstimator):
 
     Parameters
     ----------
-    max_time : int | None, default=60*3
+    max_time : int | None, default=600
         Maximum time in seconds to train the ensemble. If `None`, training will run until
         all models are fitted.
     eval_metric : str | None, default=None
@@ -75,7 +75,7 @@ class AutoTabPFNBase(BaseEstimator):
     phe_fit_args : dict | None, default=None
         Advanced customization arguments passed to the `TabularPredictor.fit()` method
         in AutoGluon. See the AutoGluon documentation for details.
-    n_ensemble_models : int, default=200
+    n_ensemble_models : int, default=20
         The number of random TabPFN configurations to generate and include in the
         AutoGluon model zoo for ensembling.
     n_estimators : int, default=16
@@ -106,7 +106,7 @@ class AutoTabPFNBase(BaseEstimator):
     def __init__(
         self,
         *,
-        max_time: int | None = 60 * 3,
+        max_time: int | None = 60 * 10,
         eval_metric: str | None = None,
         presets: Literal[
             "best_quality", "high_quality", "good_quality", "medium_quality"
@@ -116,7 +116,7 @@ class AutoTabPFNBase(BaseEstimator):
         categorical_feature_indices: list[int] | None = None,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
-        n_ensemble_models: int = 200,
+        n_ensemble_models: int = 20,
         n_estimators: int = 16,
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
@@ -150,9 +150,9 @@ class AutoTabPFNBase(BaseEstimator):
     def _get_predictor_fit_args(self) -> dict[str, Any]:
         """Constructs the fit arguments for AutoGluon's TabularPredictor."""
         default_args = {
-            "num_bag_folds": 5,
-            "num_bag_sets": 8,
-            "num_stack_levels": 1,
+            "num_bag_folds": None,
+            "num_bag_sets": None,
+            "num_stack_levels": 0,
             "fit_weighted_ensemble": True,
             "ag_args_ensemble": {"fit_strategy": "parallel"},
         }
@@ -281,7 +281,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
     Parameters
     ----------
-    max_time : int | None, default=180
+    max_time : int | None, default=600
         Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
         Metric for AutoGluon to optimize. Defaults to 'accuracy'.
@@ -297,7 +297,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         Advanced arguments for AutoGluon's `TabularPredictor` constructor.
     phe_fit_args : dict | None, default=None
         Advanced arguments for AutoGluon's `TabularPredictor.fit()` method.
-    n_ensemble_models : int, default=200
+    n_ensemble_models : int, default=20
         Number of random TabPFN configurations to generate for the ensemble.
     n_estimators : int, default=16
         Number of internal transformers per TabPFN model.
@@ -323,7 +323,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     def __init__(
         self,
         *,
-        max_time: int | None = 60 * 3,
+        max_time: int | None = 60 * 10,
         eval_metric: str | None = None,
         presets: Literal[
             "best_quality", "high_quality", "good_quality", "medium_quality"
@@ -333,7 +333,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         categorical_feature_indices: list[int] | None = None,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
-        n_ensemble_models: int = 200,
+        n_ensemble_models: int = 20,
         n_estimators: int = 2,
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
@@ -439,7 +439,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
     Parameters
     ----------
-    max_time : int | None, default=180
+    max_time : int | None, default=600
         Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
         Metric for AutoGluon to optimize. Defaults to 'root_mean_squared_error'.
@@ -455,7 +455,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         Advanced arguments for AutoGluon's `TabularPredictor` constructor.
     phe_fit_args : dict | None, default=None
         Advanced arguments for AutoGluon's `TabularPredictor.fit()` method.
-    n_ensemble_models : int, default=200
+    n_ensemble_models : int, default=20
         Number of random TabPFN configurations to generate for the ensemble.
     n_estimators : int, default=16
         Number of internal transformers per TabPFN model.
@@ -477,7 +477,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     def __init__(
         self,
         *,
-        max_time: int | None = 60 * 3,
+        max_time: int | None = 60 * 10,
         eval_metric: str | None = None,
         presets: Literal[
             "best_quality", "high_quality", "good_quality", "medium_quality"
@@ -487,7 +487,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         categorical_feature_indices: list[int] | None = None,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
-        n_ensemble_models: int = 200,
+        n_ensemble_models: int = 20,
         n_estimators: int = 16,
         ignore_pretraining_limits: bool = False,
     ):
