@@ -79,7 +79,7 @@ class AutoTabPFNBase(BaseEstimator):
         The number of random TabPFN configurations to generate and include in the
         AutoGluon model zoo for ensembling. TabArena used 200 models for their final
         evaluation.
-    n_estimators : int, default=4
+    n_estimators : int, default=8
         The number of internal transformers to ensemble within each individual TabPFN model.
         Higher values can improve performance but increase resource usage.
     balance_probabilities : bool, default=False
@@ -116,7 +116,7 @@ class AutoTabPFNBase(BaseEstimator):
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 20,
-        n_estimators: int = 4,
+        n_estimators: int = 8,
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
@@ -297,7 +297,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         The number of random TabPFN configurations to generate and include in the
         AutoGluon model zoo for ensembling. TabArena used 200 models for their final
         evaluation.
-    n_estimators : int, default=4
+    n_estimators : int, default=8
         The number of internal transformers to ensemble within each individual TabPFN model.
         Higher values can improve performance but increase resource usage.
     balance_probabilities : bool, default=False
@@ -332,7 +332,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 20,
-        n_estimators: int = 4,
+        n_estimators: int = 8,
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
@@ -457,7 +457,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         The number of random TabPFN configurations to generate and include in the
         AutoGluon model zoo for ensembling. TabArena used 200 models for their final
         evaluation.
-    n_estimators : int, default=4
+    n_estimators : int, default=8
         The number of internal transformers to ensemble within each individual TabPFN model.
         Higher values can improve performance but increase resource usage.
     ignore_pretraining_limits : bool, default=False
@@ -487,7 +487,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 20,
-        n_estimators: int = 4,
+        n_estimators: int = 8,
         ignore_pretraining_limits: bool = False,
     ):
         super().__init__(
