@@ -21,10 +21,8 @@ from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
-from tabpfn_extensions.utils import (
-    infer_categorical_features,
-    infer_device_and_type
-)
+from tabpfn_extensions.utils import infer_categorical_features, infer_device_and_type
+
 
 class TaskType(str, Enum):
     BINARY = "binary"
@@ -262,10 +260,7 @@ class AutoTabPFNBase(BaseEstimator):
         return {}
 
     def _more_tags(self):
-        return {
-            "allow_nan": True,
-            "non_deterministic": True
-        }
+        return {"allow_nan": True, "non_deterministic": True}
 
 
 class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
@@ -507,10 +502,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         self._is_classifier = False
 
     def _more_tags(self) -> dict:
-        return {
-            "allow_nan": True,
-            "non_deterministic": True
-        }
+        return {"allow_nan": True, "non_deterministic": True}
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()

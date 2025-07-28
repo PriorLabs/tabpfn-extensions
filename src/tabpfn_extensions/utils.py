@@ -42,6 +42,7 @@ def is_tabpfn(estimator: Any) -> bool:
 try:
     from tabpfn.utils import infer_device_and_type
 except ImportError:
+
     def infer_device_and_type(device: Literal["cpu", "cuda", "auto"]):
         """Infer device and type for TabPFN."""
         return "cpu"
