@@ -21,15 +21,20 @@
 - **rf_pfn**: Combine TabPFN with decision trees and random forests
 - **unsupervised**: Data generation and outlier detection
 - **embedding**: Get TabPFNs internal dense sample embeddings
+- **tabpfgen_datasynthesizer**: Synthetic tabular data generation with TabPFGen
 
 Detailed documentation for each extension is available in the respective module directories.
 
 ## ⚙️ Installation
 
 ```bash
-# Clone and install the repository
+# Clone and install the repository (Python 3.9+ compatible)
 pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-extensions.git"
+
+# Add TabPFGen Data Synthesizer (requires Python 3.10+)
+pip install "tabpfn-extensions[all, tabpfgen_datasynthesizer] @ git+https://github.com/PriorLabs/tabpfn-extensions.git"
 ```
+
 
 ### 🔄 Backend Options
 
