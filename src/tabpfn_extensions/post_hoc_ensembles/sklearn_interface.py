@@ -120,8 +120,8 @@ class AutoTabPFNBase(BaseEstimator):
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
-        if n_ensemble_models <= 1:
-            raise ValueError(f"n_ensemble_models must be > 1, got {n_ensemble_models}")
+        if n_ensemble_models < 1:
+            raise ValueError(f"n_ensemble_models must be >= 1, got {n_ensemble_models}")
 
         if max_time is not None and max_time <= 0:
             raise ValueError("max_time must be a positive integer or None.")
@@ -226,16 +226,28 @@ class AutoTabPFNBase(BaseEstimator):
         # Generate hyperparameter configurations for TabPFN Ensemble
 
         task_type = "multiclass" if self._is_classifier else "regression"
-        rng = check_random_state(self.random_state)
-        seed = rng.randint(np.iinfo(np.int32).max)
-        tabpfn_configs = search_space_func(
-            task_type=task_type,
-            n_ensemble_models=self.n_ensemble_models,
-            n_estimators=self.n_estimators,
-            balance_probabilities=self.balance_probabilities,
-            ignore_pretraining_limits=self.ignore_pretraining_limits,
-            seed=seed,
-        )
+
+        if self.n_ensemble_models > 1:
+            rng = check_random_state(self.random_state)
+            seed = rng.randint(np.iinfo(np.int32).max)
+            tabpfn_configs = search_space_func(
+                task_type=task_type,
+                n_ensemble_models=self.n_ensemble_models,
+                n_estimators=self.n_estimators,
+                balance_probabilities=self.balance_probabilities,
+                ignore_pretraining_limits=self.ignore_pretraining_limits,
+                seed=seed,
+            )
+
+        else:  # elif self.n_ensemble_models == 1:
+            tabpfn_configs = {
+                "n_estimators": self.n_estimators,
+                "balance_probabilities": None
+                if task_type == "regression"
+                else self.balance_probabilities,
+                "ignore_pretraining_limits": self.ignore_pretraining_limits,
+            }
+
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
         # Set GPU count
