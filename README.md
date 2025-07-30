@@ -93,6 +93,7 @@ Built with ❤️ by the TabPFN community
 ---
 
 ## 🚀 TabPFN Workflow Diagram
+*Note: The nodes in the workflow diagram above are clickable and link to relevant documentation and examples.*
 
 ```mermaid
 graph TD
