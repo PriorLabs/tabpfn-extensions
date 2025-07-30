@@ -79,15 +79,18 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
         """Skip test with various datasets as it takes too long for PHE."""
         pass
 
-    # TODO: Enable this test
     @pytest.mark.skip(
-        reason="AutoTabPFN needs additional work to pass all sklearn estimator checks",
+        reason="Not fully compatible with sklearn estimator checks yet, TODO",
     )
     def test_passes_estimator_checks(self, estimator):
         clf_non_deterministic = [30, 31]
-        _run_sklearn_estimator_checks(
-            AutoTabPFNClassifier(device="cuda"), clf_non_deterministic
-        )
+        _run_sklearn_estimator_checks(estimator, clf_non_deterministic)
+
+    @pytest.mark.skip(
+        reason="AutoTabPFNClassifier can't handle text features with float64 dtype requirement",
+    )
+    def test_with_text_features(self, estimator, dataset_generator):
+        pass
 
 
 @pytest.mark.local_compatible
@@ -127,15 +130,12 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
         """Skip test with various datasets as it takes too long for PHE."""
         pass
 
-    # TODO: Enable this test
     @pytest.mark.skip(
-        reason="AutoTabPFN needs additional work to pass all sklearn estimator checks",
+        reason="Not fully compatible with sklearn estimator checks yet, TODO",
     )
     def test_passes_estimator_checks(self, estimator):
         reg_non_deterministic = [27, 28]
-        _run_sklearn_estimator_checks(
-            AutoTabPFNRegressor(device="cuda"), reg_non_deterministic
-        )
+        _run_sklearn_estimator_checks(estimator, reg_non_deterministic)
 
     @pytest.mark.skip(
         reason="AutoTabPFNRegressor can't handle text features with float64 dtype requirement",

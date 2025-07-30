@@ -16,16 +16,12 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
+from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
-from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
-from tabpfn_extensions.utils import (
-    TabPFNClassifier,
-    get_device,
-    infer_categorical_features,
-)
+from tabpfn_extensions.utils import infer_categorical_features, infer_device_and_type
 
 
 class TaskType(str, Enum):
@@ -78,13 +74,12 @@ class AutoTabPFNBase(BaseEstimator):
     n_ensemble_models : int, default=5
         The number of random TabPFN configurations to generate and include in the
         AutoGluon model zoo for ensembling. TabArena used 200 models for their final
-        evaluation.
+        evaluation. In the case of a single model, the model is not ensembled and the
+        model is fitted with the default hyperparameters (with optional `n_estimators`
+        and `ignore_pretraining_limits` parameters).
     n_estimators : int, default=8
         The number of internal transformers to ensemble within each individual TabPFN model.
         Higher values can improve performance but increase resource usage.
-    balance_probabilities : bool, default=False
-        Whether to balance the output probabilities from TabPFN. This can be beneficial
-        for classification tasks with imbalanced classes.
     ignore_pretraining_limits : bool, default=False
         If `True`, bypasses TabPFN's built-in limits on dataset size (10000 samples)
         and feature count (500). **Warning:** Use with caution, as performance is not
@@ -117,27 +112,23 @@ class AutoTabPFNBase(BaseEstimator):
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 20,
         n_estimators: int = 8,
-        balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
     ):
-        if n_ensemble_models < 1:
-            raise ValueError(f"n_ensemble_models must be >= 1, got {n_ensemble_models}")
-
-        if max_time is not None and max_time <= 0:
-            raise ValueError("max_time must be a positive integer or None.")
-
         self.max_time = max_time
         self.eval_metric = eval_metric
         self.presets = presets
-        self.device = get_device(device)
+        self.device = device
+        if isinstance(random_state, np.random.Generator):
+            random_state = random_state.integers(np.iinfo(np.int32).max)
         self.random_state = random_state
         self.categorical_feature_indices = categorical_feature_indices
         self.phe_init_args = phe_init_args
         self.phe_fit_args = phe_fit_args
         self.n_ensemble_models = n_ensemble_models
         self.n_estimators = n_estimators
-        self.balance_probabilities = balance_probabilities
         self.ignore_pretraining_limits = ignore_pretraining_limits
+
+        self._is_classifier = False
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
@@ -161,6 +152,14 @@ class AutoTabPFNBase(BaseEstimator):
         y: pd.Series | np.ndarray,
         categorical_feature_indices: list[int] | None = None,
     ) -> tuple[pd.DataFrame | np.ndarray, pd.Series | np.ndarray]:
+        self.device_ = infer_device_and_type(self.device)
+        if self.n_ensemble_models <= 1:
+            raise ValueError(
+                f"n_ensemble_models must be > 1, got {self.n_ensemble_models}"
+            )
+        if self.max_time is not None and self.max_time <= 0:
+            raise ValueError("max_time must be a positive integer or None.")
+
         original_columns = None
         if isinstance(X, pd.DataFrame):
             original_columns = X.columns.tolist()
@@ -230,29 +229,25 @@ class AutoTabPFNBase(BaseEstimator):
         if self.n_ensemble_models > 1:
             rng = check_random_state(self.random_state)
             seed = rng.randint(np.iinfo(np.int32).max)
+
             tabpfn_configs = search_space_func(
                 task_type=task_type,
                 n_ensemble_models=self.n_ensemble_models,
                 n_estimators=self.n_estimators,
-                balance_probabilities=self.balance_probabilities,
                 ignore_pretraining_limits=self.ignore_pretraining_limits,
                 seed=seed,
+                **self.get_task_args_(),
             )
-
-        else:  # elif self.n_ensemble_models == 1:
+        else:
             tabpfn_configs = {
                 "n_estimators": self.n_estimators,
-                "balance_probabilities": None
-                if task_type == "regression"
-                else self.balance_probabilities,
                 "ignore_pretraining_limits": self.ignore_pretraining_limits,
             }
-
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
         # Set GPU count
         num_gpus = 0
-        if self.device == DeviceType.CUDA:
+        if self.device_ == DeviceType.CUDA:
             num_gpus = torch.cuda.device_count()
 
         self.predictor_.fit(
@@ -266,16 +261,15 @@ class AutoTabPFNBase(BaseEstimator):
 
         # Set sklearn required attributes from the fitted predictor
         self.n_features_in_ = len(self.predictor_.features())
-        if self._is_classifier:
-            # Storing the classes_ in the order AutoGluon uses them
-            self.classes_ = self.predictor_.class_labels
 
         return self
 
+    def get_task_args_(self) -> dict[str, Any]:
+        """Returns task-specific arguments for the TabPFN search space."""
+        return {}
+
     def _more_tags(self):
-        return {
-            "allow_nan": True,
-        }
+        return {"allow_nan": True, "non_deterministic": True}
 
 
 class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
@@ -359,10 +353,10 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             phe_fit_args=phe_fit_args,
             n_ensemble_models=n_ensemble_models,
             n_estimators=n_estimators,
-            balance_probabilities=balance_probabilities,
             ignore_pretraining_limits=ignore_pretraining_limits,
         )
 
+        self.balance_probabilities = balance_probabilities
         self._is_classifier = True
 
     def __sklearn_tags__(self):
@@ -378,32 +372,21 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     ) -> AutoTabPFNClassifier:
         X, y = self._prepare_fit(X, y, categorical_feature_indices)
 
-        # Single class case - special handling
-        if len(unique_labels(y)) == 1:
-            self.single_class_ = True
-            self.classes_ = unique_labels(y)
-            self.single_class_value_ = self.classes_[0]
-            self.n_features_in_ = X.shape[1]
-            return self
+        # Encode labels to be 0-indexed and set self.classes_
+        self.label_encoder_ = LabelEncoder()
+        y_encoded = self.label_encoder_.fit_transform(y)
+        self.classes_ = self.label_encoder_.classes_
 
-        # Check for extremely imbalanced classes - handle case with only 1 sample per class
-        class_counts = np.bincount(y.astype(int))
-        if np.min(class_counts[class_counts > 0]) < 2:
-            self.single_class_ = False
-            self.predictor_ = TabPFNClassifier(
-                device=self.device,
-                categorical_features_indices=self.categorical_feature_indices_,
-            )
-            self.predictor_.fit(X, y)
-            # Store the classes
-            self.classes_ = self.predictor_.classes_
+        # Single class case - special handling
+        if len(self.classes_) == 1:
+            self.single_class_ = True
+            self.single_class_value_ = self.classes_[0]
             self.n_features_in_ = X.shape[1]
             return self
 
         # Normal case - multiple classes with sufficient samples per class
         self.single_class_ = False
-
-        super().fit(X, y)
+        super().fit(X, y_encoded)
         return self
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -412,14 +395,14 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             self,
             X,
             ensure_all_finite=False,
+            reset=False,
         )
         if hasattr(self, "single_class_") and self.single_class_:
-            # For single class, always predict that class
             return np.full(X.shape[0], self.single_class_value_)
-        # Convert to pandas dataframe for AutoGluon
+
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
-        # Convert back to numpy array for sklearn
-        return preds.to_numpy()
+        # Decode predictions back to original labels.
+        return self.label_encoder_.inverse_transform(preds.to_numpy())
 
     def predict_proba(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
@@ -427,15 +410,24 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             self,
             X,
             ensure_all_finite=False,
+            reset=False,
         )
         if hasattr(self, "single_class_") and self.single_class_:
-            # For single class, return probabilities of 1.0
-            return np.ones((X.shape[0], 1))
+            # Return correct (n_samples, n_classes) shape
+            proba = np.zeros((X.shape[0], len(self.classes_)))
+            proba[:, 0] = 1.0
+            return proba
 
-        preds = self.predictor_.predict_proba(
-            pd.DataFrame(X, columns=self._column_names)
+        # Re-align predict_proba output to match self.classes_
+        proba_df = self.predictor_.predict_proba(
+            pd.DataFrame(X, columns=self._column_names), as_pandas=True
         )
-        return preds.to_numpy()
+        original_cols = self.label_encoder_.inverse_transform(proba_df.columns)
+        proba_df.columns = original_cols
+        return proba_df.reindex(columns=self.classes_).to_numpy()
+
+    def get_task_args_(self) -> dict[str, Any]:
+        return {"balance_probabilities": self.balance_probabilities}
 
 
 class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
@@ -519,9 +511,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         self._is_classifier = False
 
     def _more_tags(self) -> dict:
-        return {
-            "allow_nan": True,
-        }
+        return {"allow_nan": True, "non_deterministic": True}
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
@@ -547,6 +537,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
             self,
             X,
             ensure_all_finite=False,
+            reset=False,
         )
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         return preds.to_numpy()

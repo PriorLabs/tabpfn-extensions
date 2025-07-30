@@ -61,12 +61,13 @@ interpretability = [
 post_hoc_ensembles = [
     "llvmlite",
     "hyperopt>=0.2.7",
-    # Pinned to a specific autogluon commit to get access to AutoGluon TabPFN.
+
+    # Pinned to the 1.4.0b20250728 pre-release version of autogluon.
     # TODO: Move to a released version once autogluon 1.4 is available.
-    "autogluon.common @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=common",
-    "autogluon.features @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=features",
-    "autogluon.core @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=core",
-    "autogluon.tabular @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=tabular"
+    "autogluon.common==1.4.0b20250728",
+    "autogluon.features==1.4.0b20250728",
+    "autogluon.core==1.4.0b20250728",
+    "autogluon.tabular==1.4.0b20250728"
 ]
 hpo = [
     "hyperopt>=0.2.7",
@@ -87,10 +88,12 @@ all = [
     "hyperopt>=0.2.7",
     "setuptools>=67.0.0",
 
-    "autogluon.common @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=common",
-    "autogluon.features @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=features",
-    "autogluon.core @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=core",
-    "autogluon.tabular @ git+https://github.com/autogluon/autogluon@7f12d1660ae4061f86a705f8c9b6b2ba83d310d5#subdirectory=tabular"
+    # Pinned to the 1.4.0b20250728 pre-release version of autogluon.
+    # TODO: Move to a released version once autogluon 1.4 is available.
+    "autogluon.common==1.4.0b20250728",
+    "autogluon.features==1.4.0b20250728",
+    "autogluon.core==1.4.0b20250728",
+    "autogluon.tabular==1.4.0b20250728"
 ]
 
 dev = [
