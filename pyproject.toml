@@ -61,10 +61,6 @@ interpretability = [
 post_hoc_ensembles = [
     "llvmlite",
     "hyperopt>=0.2.7",
-
-    "autogluon.common==1.4.0",
-    "autogluon.features==1.4.0",
-    "autogluon.core==1.4.0",
     "autogluon.tabular==1.4.0"
 ]
 hpo = [
@@ -86,9 +82,6 @@ all = [
     "hyperopt>=0.2.7",
     "setuptools>=67.0.0",
 
-    "autogluon.common==1.4.0",
-    "autogluon.features==1.4.0",
-    "autogluon.core==1.4.0",
     "autogluon.tabular==1.4.0"
 ]
 
