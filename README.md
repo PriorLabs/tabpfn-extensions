@@ -71,6 +71,7 @@ graph LR
     style Unsupervised fill:#fff,stroke:#ccc,stroke-width:5px;
     style Data fill:#fff,stroke:#ccc,stroke-width:5px;
     style Performance fill:#fff,stroke:#ccc,stroke-width:5px;
+    style Interpretability fill:#fff,stroke:#ccc,stroke-width:5px;
 
     %% 2. DEFINE GRAPH STRUCTURE
     subgraph Infrastructure
@@ -109,25 +110,36 @@ graph LR
 
     subgraph Performance
         finetune_check["Need<br/>Finetuning?"];
-        interpretability_check["Need<br/>Interpretability?"];
         performance_check["Need Even Better Performance?"];
+        tuning_complete["Tuning Complete"];
 
         finetune_check -- Yes --> finetuning["Finetuning"];
-        finetune_check -- No --> interpretability_check;
+        finetune_check -- No --> performance_check;
 
         finetuning --> performance_check;
-        interpretability_check -- Yes --> shapley["Explain with<br/>SHAP"];
-        interpretability_check -- No --> performance_check;
-        shapley --> performance_check;
+
 
         performance_check -- No --> end_node;
         performance_check -- Yes --> hpo["HPO"];
         performance_check -- Yes --> post_hoc["Post-Hoc<br/>Ensembling"];
         performance_check -- Yes --> more_estimators["More<br/>Estimators"];
 
-        hpo --> end_node;
-        post_hoc --> end_node;
-        more_estimators --> end_node;
+        hpo --> tuning_complete;
+        post_hoc --> tuning_complete;
+        more_estimators --> tuning_complete;
+    end
+
+    subgraph Interpretability
+
+        tuning_complete --> interpretability_check;
+
+        interpretability_check["Need<br/>Interpretability?"];
+
+        interpretability_check -- Yes --> shapley["Explain with<br/>SHAP"];
+        interpretability_check -- No --> end_node;
+
+        shapley --> end_node;
+
     end
 
     %% 3. LINK SUBGRAPHS AND PATHS
@@ -142,6 +154,7 @@ graph LR
     class start,end_node start_node;
     class local_version,api_client,imputation,data_gen,density,embedding,api_backend_note,ts_features,rfpfn,subsample,many_class,finetuning,shapley,hpo,post_hoc,more_estimators process_node;
     class gpu_check,task_type,unsupervised_type,data_check,model_choice,finetune_check,interpretability_check,performance_check decision_node;
+    class tuning_complete process_node;
 
     %% 5. ADD CLICKABLE LINKS (RESTORED FROM ORIGINAL)
     click local_version "https://github.com/PriorLabs/TabPFN" "TabPFN Backend Options" _blank
