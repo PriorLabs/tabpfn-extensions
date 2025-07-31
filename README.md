@@ -91,81 +91,103 @@ tabpfn-extensions/
 *Note: The nodes in the workflow diagram above are clickable and link to relevant documentation and examples.*
 
 ```mermaid
-graph TD
-    %% 1. DEFINE ALL STYLES
-    classDef start_node fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#333;
-    classDef end_node fill:#f0fff0,stroke:#28a745,stroke-width:2px;
-    classDef process_node fill:#e0f7fa,stroke:#007bff,stroke-width:2px,color:#333;
-    classDef decision_node fill:#fff3cd,stroke:#ffc107,stroke-width:2px,color:#333;
-    classDef info_node fill:#f0f0f0,stroke:#6c757d,stroke-width:2px,color:#333;
+---
+config:
+  theme: 'default'
+  themeVariables:
+    edgeLabelBackground: 'white'
+---
+graph LR
+    %% 1. DEFINE COLOR SCHEME & STYLES
+    classDef default fill:#fff,stroke:#333,stroke-width:2px,color:#333;
+    classDef start_node fill:#e8f5e9,stroke:#43a047,stroke-width:2px,color:#333;
+    classDef process_node fill:#e0f2f1,stroke:#00796b,stroke-width:2px,color:#333;
+    classDef decision_node fill:#fff8e1,stroke:#ffa000,stroke-width:2px,color:#333;
+
+    style Infrastructure fill:#fff,stroke:#ccc,stroke-width:5px;
+    style Unsupervised fill:#fff,stroke:#ccc,stroke-width:5px;
+    style Data fill:#fff,stroke:#ccc,stroke-width:5px;
+    style Performance fill:#fff,stroke:#ccc,stroke-width:5px;
+
+    %% 2. DEFINE GRAPH STRUCTURE
+    subgraph Infrastructure
+        start((Start)) --> gpu_check["GPU available?"];
+        gpu_check -- Yes --> local_version["Use TabPFN<br/>(local PyTorch)"];
+        gpu_check -- No --> api_client["Use TabPFN-Client<br/>(cloud API)"];
+        task_type["What is<br/>your task?"]
+    end
+
+    local_version --> task_type
+    api_client --> task_type
+
+    end_node((Workflow<br/>Complete));
+
+    subgraph Unsupervised
+        unsupervised_type["Select<br/>Unsupervised Task"];
+        unsupervised_type --> imputation["Imputation"]
+        unsupervised_type --> data_gen["Data<br/>Generation"];
+        unsupervised_type --> density["Outlier<br/>Detection"];
+        unsupervised_type --> embedding["Get<br/>Embeddings"];
+    end
 
 
-    %% 2. DEFINE THE GRAPH STRUCTURE
-    start((Start)) --> gpu_check{GPU available?};
+    subgraph Data
+        data_check["Data Checks"];
+        model_choice["Samples > 10k or<br/>Classes > 10?"]
+        data_check -- "Table Contains Text Data?" --> api_backend_note["Note: API client has<br/>native text support"];
+        api_backend_note --> model_choice;
+        data_check -- "Time-Series Data?" --> ts_features["Use Time-Series<br/>Features"];
+        ts_features --> model_choice;
+        data_check -- "Purely Tabular" --> model_choice;
+        model_choice -- "No" --> rfpfn["RF-PFN"];
+        model_choice -- "Yes, >10k samples" --> subsample["Subsample<br/>Data"];
+        model_choice -- "Yes, >10 classes" --> many_class["Many-Class<br/>Method"];
+    end
 
-    gpu_check -- No --> api_client("Use TabPFN Client backend");
-    gpu_check -- Yes --> local_version("Use TabPFN Local Version");
+    subgraph Performance
+        finetune_check["Need<br/>Finetuning?"];
+        interpretability_check["Need<br/>Interpretability?"];
+        performance_check["Need Even Better Performance?"];
 
+        finetune_check -- Yes --> finetuning["Finetuning"];
+        finetune_check -- No --> interpretability_check;
 
-    api_client --> task_type{"Type of task?"};
-    local_version --> task_type{"Type of task?"};
+        finetuning --> performance_check;
+        interpretability_check -- Yes --> shapley["Explain with<br/>SHAP"];
+        interpretability_check -- No --> performance_check;
+        shapley --> performance_check;
 
-    task_type -- Unsupervised --> unsupervised_type{"What kind of<br/>unsupervised task?"};
-    unsupervised_type --> imputation(Imputation);
-    unsupervised_type --> data_gen("Data Generation");
-    unsupervised_type --> density("Density Estimation/Outlier Detection");
-    unsupervised_type --> embedding("Get Embeddings");
+        performance_check -- No --> end_node;
+        performance_check -- Yes --> hpo["HPO"];
+        performance_check -- Yes --> post_hoc["Post-Hoc<br/>Ensembling"];
+        performance_check -- Yes --> more_estimators["More<br/>Estimators"];
 
-    task_type -- "Prediction Problem" --> text_check{"Contains Text Data?"};
+        hpo --> end_node;
+        post_hoc --> end_node;
+        more_estimators --> end_node;
+    end
 
-    text_check -- Yes --> api_backend("Consider using our API client as<br/>TabPFN backend.<br/>Natively understands text.");
+    %% 3. LINK SUBGRAPHS AND PATHS
+    task_type -- "Prediction" --> data_check;
+    task_type -- "Unsupervised" --> unsupervised_type;
 
-    text_check -- No --> ts_check{"Time-Series Data?"};
-
-    ts_check -- Yes --> ts_features["Consider TabPFN-Time-Series features"];
-    ts_check -- No --> sample_size_check{"More than 10,000 samples?"};
-
-    ts_features --> sample_size_check;
-    api_backend --> sample_size_check;
-
-    sample_size_check -- No --> class_check{"More than 10 classes?"};
-    sample_size_check -- Yes --> subsample["TabPFN subsample<br/> to 10,000"];
-
-    class_check -- No --> rfpfn("RF-PFN");
-    class_check -- Yes --> many_class("Many Class");
-
-    subsample --> finetune_check{"Need to Finetune?"};
     rfpfn --> finetune_check;
+    subsample --> finetune_check;
     many_class --> finetune_check;
 
-    finetune_check -- Yes --> finetuning("Finetuning");
-    finetune_check -- No --> interpretability_check{"Need Interpretability?"};
+    %% 4. APPLY STYLES
+    class start,end_node start_node;
+    class local_version,api_client,imputation,data_gen,density,embedding,api_backend_note,ts_features,rfpfn,subsample,many_class,finetuning,shapley,hpo,post_hoc,more_estimators process_node;
+    class gpu_check,task_type,unsupervised_type,data_check,model_choice,finetune_check,interpretability_check,performance_check decision_node;
 
-    finetuning --> performance_check{"Performance not<br/>good enough?"};
-    interpretability_check -- Yes --> shapley("Shapley Values for TabPFN");
-    interpretability_check -- No --> performance_check;
-    shapley --> performance_check;
-
-    performance_check -- No --> congrats((Congrats!));
-    performance_check -- Yes --> tuning_options("Tuning Options");
-    tuning_options --> more_estimators("More estimators on TabPFN");
-    tuning_options --> hpo("HPO for TabPFN");
-    tuning_options --> post_hoc("Post-Hoc-Ensemble<br/>(AutoTabPFN)");
-
-    %% 3. APPLY STYLES TO NODES
-    class Start start_node;
-    class Congrats end_node;
-    class gpu_check,task_type,unsupervised_type,text_check,ts_check,sample_size_check,class_check,finetune_check,interpretability_check,performance_check decision_node;
-    class local_version,api_client,imputation,data_gen,density,embedding,api_backend,ts_features,subsample,rfpfn,many_class,finetuning,shapley,more_estimators,hpo,post_hoc,tuning_options process_node;
-
-    %% 4. ADD CLICKABLE LINKS
+    %% 5. ADD CLICKABLE LINKS (RESTORED FROM ORIGINAL)
     click local_version "https://github.com/PriorLabs/TabPFN" "TabPFN Backend Options" _blank
     click api_client "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Client" _blank
-    click api_backend "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Backend" _blank
+    click api_backend_note "https://github.com/PriorLabs/tabpfn-client" "TabPFN API Backend" _blank
     click unsupervised_type "https://github.com/PriorLabs/tabpfn-extensions" "TabPFN Extensions" _blank
+    click imputation "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/imputation.py" "TabPFN Imputation Example" _blank
     click data_gen "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/generate_data.py" "TabPFN Data Generation Example" _blank
     click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/density_estimation_outlier_detection.py" "TabPFN Density Estimation/Outlier Detection Example" _blank
-    click imputation "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/imputation.py" "TabPFN Imputation Example" _blank
     click embedding "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding" "TabPFN Embedding Example" _blank
     click ts_features "https://github.com/PriorLabs/tabpfn-time-series" "TabPFN Time-Series Example" _blank
     click rfpfn "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/rf_pfn/rf_pfn_example.py" "RF-PFN Example" _blank
@@ -176,8 +198,3 @@ graph TD
     click hpo "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/hpo/tuned_tabpfn.py" "HPO Example" _blank
     click subsample "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/large_datasets/large_datasets_example.py" "Large Datasets Example" _blank
 ```
-
----
-
-Built with ❤️ by the TabPFN community
-
