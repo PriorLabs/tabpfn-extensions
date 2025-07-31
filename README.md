@@ -119,7 +119,7 @@ graph LR
         finetuning --> performance_check;
 
 
-        performance_check -- No --> end_node;
+        performance_check -- No --> tuning_complete;
         performance_check -- Yes --> hpo["HPO"];
         performance_check -- Yes --> post_hoc["Post-Hoc<br/>Ensembling"];
         performance_check -- Yes --> more_estimators["More<br/>Estimators"];
