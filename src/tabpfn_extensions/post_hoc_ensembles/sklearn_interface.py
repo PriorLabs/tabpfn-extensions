@@ -153,9 +153,9 @@ class AutoTabPFNBase(BaseEstimator):
         categorical_feature_indices: list[int] | None = None,
     ) -> tuple[pd.DataFrame | np.ndarray, pd.Series | np.ndarray]:
         self.device_ = infer_device_and_type(self.device)
-        if self.n_ensemble_models <= 1:
+        if self.n_ensemble_models < 1:
             raise ValueError(
-                f"n_ensemble_models must be > 1, got {self.n_ensemble_models}"
+                f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}"
             )
         if self.max_time is not None and self.max_time <= 0:
             raise ValueError("max_time must be a positive integer or None.")
@@ -242,6 +242,7 @@ class AutoTabPFNBase(BaseEstimator):
             tabpfn_configs = {
                 "n_estimators": self.n_estimators,
                 "ignore_pretraining_limits": self.ignore_pretraining_limits,
+                **self.get_task_args_(),
             }
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
