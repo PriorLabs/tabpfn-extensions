@@ -209,7 +209,6 @@ def get_param_grid_hyperopt(task_type: str) -> dict:
             str(local_dir / "tabpfn-v2-regressor.ckpt"),
             str(local_dir / "tabpfn-v2-regressor-2noar4o2.ckpt"),
             str(local_dir / "tabpfn-v2-regressor-wyl4o83o.ckpt"),
-            str(local_dir / "tabpfn-v2-regressor-5wof9ojf.ckpt"),
         ]
         search_space["inference_config/REGRESSION_Y_PREPROCESS_TRANSFORMS"] = hp.choice(
             "REGRESSION_Y_PREPROCESS_TRANSFORMS",

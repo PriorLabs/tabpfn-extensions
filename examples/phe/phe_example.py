@@ -30,7 +30,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.33,
     random_state=42,
 )
-clf = AutoTabPFNClassifier(max_time=60 * 3)
+clf = AutoTabPFNClassifier(max_time=60 * 6)
 clf.fit(X_train, y_train)
 prediction_probabilities = clf.predict_proba(X_test)
 predictions = np.argmax(prediction_probabilities, axis=-1)
@@ -46,7 +46,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.33,
     random_state=42,
 )
-clf = AutoTabPFNClassifier(max_time=60 * 3)
+clf = AutoTabPFNClassifier(max_time=60 * 6)
 clf.fit(X_train, y_train)
 prediction_probabilities = clf.predict_proba(X_test)
 predictions = np.argmax(prediction_probabilities, axis=-1)
@@ -62,7 +62,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.33,
     random_state=42,
 )
-reg = AutoTabPFNRegressor(max_time=60 * 3)
+reg = AutoTabPFNRegressor(max_time=60 * 6)
 reg.fit(X_train, y_train)
 predictions = reg.predict(X_test)
 print("Mean Squared Error (MSE):", mean_squared_error(y_test, predictions))

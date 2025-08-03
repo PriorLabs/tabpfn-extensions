@@ -7,6 +7,7 @@ import logging
 import os
 import warnings
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar
 
 import numpy as np
@@ -39,35 +40,26 @@ def is_tabpfn(estimator: Any) -> bool:
         return False
 
 
-def get_device(device: str | None = "auto") -> str:
-    """Determine the appropriate device for computation.
+try:
+    from tabpfn.utils import infer_device_and_type
+except ImportError:
+    # Fallback for environments without tabpfn package, in these environments
+    # prediction uses the API client, so we can just return "cpu"
 
-    This function implements automatic device selection, defaulting to CUDA
-    if available, otherwise falling back to CPU.
+    # torch device mock dataclass
+    @dataclass
+    class DeviceType:
+        type: str
 
-    Args:
-        device: Device specification, options are:
-            - "auto": Automatically use CUDA if available, otherwise CPU
-            - "cpu": Force CPU usage
-            - "cuda": Force CUDA usage (raises error if not available)
-            - None: Same as "auto"
-
-    Returns:
-        str: The resolved device string ("cpu" or "cuda")
-
-    Raises:
-        RuntimeError: If "cuda" is explicitly requested but not available
-    """
-    import torch
-
-    if device is None or device == "auto":
-        return "cuda" if torch.cuda.is_available() else "cpu"
-    if device == "cuda" and not torch.cuda.is_available():
-        raise RuntimeError(
-            "CUDA device requested but not available. "
-            "Use device='auto' to fall back to CPU automatically.",
-        )
-    return device
+    def infer_device_and_type(device: Literal["cpu", "cuda", "auto"]):
+        if device in ("cuda"):
+            warnings.warn(
+                "CUDA device requested but 'tabpfn' package not found. "
+                "Falling back to CPU as the client-based API does not support GPU.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return DeviceType(type="cpu")
 
 
 USE_TABPFN_LOCAL = os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"
