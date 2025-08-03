@@ -52,6 +52,13 @@ except ImportError:
         type: str
 
     def infer_device_and_type(device: Literal["cpu", "cuda", "auto"]):
+        if device in ("cuda"):
+            warnings.warn(
+                "CUDA device requested but 'tabpfn' package not found. "
+                "Falling back to CPU as the client-based API does not support GPU.",
+                UserWarning,
+                stacklevel=2,
+            )
         return DeviceType(type="cpu")
 
 
