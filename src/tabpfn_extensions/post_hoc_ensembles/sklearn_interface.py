@@ -30,12 +30,6 @@ class TaskType(str, Enum):
     REGRESSION = "regression"
 
 
-class DeviceType(str, Enum):
-    CUDA = "cuda"
-    CPU = "cpu"
-    AUTO = "auto"
-
-
 class AutoTabPFNBase(BaseEstimator):
     """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN models.
 
@@ -248,7 +242,7 @@ class AutoTabPFNBase(BaseEstimator):
 
         # Set GPU count
         num_gpus = 0
-        if self.device_ == DeviceType.CUDA:
+        if self.device_.type == "cuda":
             num_gpus = torch.cuda.device_count()
 
         self.predictor_.fit(
