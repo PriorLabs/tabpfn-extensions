@@ -400,6 +400,13 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
     def predict_proba(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
+
+        if X.shape[1] != self.n_features_in_:
+            raise ValueError(
+                f"X has {X.shape[1]} features, but {self.__class__.__name__} "
+                f"is expecting {self.n_features_in_} features as input."
+            )
+
         if hasattr(self, "single_class_") and self.single_class_:
             # Return correct (n_samples, n_classes) shape
             proba = np.zeros((X.shape[0], len(self.classes_)))
