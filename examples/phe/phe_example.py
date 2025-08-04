@@ -7,87 +7,64 @@ This example trains multiple TabPFN models, which is computationally intensive.
 """
 
 import numpy as np
-import pandas as pd
-import torch
-from sklearn.datasets import fetch_openml
+from sklearn.datasets import load_breast_cancer, load_diabetes, load_iris
 from sklearn.metrics import (
+    accuracy_score,
     mean_absolute_error,
     mean_squared_error,
     r2_score,
+    roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
 
-from tabpfn import TabPFNRegressor
 from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import (
+    AutoTabPFNClassifier,
     AutoTabPFNRegressor,
 )
 
-
-def fetch_boston_housing_manually():
-    """Fetches the Boston housing dataset from its original source at CMU.
-    This is a replacement for the deprecated function from scikit-learn.
-
-    Returns:
-        (data, target): A tuple of numpy arrays. `data` is the feature matrix,
-                        and `target` is the regression target.
-    """
-    data_url = "http://lib.stat.cmu.edu/datasets/boston"
-    raw_df = pd.read_csv(data_url, sep=r"\s+", skiprows=22, header=None)
-    data = np.hstack([raw_df.values[::2, :], raw_df.values[1::2, :2]])
-    target = raw_df.values[1::2, 2]
-    return data, target
-
-
-# Regression
-
-
-X_manual, y_manual = fetch_boston_housing_manually()
-
-# Root Mean Squared Error (RMSE): 5.279701791369698
-# Mean Absolute Error (MAE): 3.7002804556292683
-# R-squared (R^2): 0.6316622564943378
-df_boston = fetch_openml(data_id=531, as_frame=True)
-X_fetch_openml, y_fetch_openml = df_boston.data, df_boston.target
-
-print("X_manual.shape, y_manual.shape:", X_manual.shape, y_manual.shape)
-print(
-    "X_fetch_openml.shape, y_fetch_openml.shape:",
-    X_fetch_openml.shape,
-    y_fetch_openml.shape,
-)
-
-print("X_fetch_openml.head():", X_fetch_openml.head())
-print("y_fetch_openml.head():", y_fetch_openml.head())
-
-print("Correct data types after loading:")
-print(X_fetch_openml.dtypes)
-
-
+# Binary
+X, y = load_breast_cancer(return_X_y=True)
 X_train, X_test, y_train, y_test = train_test_split(
-    X_fetch_openml,
-    y_fetch_openml,
-    test_size=0.30,
+    X,
+    y,
+    test_size=0.33,
     random_state=42,
 )
-device = "cuda" if torch.cuda.is_available() else "cpu"
+clf = AutoTabPFNClassifier(max_time=60 * 6)
+clf.fit(X_train, y_train)
+prediction_probabilities = clf.predict_proba(X_test)
+predictions = np.argmax(prediction_probabilities, axis=-1)
 
-tabpfn_base = TabPFNRegressor(device=device)
-tabpfn_base.fit(X_train, y_train)
-predictions_tabpfn_base = tabpfn_base.predict(X_test)
-print(
-    "Root Mean Squared Error (RMSE):",
-    np.sqrt(mean_squared_error(y_test, predictions_tabpfn_base)),
-)
-print(
-    "Mean Absolute Error (MAE):", mean_absolute_error(y_test, predictions_tabpfn_base)
-)
-print("R-squared (R^2):", r2_score(y_test, predictions_tabpfn_base))
+print("ROC AUC:", roc_auc_score(y_test, prediction_probabilities[:, 1]))
+print("Accuracy", accuracy_score(y_test, predictions))
 
-reg = AutoTabPFNRegressor(max_time=60 * 6, device=device, phe_fit_args={"verbosity": 0})
+# Multiclass
+X, y = load_iris(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.33,
+    random_state=42,
+)
+clf = AutoTabPFNClassifier(max_time=60 * 6)
+clf.fit(X_train, y_train)
+prediction_probabilities = clf.predict_proba(X_test)
+predictions = np.argmax(prediction_probabilities, axis=-1)
+
+print("ROC AUC:", roc_auc_score(y_test, prediction_probabilities, multi_class="ovr"))
+print("Accuracy", accuracy_score(y_test, predictions))
+
+# Regression
+X, y = load_diabetes(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.33,
+    random_state=42,
+)
+reg = AutoTabPFNRegressor(max_time=60 * 6)
 reg.fit(X_train, y_train)
 predictions = reg.predict(X_test)
-print(
-    "Root Mean Squared Error (RMSE):", np.sqrt(mean_squared_error(y_test, predictions))
-)
+print("Mean Squared Error (MSE):", mean_squared_error(y_test, predictions))
 print("Mean Absolute Error (MAE):", mean_absolute_error(y_test, predictions))
 print("R-squared (R^2):", r2_score(y_test, predictions))
