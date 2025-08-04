@@ -20,7 +20,6 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
 
-from tabpfn_extensions.misc.sklearn_compat import validate_data
 from tabpfn_extensions.utils import infer_categorical_features, infer_device_and_type
 
 
@@ -101,7 +100,6 @@ class AutoTabPFNBase(BaseEstimator):
         presets: list[str] | str | None = None,
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
-        categorical_feature_indices: list[int] | None = None,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 20,
@@ -115,7 +113,6 @@ class AutoTabPFNBase(BaseEstimator):
         if isinstance(random_state, np.random.Generator):
             random_state = random_state.integers(np.iinfo(np.int32).max)
         self.random_state = random_state
-        self.categorical_feature_indices = categorical_feature_indices
         self.phe_init_args = phe_init_args
         self.phe_fit_args = phe_fit_args
         self.n_ensemble_models = n_ensemble_models
@@ -145,7 +142,17 @@ class AutoTabPFNBase(BaseEstimator):
         X: pd.DataFrame | np.ndarray,
         y: pd.Series | np.ndarray,
         categorical_feature_indices: list[int] | None = None,
-    ) -> tuple[pd.DataFrame | np.ndarray, pd.Series | np.ndarray]:
+        feature_names: list[str] | None = None,
+    ) -> tuple[pd.DataFrame, pd.Series | np.ndarray]:
+        """Sets up the training environment and normalizes input data for fitting.
+
+        This helper method performs the initial setup before the main training
+        process. It determines the computation device (CPU/GPU), validates key
+        model parameters, and ensures the feature matrix `X` is a Pandas
+        DataFrame. If the input `X` is a NumPy array, it is converted to a
+        DataFrame, using the provided `feature_names` or generating default names.
+        Finally, it resolves the categorical feature indices to be used.
+        """
         self.device_ = infer_device_and_type(self.device)
         if self.n_ensemble_models < 1:
             raise ValueError(
@@ -154,29 +161,15 @@ class AutoTabPFNBase(BaseEstimator):
         if self.max_time is not None and self.max_time <= 0:
             raise ValueError("max_time must be a positive integer or None.")
 
-        original_columns = None
-        if isinstance(X, pd.DataFrame):
-            original_columns = X.columns.tolist()
-
-        X, y = validate_data(
-            self,
-            X,
-            y,
-            ensure_all_finite=False,
-        )
-
-        if original_columns is not None:
+        if not isinstance(X, pd.DataFrame):
+            original_columns = feature_names or [f"f{i}" for i in range(X.shape[1])]
             X = pd.DataFrame(X, columns=original_columns)
 
-        effective_cat_indices = categorical_feature_indices
-        if effective_cat_indices is None:
-            effective_cat_indices = self.categorical_feature_indices
-
         # Auto-detect if still not specified and store in a new "fitted" attribute
-        if effective_cat_indices is None:
+        if categorical_feature_indices is None:
             self.categorical_feature_indices_ = infer_categorical_features(X)
         else:
-            self.categorical_feature_indices_ = effective_cat_indices
+            self.categorical_feature_indices_ = categorical_feature_indices
 
         return X, y
 
@@ -288,8 +281,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         Device for training. "auto" selects "cuda" if available.
     random_state : int | np.random.RandomState | None, default=None
         Controls randomness for reproducibility.
-    categorical_feature_indices : list[int] | None, default=None
-        Indices of categorical features. If `None`, they are inferred automatically.
     phe_init_args : dict | None, default=None
         Advanced arguments for AutoGluon's `TabularPredictor` constructor.
     phe_fit_args : dict | None, default=None
@@ -329,7 +320,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         presets: list[str] | str | None = None,
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
-        categorical_feature_indices: list[int] | None = None,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 20,
@@ -343,7 +333,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             presets=presets,
             device=device,
             random_state=random_state,
-            categorical_feature_indices=categorical_feature_indices,
             phe_init_args=phe_init_args,
             phe_fit_args=phe_fit_args,
             n_ensemble_models=n_ensemble_models,
@@ -364,8 +353,12 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         X: pd.DataFrame | np.ndarray,
         y: pd.Series | np.ndarray,
         categorical_feature_indices: list[int] | None = None,
+        feature_names: list[str] | None = None,
     ) -> AutoTabPFNClassifier:
-        X, y = self._prepare_fit(X, y, categorical_feature_indices)
+        X, y = self._prepare_fit(
+            X, y, categorical_feature_indices=categorical_feature_indices,
+            feature_names=feature_names
+        )
 
         # Encode labels to be 0-indexed and set self.classes_
         self.label_encoder_ = LabelEncoder()
@@ -386,12 +379,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
-        X = validate_data(
-            self,
-            X,
-            ensure_all_finite=False,
-            reset=False,
-        )
         if hasattr(self, "single_class_") and self.single_class_:
             return np.full(X.shape[0], self.single_class_value_)
 
@@ -401,12 +388,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
     def predict_proba(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
-        X = validate_data(
-            self,
-            X,
-            ensure_all_finite=False,
-            reset=False,
-        )
         if hasattr(self, "single_class_") and self.single_class_:
             # Return correct (n_samples, n_classes) shape
             proba = np.zeros((X.shape[0], len(self.classes_)))
@@ -446,8 +427,6 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         Device for training. "auto" selects "cuda" if available.
     random_state : int | np.random.RandomState | None, default=None
         Controls randomness for reproducibility.
-    categorical_feature_indices : list[int] | None, default=None
-        Indices of categorical features. If `None`, they are inferred automatically.
     phe_init_args : dict | None, default=None
         Advanced arguments for AutoGluon's `TabularPredictor` constructor.
     phe_fit_args : dict | None, default=None
@@ -482,7 +461,6 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         presets: list[str] | str | None = None,
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
-        categorical_feature_indices: list[int] | None = None,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 20,
@@ -495,7 +473,6 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
             presets=presets,
             device=device,
             random_state=random_state,
-            categorical_feature_indices=categorical_feature_indices,
             phe_init_args=phe_init_args,
             phe_fit_args=phe_fit_args,
             n_ensemble_models=n_ensemble_models,
@@ -518,9 +495,11 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         X: pd.DataFrame | np.ndarray,
         y: pd.Series | np.ndarray,
         categorical_feature_indices: list[int] | None = None,
+        feature_names: list[str] | None = None,
     ) -> AutoTabPFNRegressor:
         X, y = self._prepare_fit(
-            X, y, categorical_feature_indices=categorical_feature_indices
+            X, y, categorical_feature_indices=categorical_feature_indices,
+            feature_names=feature_names
         )
         super().fit(X, y)
 
@@ -528,11 +507,5 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
-        X = validate_data(
-            self,
-            X,
-            ensure_all_finite=False,
-            reset=False,
-        )
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         return preds.to_numpy()
