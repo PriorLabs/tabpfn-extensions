@@ -165,6 +165,9 @@ class AutoTabPFNBase(BaseEstimator):
             original_columns = feature_names or [f"f{i}" for i in range(X.shape[1])]
             X = pd.DataFrame(X, columns=original_columns)
 
+        self.n_features_in_ = X.shape[1]
+        self.feature_names_in_ = X.columns.to_numpy(dtype=object)
+
         # Auto-detect if still not specified and store in a new "fitted" attribute
         if categorical_feature_indices is None:
             self.categorical_feature_indices_ = infer_categorical_features(X)
@@ -379,6 +382,13 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
+
+        if X.shape[1] != self.n_features_in_:
+            raise ValueError(
+                f"X has {X.shape[1]} features, but {self.__class__.__name__} "
+                f"is expecting {self.n_features_in_} features as input."
+            )
+
         if hasattr(self, "single_class_") and self.single_class_:
             return np.full(X.shape[0], self.single_class_value_)
 
@@ -507,5 +517,12 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
+
+        if X.shape[1] != self.n_features_in_:
+            raise ValueError(
+                f"X has {X.shape[1]} features, but {self.__class__.__name__} "
+                f"is expecting {self.n_features_in_} features as input."
+            )
+
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         return preds.to_numpy()
