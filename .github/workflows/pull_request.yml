@@ -82,6 +82,8 @@ jobs:
 
       - name: Run Tests (Unix)
         if: runner.os != 'Windows'
+        env:
+          TABPFN_EXCLUDE_DEVICES: "mps"
         run: |
           FAST_TEST_MODE=1 pytest tests/
 
