@@ -49,7 +49,7 @@ class AutoTabPFNBase(BaseEstimator):
         The evaluation metric for AutoGluon to optimize. If `None`, a default metric
         is chosen based on the problem type (e.g., 'accuracy' for classification).
         For a full list of options, see the AutoGluon documentation.
-    presets : list[str] | str | None, default=None
+    presets : list[str] | str | None, default="best_quality"
         AutoGluon preset to control the quality-time trade-off.
     device : {"cpu", "cuda", "auto"}, default="auto"
         The device to use for training. "auto" will select "cuda" if available, otherwise "cpu".
@@ -97,7 +97,7 @@ class AutoTabPFNBase(BaseEstimator):
         *,
         max_time: int | None = 360,
         eval_metric: str | None = None,
-        presets: list[str] | str | None = None,
+        presets: list[str] | str | None = "best_quality",
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
         phe_init_args: dict | None = None,
@@ -277,7 +277,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
         Metric for AutoGluon to optimize. Defaults to 'accuracy'.
-    presets : list[str] | str | None, default=None
+    presets : list[str] | str | None, default="best_quality"
         AutoGluon preset to control the quality-time trade-off.
     device : {"cpu", "cuda", "auto"}, default="auto"
         Device for training. "auto" selects "cuda" if available.
@@ -319,7 +319,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         *,
         max_time: int | None = 360,
         eval_metric: str | None = None,
-        presets: list[str] | str | None = None,
+        presets: list[str] | str | None = "best_quality",
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
         phe_init_args: dict | None = None,
@@ -426,7 +426,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
         Metric for AutoGluon to optimize. Defaults to 'root_mean_squared_error'.
-    presets : list[str] | str | None, default=None
+    presets : list[str] | str | None, default="best_quality"
         AutoGluon preset to control the quality-time trade-off.
     device : {"cpu", "cuda", "auto"}, default="auto"
         Device for training. "auto" selects "cuda" if available.
@@ -463,7 +463,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         *,
         max_time: int | None = 360,
         eval_metric: str | None = None,
-        presets: list[str] | str | None = None,
+        presets: list[str] | str | None = "best_quality",
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
         phe_init_args: dict | None = None,
