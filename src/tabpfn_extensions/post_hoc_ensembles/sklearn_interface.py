@@ -369,10 +369,13 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         y_encoded = self.label_encoder_.fit_transform(y)
         self.classes_ = self.label_encoder_.classes_
 
+        self.n_features_in_ = X.shape[1]
+
         # Single class case - special handling
         if len(self.classes_) == 1:
             self.single_class_ = True
             self.single_class_value_ = self.classes_[0]
+            self.n_features_in_ = X.shape[1]
             return self
 
         # Normal case - multiple classes with sufficient samples per class
