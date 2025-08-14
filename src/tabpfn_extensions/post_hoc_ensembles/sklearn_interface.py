@@ -42,7 +42,7 @@ class AutoTabPFNBase(BaseEstimator):
 
     Parameters
     ----------
-    max_time : int | None, default=360
+    max_time : int | None, default=3600
         Maximum time in seconds to train the ensemble. If `None`, training will run until
         all models are fitted.
     eval_metric : str | None, default=None
@@ -95,7 +95,7 @@ class AutoTabPFNBase(BaseEstimator):
     def __init__(
         self,
         *,
-        max_time: int | None = 360,
+        max_time: int | None = 3600,
         eval_metric: str | None = None,
         presets: list[str] | str | None = "best_quality",
         device: Literal["cpu", "cuda", "auto"] = "auto",
@@ -273,7 +273,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
     Parameters
     ----------
-    max_time : int | None, default=360
+    max_time : int | None, default=3600
         Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
         Metric for AutoGluon to optimize. Defaults to 'accuracy'.
@@ -317,7 +317,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     def __init__(
         self,
         *,
-        max_time: int | None = 360,
+        max_time: int | None = 3600,
         eval_metric: str | None = None,
         presets: list[str] | str | None = "best_quality",
         device: Literal["cpu", "cuda", "auto"] = "auto",
@@ -425,7 +425,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
     Parameters
     ----------
-    max_time : int | None, default=360
+    max_time : int | None, default=3600
         Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
         Metric for AutoGluon to optimize. Defaults to 'root_mean_squared_error'.
@@ -464,7 +464,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     def __init__(
         self,
         *,
-        max_time: int | None = 360,
+        max_time: int | None = 3600,
         eval_metric: str | None = None,
         presets: list[str] | str | None = "best_quality",
         device: Literal["cpu", "cuda", "auto"] = "auto",
