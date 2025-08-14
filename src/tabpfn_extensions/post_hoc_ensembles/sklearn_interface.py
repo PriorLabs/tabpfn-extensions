@@ -124,7 +124,7 @@ class AutoTabPFNBase(BaseEstimator):
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_args = {"verbosity": 2, "path": f"TabPFNModels/m-{timestamp}"}
+        default_args = {"verbosity": 1, "path": f"TabPFNModels/m-{timestamp}"}
         user_args = self.phe_init_args or {}
         return {**default_args, **user_args}
 
@@ -165,7 +165,6 @@ class AutoTabPFNBase(BaseEstimator):
             original_columns = feature_names or [f"f{i}" for i in range(X.shape[1])]
             X = pd.DataFrame(X, columns=original_columns)
 
-        self.n_features_in_ = X.shape[1]
         self.feature_names_in_ = X.columns.to_numpy(dtype=object)
 
         # Auto-detect if still not specified and store in a new "fitted" attribute
@@ -374,7 +373,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         if len(self.classes_) == 1:
             self.single_class_ = True
             self.single_class_value_ = self.classes_[0]
-            self.n_features_in_ = X.shape[1]
             return self
 
         # Normal case - multiple classes with sufficient samples per class
@@ -385,12 +383,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
 
-        if X.shape[1] != self.n_features_in_:
-            raise ValueError(
-                f"X has {X.shape[1]} features, but {self.__class__.__name__} "
-                f"is expecting {self.n_features_in_} features as input."
-            )
-
         if hasattr(self, "single_class_") and self.single_class_:
             return np.full(X.shape[0], self.single_class_value_)
 
@@ -400,12 +392,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
     def predict_proba(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
-
-        if X.shape[1] != self.n_features_in_:
-            raise ValueError(
-                f"X has {X.shape[1]} features, but {self.__class__.__name__} "
-                f"is expecting {self.n_features_in_} features as input."
-            )
 
         if hasattr(self, "single_class_") and self.single_class_:
             # Return correct (n_samples, n_classes) shape
@@ -528,12 +514,6 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
-
-        if X.shape[1] != self.n_features_in_:
-            raise ValueError(
-                f"X has {X.shape[1]} features, but {self.__class__.__name__} "
-                f"is expecting {self.n_features_in_} features as input."
-            )
 
         preds = self.predictor_.predict(pd.DataFrame(X, columns=self._column_names))
         return preds.to_numpy()
