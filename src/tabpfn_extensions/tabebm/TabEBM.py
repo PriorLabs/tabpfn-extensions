@@ -38,7 +38,7 @@ def to_numpy(X: Union[np.ndarray, torch.Tensor, pd.DataFrame, None]) -> Optional
         case None:
             return None
         case _:
-            raise ValueError("X must be either a np.ndarray or a torch.Tensor")
+            raise ValueError("X must be a np.ndarray, torch.Tensor, pd.DataFrame, or None")
 
 
 def seed_everything(seed: int) -> None:
