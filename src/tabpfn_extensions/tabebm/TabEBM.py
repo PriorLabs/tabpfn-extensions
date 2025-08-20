@@ -172,7 +172,8 @@ class TabEBM:
 
         # Extract sampling results and format output
         augmented_data = {}
-        for target_class in range(len(np.unique(to_numpy(y)))):
+        unique_labels = np.unique(to_numpy(y))
+        for target_class in unique_labels:
             class_key = f"class_{int(target_class)}"
             augmented_data[class_key] = res[class_key]["sampling_paths"]
 
