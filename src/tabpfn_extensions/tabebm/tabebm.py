@@ -1,23 +1,24 @@
+from __future__ import annotations
+
 import os
 import random
 from functools import partial
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import scipy
 import torch
 from sklearn.model_selection import train_test_split
-from tabpfn.config import ModelInterfaceConfig, PreprocessorConfig
-from tabpfn.utils import meta_dataset_collator
 from torch.utils.data import DataLoader
 
+from tabpfn.config import ModelInterfaceConfig, PreprocessorConfig
+from tabpfn.utils import meta_dataset_collator
 from tabpfn_extensions.utils import TabPFNClassifier
 
 
-def to_numpy(X: Union[np.ndarray, torch.Tensor, pd.DataFrame, None]) -> Optional[np.ndarray]:
-    """
-    Convert input data to numpy array format.
+def to_numpy(X: np.ndarray | torch.Tensor | pd.DataFrame | None) -> np.ndarray | None:
+    """Convert input data to numpy array format.
 
     Args:
         X: Input data in various formats (numpy array, torch tensor, pandas DataFrame, or None)
@@ -28,22 +29,20 @@ def to_numpy(X: Union[np.ndarray, torch.Tensor, pd.DataFrame, None]) -> Optional
     Raises:
         ValueError: If input type is not supported
     """
-    match type(X):
-        case np.ndarray:
-            return X
-        case torch.Tensor:
-            return X.detach().cpu().numpy()
-        case pd.DataFrame:
-            return X.to_numpy()
-        case None:
-            return None
-        case _:
-            raise ValueError("X must be a np.ndarray, torch.Tensor, pd.DataFrame, or None")
+    if isinstance(X, np.ndarray):
+        return X
+    elif isinstance(X, torch.Tensor):
+        return X.detach().cpu().numpy()
+    elif isinstance(X, pd.DataFrame):
+        return X.to_numpy()
+    elif X is None:
+        return None
+    else:
+        raise ValueError("X must be a np.ndarray, torch.Tensor, pd.DataFrame, or None")
 
 
 def seed_everything(seed: int) -> None:
-    """
-    Set random seeds for reproducibility across all libraries.
+    """Set random seeds for reproducibility across all libraries.
 
     Args:
         seed: Random seed value
@@ -61,8 +60,7 @@ def seed_everything(seed: int) -> None:
 
 
 class TabEBM:
-    """
-    TabEBM: Tabular Energy-Based Model for synthetic data generation.
+    """TabEBM: Tabular Energy-Based Model for synthetic data generation.
 
     This class implements an energy-based model that uses TabPFN as the underlying
     classifier to define energy functions. It generates synthetic tabular data
@@ -77,8 +75,7 @@ class TabEBM:
         self,
         max_data_size: int = 10000,
     ):
-        """
-        Initialize TabEBM with optimized configuration.
+        """Initialize TabEBM with optimized configuration.
 
         Args:
             max_data_size: Maximum number of data points to use for training.
@@ -108,12 +105,12 @@ class TabEBM:
         self.max_data_size = max_data_size
 
         # Cache for fitted models to avoid redundant fitting
-        self._fitted_models_cache: Dict[int, Any] = {}
+        self._fitted_models_cache: dict[int, Any] = {}
 
     def generate(
         self,
-        X: Union[np.ndarray, torch.Tensor, pd.DataFrame],
-        y: Union[np.ndarray, torch.Tensor, pd.Series],
+        X: np.ndarray | torch.Tensor | pd.DataFrame,
+        y: np.ndarray | torch.Tensor | pd.Series,
         num_samples: int,
         starting_point_noise_std: float = 0.01,
         sgld_step_size: float = 0.1,
@@ -122,9 +119,8 @@ class TabEBM:
         distance_negative_class: float = 5,
         seed: int = 42,
         debug: bool = False,
-    ) -> Dict[str, np.ndarray]:
-        """
-        Generate synthetic samples using Stochastic Gradient Langevin Dynamics (SGLD).
+    ) -> dict[str, np.ndarray]:
+        """Generate synthetic samples using Stochastic Gradient Langevin Dynamics (SGLD).
 
         This method creates synthetic data by treating the TabPFN classifier as an energy
         function and using SGLD to sample from the learned energy landscape. For each class,
@@ -191,9 +187,8 @@ class TabEBM:
         distance_negative_class: float = 5,
         seed: int = 42,
         debug: bool = False,
-    ) -> Dict[str, Dict[str, np.ndarray]]:
-        """
-        Optimized internal SGLD sampling method with caching and batch processing.
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """Optimized internal SGLD sampling method with caching and batch processing.
 
         This method performs the core SGLD sampling for each class by:
         1. Creating binary classification datasets (target class vs surrogate negatives)
@@ -219,11 +214,7 @@ class TabEBM:
             Dictionary containing sampling results for each class
         """
         if debug:
-            print("=== TabEBM Optimized Sampling ===")
-            print(f"Device: {self.device}")
-            print(f"SGLD parameters: step_size={sgld_step_size}, noise_std={sgld_noise_std}, steps={sgld_steps}")
-            print(f"Surrogate negatives distance: {distance_negative_class}")
-            print(f"Starting point noise std: {starting_point_noise_std}")
+            pass
 
         # Pre-compute unique classes for iteration
         unique_classes = np.unique(y)
@@ -238,7 +229,7 @@ class TabEBM:
 
         for target_class in unique_classes:
             if debug:
-                print(f"\n--- Processing class {target_class} ---")
+                pass
 
             # Create or retrieve cached EBM dataset and model
             ebm_dict = self._get_or_create_ebm_dataset(X, y, target_class, distance_negative_class)
@@ -257,7 +248,7 @@ class TabEBM:
 
             # Prepare batch data for TabPFN (optimized)
             batch_dict = self._prepare_tabpfn_batch_data(X_sgld, y_sgld)
-            X_sgld_tensor = batch_dict["X_train"][0].to(self.device).requires_grad_(True)
+            X_sgld_tensor = batch_dict["X_train"][0].to(self.device).requires_grad_(requires_grad=True)
 
             # Pre-generate all noise for SGLD steps (memory/computation savings)
             noise_tensor = torch.randn(noise_shape, device=self.device, dtype=X_sgld_tensor.dtype)
@@ -276,11 +267,10 @@ class TabEBM:
 
     def _preprocess(
         self,
-        X: Union[np.ndarray, torch.Tensor, pd.DataFrame],
-        y: Union[np.ndarray, torch.Tensor, pd.Series],
-    ) -> Dict[str, np.ndarray]:
-        """
-        Preprocess input data with optimized memory usage and stratified sampling.
+        X: np.ndarray | torch.Tensor | pd.DataFrame,
+        y: np.ndarray | torch.Tensor | pd.Series,
+    ) -> dict[str, np.ndarray]:
+        """Preprocess input data with optimized memory usage and stratified sampling.
 
         Converts inputs to numpy arrays and applies stratified subsampling for large datasets
         to ensure balanced representation across classes while maintaining efficiency.
@@ -314,9 +304,8 @@ class TabEBM:
 
     def _get_or_create_ebm_dataset(
         self, X: np.ndarray, y: np.ndarray, target_class: int, distance_negative_class: float
-    ) -> Dict[str, torch.Tensor]:
-        """
-        Create EBM dataset with caching for better performance.
+    ) -> dict[str, torch.Tensor]:
+        """Create EBM dataset with caching for better performance.
 
         Args:
             X, y: Input data and labels
@@ -339,8 +328,7 @@ class TabEBM:
         return {"X_ebm": X_ebm, "y_ebm": y_ebm}
 
     def _fit_predictor_cached(self, X_ebm: torch.Tensor, y_ebm: torch.Tensor, target_class: int) -> None:
-        """
-        Fit predictor with caching to avoid redundant model training.
+        """Fit predictor with caching to avoid redundant model training.
 
         This method caches fitted models per class to avoid retraining when
         generating multiple batches for the same class.
@@ -376,9 +364,8 @@ class TabEBM:
 
     def _initialize_sgld_starting_points(
         self, X_ebm: torch.Tensor, y_ebm: torch.Tensor, num_samples: int, starting_point_noise_std: float, seed: int
-    ) -> Dict[str, torch.Tensor]:
-        """
-        Optimized initialization of SGLD starting points.
+    ) -> dict[str, torch.Tensor]:
+        """Optimized initialization of SGLD starting points.
 
         Args:
             X_ebm: EBM training features
@@ -409,9 +396,8 @@ class TabEBM:
 
         return {"X_start": X_start, "y_start": y_start}
 
-    def _prepare_tabpfn_batch_data(self, X: torch.Tensor, y: torch.Tensor) -> Dict[str, Any]:
-        """
-        Optimized preparation of TabPFN batch data with reduced overhead.
+    def _prepare_tabpfn_batch_data(self, X: torch.Tensor, y: torch.Tensor) -> dict[str, Any]:
+        """Optimized preparation of TabPFN batch data with reduced overhead.
 
         Args:
             X: Input features tensor
@@ -462,8 +448,7 @@ class TabEBM:
         sgld_steps: int,
         debug: bool,
     ) -> torch.Tensor:
-        """
-        Optimized SGLD sampling loop with reduced memory allocations.
+        """Optimized SGLD sampling loop with reduced memory allocations.
 
         This method performs the core SGLD updates using pre-computed noise
         and optimized gradient computations.
@@ -499,8 +484,7 @@ class TabEBM:
 
             # Debug output (optional)
             if debug and t % 10 == 0:  # Print every 10 steps to reduce overhead
-                grad_norm = X_sgld_list[0].grad.norm().item()
-                print(f"Step {t}: energy={total_energy.item():.3f}, grad_norm={grad_norm:.4f}")
+                X_sgld_list[0].grad.norm().item()
 
             # SGLD update with pre-computed noise
             with torch.no_grad():
@@ -509,17 +493,16 @@ class TabEBM:
                 )
 
                 # Update tensor in-place to maintain gradient tracking
-                X_sgld_list[0] = X_sgld_updated.requires_grad_(True)
+                X_sgld_list[0] = X_sgld_updated.requires_grad_(requires_grad=True)
 
         return X_sgld_list[0]
 
     @staticmethod
     def compute_energy(
-        logits: Union[torch.Tensor, np.ndarray],
+        logits: torch.Tensor | np.ndarray,
         return_unnormalized_prob: bool = False,
-    ) -> Union[torch.Tensor, np.ndarray]:
-        """
-        Compute TabEBM class-specific energy function.
+    ) -> torch.Tensor | np.ndarray:
+        """Compute TabEBM class-specific energy function.
 
         The energy function is defined as:
         E_c(x) = -log(exp(f^c(x)[0]) + exp(f^c(x)[1]))
@@ -566,11 +549,10 @@ class TabEBM:
 
     @staticmethod
     def add_surrogate_negative_samples(
-        X: Union[np.ndarray, torch.Tensor],
+        X: np.ndarray | torch.Tensor,
         distance_negative_class: float = 5,
-    ) -> Tuple[Union[np.ndarray, torch.Tensor], Union[np.ndarray, torch.Tensor]]:
-        """
-        Create surrogate negative samples for TabEBM's binary classification approach.
+    ) -> tuple[np.ndarray | torch.Tensor, np.ndarray | torch.Tensor]:
+        """Create surrogate negative samples for TabEBM's binary classification approach.
 
         This method creates artificial "negative" samples at specified distances from the origin
         to enable energy-based modeling through binary classification. The surrogate negatives
@@ -648,21 +630,20 @@ class TabEBM:
 
     @staticmethod
     def train_test_split_allow_full_train(
-        X: Union[np.ndarray, torch.Tensor],
-        y: Union[np.ndarray, torch.Tensor],
-        test_size: Optional[float] = None,
-        train_size: Optional[float] = None,
-        random_state: Optional[int] = None,
+        X: np.ndarray | torch.Tensor,
+        y: np.ndarray | torch.Tensor,
+        test_size: float | None = None,
+        train_size: float | None = None,
+        random_state: int | None = None,
         shuffle: bool = True,
-        stratify: Optional[Union[np.ndarray, torch.Tensor]] = None,
-    ) -> Tuple[
-        Union[np.ndarray, torch.Tensor],
-        Union[np.ndarray, torch.Tensor],
-        Union[np.ndarray, torch.Tensor],
-        Union[np.ndarray, torch.Tensor],
+        stratify: np.ndarray | torch.Tensor | None = None,
+    ) -> tuple[
+        np.ndarray | torch.Tensor,
+        np.ndarray | torch.Tensor,
+        np.ndarray | torch.Tensor,
+        np.ndarray | torch.Tensor,
     ]:
-        """
-        Enhanced train-test split that supports full training mode.
+        """Enhanced train-test split that supports full training mode.
 
         This method extends sklearn's train_test_split to handle the case where
         test_size=0, which means we want to use all data for training (no validation).
