@@ -11,12 +11,13 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-from conftest import DEFAULT_TEST_SIZE, FAST_TEST_MODE, SMALL_TEST_SIZE
 from sklearn.datasets import make_classification
+
+from conftest import DEFAULT_TEST_SIZE, FAST_TEST_MODE, SMALL_TEST_SIZE
 
 # Try to import TabEBM, but skip tests if dependencies are not available
 try:
-    from tabpfn_extensions.tabebm.TabEBM import TabEBM, to_numpy
+    from tabpfn_extensions.tabebm.tabebm import TabEBM, to_numpy
 except ImportError:
     pytest.skip(
         "TabEBM dependencies not available. Install with 'pip install \"tabpfn-extensions\"'",
