@@ -542,7 +542,6 @@ class TabEBM:
             logit_sums = logits.sum(dim=1)
             if (logit_sums - 1).abs().max() <= 1e-5:
                 raise ValueError("Logits must be unnormalized (not probabilities)")
-
             # Compute energy using log-sum-exp for numerical stability
             energy = -torch.logsumexp(logits, dim=1)
 
