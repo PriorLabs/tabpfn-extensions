@@ -552,7 +552,7 @@ class TabEBM:
         elif isinstance(logits, np.ndarray):
             # Validate that logits are unnormalized (not probabilities)
             logit_sums = logits.sum(axis=1)
-            if (logit_sums - 1).max() <= 1e-5:
+            if np.abs(logit_sums - 1).max() <= 1e-5:
                 raise ValueError("Logits must be unnormalized (not probabilities)")
             # Compute energy using scipy's log-sum-exp for numerical stability
             energy = -scipy.special.logsumexp(logits, axis=1)
