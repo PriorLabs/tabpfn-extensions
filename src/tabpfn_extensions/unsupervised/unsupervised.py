@@ -416,7 +416,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         model: Any,
         X_predict: torch.Tensor,
         t: float,
-    ) -> tuple[dict[str, Any] | np.ndarray, torch.Tensor]:
+    ) -> tuple[dict[str, Any] | torch.Tensor, torch.Tensor]:
         """Sample values from a model's prediction distribution.
 
         Args:
@@ -428,7 +428,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         Returns:
             tuple containing:
-                - The raw prediction output (dictionary for regressors, array for classifiers)
+                - The raw prediction output (dictionary for regressors, tensor for classifiers)
                 - The sampled values as a tensor
         """
         if not self.use_classifier_(column_idx, X_fit[:, column_idx]):
