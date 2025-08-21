@@ -346,8 +346,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             else:
                 # Convert numpy arrays to tensors if necessary before stacking
                 tensor_densities = [
-                    torch.as_tensor(d, dtype=torch.float32)
-                    for d in densities
+                    torch.as_tensor(d, dtype=torch.float32) for d in densities
                 ]
                 pred = torch.stack(tensor_densities).mean(dim=0)
                 pred_sampled = (
