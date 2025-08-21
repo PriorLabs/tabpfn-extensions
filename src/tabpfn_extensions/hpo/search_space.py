@@ -197,11 +197,11 @@ def get_param_grid_hyperopt(task_type: str) -> dict:
     if task_type == "multiclass":
         model_paths = [
             str(local_dir / "tabpfn-v2-classifier.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-od3j1g5m.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-gn2p4bpt.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-znskzxi4.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-llderlii.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-vutqq28w.ckpt"),
+            str(local_dir / "tabpfn-v2-classifier-finetuned-od3j1g5m-4svepuy5.ckpt"),
+            str(local_dir / "tabpfn-v2-classifier-finetuned-gn2p4bpt-xp6f0iqb.ckpt"),
+            str(local_dir / "tabpfn-v2-classifier-finetuned-znskzxi4-tvvss6bp.ckpt"),
+            str(local_dir / "tabpfn-v2-classifier-finetuned-llderlii-oyd7ul21.ckpt"),
+            str(local_dir / "tabpfn-v2-classifier-finetuned-vutqq28w-boexhu6h.ckpt"),
         ]
     elif task_type == "regression":
         model_paths = [
