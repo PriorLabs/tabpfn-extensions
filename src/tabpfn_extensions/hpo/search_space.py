@@ -147,7 +147,7 @@ def get_param_grid_hyperopt(task_type: str) -> dict:
         task_type: Either "multiclass" or "regression"
 
     Returns:
-        Hyperopt search space dictionary
+        Hyperopt search space dictionary.
     """
     search_space = {
         # Custom HPs
