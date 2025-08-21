@@ -346,8 +346,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             else:
                 # Convert numpy arrays to tensors if necessary before stacking
                 tensor_densities = [
-                    torch.tensor(d) if isinstance(d, np.ndarray) else d
-                    for d in densities
+                    torch.as_tensor(d, dtype=torch.float32) for d in densities
                 ]
                 pred = torch.stack(tensor_densities).mean(dim=0)
                 pred_sampled = (
@@ -416,7 +415,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         model: Any,
         X_predict: torch.Tensor,
         t: float,
-    ) -> tuple[dict[str, Any] | np.ndarray, torch.Tensor]:
+    ) -> tuple[dict[str, Any] | torch.Tensor, torch.Tensor]:
         """Sample values from a model's prediction distribution.
 
         Args:
@@ -428,7 +427,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         Returns:
             tuple containing:
-                - The raw prediction output (dictionary for regressors, array for classifiers)
+                - The raw prediction output (dictionary for regressors, tensor for classifiers)
                 - The sampled values as a tensor
         """
         if not self.use_classifier_(column_idx, X_fit[:, column_idx]):
@@ -442,12 +441,13 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             )
             pred_sampled = pred["criterion"].sample(logits_tensor, t=t)
         else:
-            pred = model.predict_proba(X_predict.numpy())
+            pred_np = model.predict_proba(X_predict.numpy())
             # Proper tensor construction to avoid warnings
-            probs_tensor = torch.as_tensor(pred)
+            probs_tensor = torch.as_tensor(pred_np, dtype=torch.float32)
             pred_sampled = (
                 torch.distributions.Categorical(probs=probs_tensor).sample().float()
             )
+            pred = probs_tensor
 
         return pred, pred_sampled
 
