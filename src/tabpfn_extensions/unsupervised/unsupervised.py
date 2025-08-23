@@ -516,13 +516,15 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             if self.use_classifier_(column_idx, y_fit)
             else self.tabpfn_reg
         )
-
         # Handle potential nan values in y_fit
         y_fit_np = y_fit.numpy() if hasattr(y_fit, "numpy") else y_fit
         if np.isnan(y_fit_np).any():
             y_fit_np = np.nan_to_num(y_fit_np, nan=0.0)
 
         X_fit_np = X_fit.numpy() if hasattr(X_fit, "numpy") else X_fit
+
+        if self.use_classifier_(column_idx, y_fit):
+            y_fit_np, y_predict = y_fit.int(), y_predict.long()
 
         model.fit(X_fit_np, y_fit_np)
 
