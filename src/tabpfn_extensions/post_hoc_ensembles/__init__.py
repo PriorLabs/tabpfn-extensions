@@ -13,10 +13,13 @@ except ModuleNotFoundError:
 if AUTOGLUON_TABULAR_AVAILABLE:
     # If it's installed, import and expose the relevant classes.
     from .sklearn_interface import AutoTabPFNClassifier, AutoTabPFNRegressor
+    from .autotab_ts import AutoTabPFN_TS_Classifier, AutoTabPFN_TS_Regressor
 
     __all__ = [
         "AutoTabPFNClassifier",
         "AutoTabPFNRegressor",
+        "AutoTabPFN_TS_Classifier",
+        "AutoTabPFN_TS_Regressor",
     ]
 else:
     warnings.warn(
@@ -46,5 +49,7 @@ else:
     __all__ = [
         "AutoTabPFNClassifier",
         "AutoTabPFNRegressor",
+        "AutoTabPFN_TS_Classifier",
+        "AutoTabPFN_TS_Regressor",
         "AUTOGLUON_TABULAR_AVAILABLE",
     ]

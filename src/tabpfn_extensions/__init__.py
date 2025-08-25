@@ -11,6 +11,7 @@ from .embedding import TabPFNEmbedding
 from .hpo import TunedTabPFNClassifier, TunedTabPFNRegressor
 from .many_class import ManyClassClassifier
 from .post_hoc_ensembles import AutoTabPFNClassifier, AutoTabPFNRegressor
+from .post_hoc_ensembles.autotab_ts import AutoTabPFN_TS_Classifier, AutoTabPFN_TS_Regressor
 from .unsupervised import TabPFNUnsupervisedModel
 
 # Import utilities and wrapped TabPFN classes
@@ -26,6 +27,8 @@ __all__ = [
     "TabPFNUnsupervisedModel",
     "AutoTabPFNClassifier",
     "AutoTabPFNRegressor",
+    "AutoTabPFN_TS_Classifier",
+    "AutoTabPFN_TS_Regressor",
     "TunedTabPFNClassifier",
     "TunedTabPFNRegressor",
 ]
