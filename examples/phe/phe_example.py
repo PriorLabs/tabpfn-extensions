@@ -4,9 +4,6 @@
 """WARNING: This example may run slowly on CPU-only systems.
 For better performance, we recommend running with GPU acceleration.
 This example trains multiple TabPFN models, which is computationally intensive.
-
-NOTE: For higher accuracy, consider manually setting 'presets="best_quality'
-in AutoTabPFNClassifier / AutoTabPFNRegressor if more runtime is available.
 """
 
 import numpy as np
@@ -33,7 +30,11 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.33,
     random_state=42,
 )
-clf = AutoTabPFNClassifier(max_time=60 * 60)
+clf = AutoTabPFNClassifier(
+    max_time=3600,
+    preset="best_quality",  # Adjust the preset to a lower setting,
+    # e.g. "medium" when less time is available
+)
 clf.fit(X_train, y_train)
 prediction_probabilities = clf.predict_proba(X_test)
 predictions = np.argmax(prediction_probabilities, axis=-1)
@@ -49,7 +50,11 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.33,
     random_state=42,
 )
-clf = AutoTabPFNClassifier(max_time=60 * 60)
+clf = AutoTabPFNClassifier(
+    max_time=3600,
+    preset="best_quality",  # Adjust the preset to a lower setting,
+    # e.g. "medium" when less time is available
+)
 clf.fit(X_train, y_train)
 prediction_probabilities = clf.predict_proba(X_test)
 predictions = np.argmax(prediction_probabilities, axis=-1)
@@ -65,7 +70,11 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.33,
     random_state=42,
 )
-reg = AutoTabPFNRegressor(max_time=60 * 60)
+reg = AutoTabPFNRegressor(
+    max_time=3600,
+    preset="best_quality",  # Adjust the preset to a lower setting,
+    # e.g. "medium" when less time is available
+)
 reg.fit(X_train, y_train)
 predictions = reg.predict(X_test)
 print("Mean Squared Error (MSE):", mean_squared_error(y_test, predictions))
