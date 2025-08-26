@@ -98,19 +98,17 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
     def __init__(
         self,
-        tabpfn_clf: TabPFNClassifier | None = None,
-        tabpfn_reg: TabPFNRegressor | None = None,
+        tabpfn_clf: TabPFNClassifier,
+        tabpfn_reg: TabPFNRegressor,
     ) -> None:
         """Initialize the TabPFNUnsupervisedModel.
 
         Args:
-            tabpfn_clf : TabPFNClassifier, optional
-                TabPFNClassifier instance for handling categorical features. If not provided, the model
-                assumes that there are no categorical features in the data.
+            tabpfn_clf : TabPFNClassifier
+                TabPFNClassifier instance for handling categorical features.
 
-            tabpfn_reg : TabPFNRegressor, optional
-                TabPFNRegressor instance for handling numerical features. If not provided, the model
-                assumes that there are no numerical features in the data.
+            tabpfn_reg : TabPFNRegressor
+                TabPFNRegressor instance for handling numerical features.
 
         Raises:
             AssertionError
@@ -508,7 +506,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         else:
             # If the first feature, use a zero feature as input
             # Because of preprocessing, we can't use a zero feature, so we use a random feature
-            X_fit, y_fit = torch.randn_like(X_fit[:, 0:1]), X_fit[:, 0]
+            X_fit, y_fit = torch.randn(X_fit[:, 0:1].shape, dtype=torch.float32), X_fit[:, 0]
             X_predict, y_predict = torch.randn_like(X_predict[:, 0:1]), X_predict[:, 0]
 
         model = (
