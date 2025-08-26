@@ -525,7 +525,8 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X_fit_np = X_fit.numpy() if hasattr(X_fit, "numpy") else X_fit
 
         if self.use_classifier_(column_idx, y_fit):
-            y_fit_np, y_predict = y_fit.int(), y_predict.long()
+            y_fit_np = y_fit_np.astype(int)
+            y_predict = y_predict.long()
 
         model.fit(X_fit_np, y_fit_np)
 
