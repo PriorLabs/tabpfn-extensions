@@ -114,8 +114,8 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             AssertionError
                 If both tabpfn_clf and tabpfn_reg are None.
         """
-        assert (
-            tabpfn_clf is not None or tabpfn_reg is not None
+        assert not (
+            tabpfn_clf is None and tabpfn_reg is None
         ), "You cannot set both `tabpfn_clf` and `tabpfn_reg` to None. You can set one to None, if your table exclusively consists of categoricals/numericals."
 
         self.tabpfn_clf = tabpfn_clf
@@ -506,7 +506,10 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         else:
             # If the first feature, use a zero feature as input
             # Because of preprocessing, we can't use a zero feature, so we use a random feature
-            X_fit, y_fit = torch.randn(X_fit[:, 0:1].shape, dtype=torch.float32), X_fit[:, 0]
+            X_fit, y_fit = (
+                torch.randn(X_fit[:, 0:1].shape, dtype=torch.float32),
+                X_fit[:, 0],
+            )
             X_predict, y_predict = torch.randn_like(X_predict[:, 0:1]), X_predict[:, 0]
 
         model = (

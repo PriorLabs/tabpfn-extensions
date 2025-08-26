@@ -13,6 +13,7 @@ def test_generate_synthetic_data_mixed(monkeypatch):
     """Test generating synthetic data with categorical features."""
     monkeypatch.setenv("FAST_TEST_MODE", "1")
     from sklearn.datasets import load_diabetes
+
     X, y = load_diabetes(return_X_y=True)
     clf = TabPFNClassifier(n_estimators=1, random_state=0)
     reg = TabPFNRegressor(n_estimators=1, random_state=0)
@@ -20,8 +21,8 @@ def test_generate_synthetic_data_mixed(monkeypatch):
         tabpfn_clf=clf,
         tabpfn_reg=reg,
     )
-    #X[:, 0] = (X[:, 0] > X[:, 0].mean()).astype(int)
-    X = X[:, :3] # Use only first 3 features for speed
+    X[:, 0] = (X[:, 0] > X[:, 0].mean()).astype(int)
+    X = X[:, :3]  # Use only first 3 features for speed
     model.set_categorical_features([0])
     model.fit(X)
 
@@ -37,13 +38,14 @@ def test_generate_synthetic_data_mixed(monkeypatch):
 def test_generate_synthetic_data_categorical(monkeypatch):
     """Test generating synthetic data with categorical features."""
     monkeypatch.setenv("FAST_TEST_MODE", "1")
-    from sklearn.datasets import load_diabetes
+
     X = np.random.randint(5, size=(5, 2))
     X_tensor = torch.tensor(X)
 
     tabpfn_clf = TabPFNClassifier(n_estimators=1)
     tabpfn_reg = TabPFNRegressor(n_estimators=1)
     model = unsupervised.TabPFNUnsupervisedModel(tabpfn_clf, tabpfn_reg)
+    model.set_categorical_features([0, 1])
     model.fit(X_tensor)
     n_samples = 10
     synthetic_X = model.generate_synthetic_data(n_samples=n_samples)
