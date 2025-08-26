@@ -20,15 +20,12 @@ def test_generate_synthetic_data_with_categorical(monkeypatch):
         tabpfn_clf=clf,
         tabpfn_reg=reg,
     )
-    X[:, 0] = (X[:, 0] > X[:, 0].mean()).astype(int)
+    #X[:, 0] = (X[:, 0] > X[:, 0].mean()).astype(int)
     model_unsup.set_categorical_features([0])
     model_unsup.fit(X)
 
     n_samples = 10
     synthetic_X = model_unsup.generate_synthetic_data(n_samples=n_samples)
-
-    print(X[:2])
-    print(synthetic_X[:2])
 
     assert isinstance(synthetic_X, torch.Tensor)
     assert synthetic_X.shape == (n_samples, X.shape[1])
