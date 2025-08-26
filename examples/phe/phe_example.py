@@ -4,6 +4,9 @@
 """WARNING: This example may run slowly on CPU-only systems.
 For better performance, we recommend running with GPU acceleration.
 This example trains multiple TabPFN models, which is computationally intensive.
+
+NOTE: For higher accuracy, consider manually setting 'presets="best_quality'
+in AutoTabPFNClassifier / AutoTabPFNRegressor if more runtime is available.
 """
 
 import numpy as np
