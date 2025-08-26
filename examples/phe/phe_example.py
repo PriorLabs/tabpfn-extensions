@@ -33,7 +33,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 clf = AutoTabPFNClassifier(
     max_time=3600,
     preset="best_quality",  # Adjust the preset to a lower setting,
-    # e.g. "medium" when less time is available
+    # e.g. "medium_quality" when less time is available
 )
 clf.fit(X_train, y_train)
 prediction_probabilities = clf.predict_proba(X_test)
@@ -53,7 +53,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 clf = AutoTabPFNClassifier(
     max_time=3600,
     preset="best_quality",  # Adjust the preset to a lower setting,
-    # e.g. "medium" when less time is available
+    # e.g. "medium_quality" when less time is available
 )
 clf.fit(X_train, y_train)
 prediction_probabilities = clf.predict_proba(X_test)
@@ -73,7 +73,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 reg = AutoTabPFNRegressor(
     max_time=3600,
     preset="best_quality",  # Adjust the preset to a lower setting,
-    # e.g. "medium" when less time is available
+    # e.g. "medium_quality" when less time is available
 )
 reg.fit(X_train, y_train)
 predictions = reg.predict(X_test)
