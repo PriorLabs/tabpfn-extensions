@@ -98,26 +98,24 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
     def __init__(
         self,
-        tabpfn_clf: TabPFNClassifier | None = None,
-        tabpfn_reg: TabPFNRegressor | None = None,
+        tabpfn_clf: TabPFNClassifier,
+        tabpfn_reg: TabPFNRegressor,
     ) -> None:
         """Initialize the TabPFNUnsupervisedModel.
 
         Args:
-            tabpfn_clf : TabPFNClassifier, optional
-                TabPFNClassifier instance for handling categorical features. If not provided, the model
-                assumes that there are no categorical features in the data.
+            tabpfn_clf : TabPFNClassifier
+                TabPFNClassifier instance for handling categorical features.
 
-            tabpfn_reg : TabPFNRegressor, optional
-                TabPFNRegressor instance for handling numerical features. If not provided, the model
-                assumes that there are no numerical features in the data.
+            tabpfn_reg : TabPFNRegressor
+                TabPFNRegressor instance for handling numerical features.
 
         Raises:
             AssertionError
                 If both tabpfn_clf and tabpfn_reg are None.
         """
-        assert (
-            tabpfn_clf is not None or tabpfn_reg is not None
+        assert not (
+            tabpfn_clf is None and tabpfn_reg is None
         ), "You cannot set both `tabpfn_clf` and `tabpfn_reg` to None. You can set one to None, if your table exclusively consists of categoricals/numericals."
 
         self.tabpfn_clf = tabpfn_clf
@@ -508,7 +506,10 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         else:
             # If the first feature, use a zero feature as input
             # Because of preprocessing, we can't use a zero feature, so we use a random feature
-            X_fit, y_fit = torch.randn_like(X_fit[:, 0:1]), X_fit[:, 0]
+            X_fit, y_fit = (
+                torch.randn(X_fit[:, 0:1].shape, dtype=torch.float32),
+                X_fit[:, 0],
+            )
             X_predict, y_predict = torch.randn_like(X_predict[:, 0:1]), X_predict[:, 0]
 
         model = (
@@ -516,13 +517,16 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             if self.use_classifier_(column_idx, y_fit)
             else self.tabpfn_reg
         )
-
         # Handle potential nan values in y_fit
         y_fit_np = y_fit.numpy() if hasattr(y_fit, "numpy") else y_fit
         if np.isnan(y_fit_np).any():
             y_fit_np = np.nan_to_num(y_fit_np, nan=0.0)
 
         X_fit_np = X_fit.numpy() if hasattr(X_fit, "numpy") else X_fit
+
+        if self.use_classifier_(column_idx, y_fit):
+            y_fit_np = y_fit_np.astype(int)
+            y_predict = y_predict.long()
 
         model.fit(X_fit_np, y_fit_np)
 
