@@ -25,8 +25,9 @@ print(f"Data split: {len(X_train)} training samples, {len(X_test)} test samples.
 base_clf = TabPFNClassifier(device='cuda' if torch.cuda.is_available() else 'cpu', n_estimators=2)
 base_clf.fit(X_train, y_train)
 
-roc_auc = roc_auc_score(y_test, base_clf.predict_proba(X_test)[:, 1]) if len(np.unique(y_test)) == 2 else roc_auc_score(y_test, base_clf.predict_proba(X_test), multi_class="ovr", average="weighted")
-log_loss_score = log_loss(y_test, base_clf.predict_proba(X_test))
+base_pred_proba = base_clf.predict_proba(X_test)
+roc_auc = roc_auc_score(y_test, base_pred_proba[:, 1]) if len(np.unique(y_test)) == 2 else roc_auc_score(y_test, base_pred_proba, multi_class="ovr", average="weighted")
+log_loss_score = log_loss(y_test, base_pred_proba)
 
 print(f"📊 Initial Test ROC: {roc_auc:.4f}")
 print(f"📊 Initial Test Log Loss: {log_loss_score:.4f}\n")
