@@ -232,7 +232,9 @@ class TabEBM:
                 pass
 
             # Create or retrieve cached EBM dataset and model
-            ebm_dict = self._get_or_create_ebm_dataset(X, y, target_class, distance_negative_class)
+            ebm_dict = self._get_or_create_ebm_dataset(
+                X, y, target_class, distance_negative_class
+            )
             X_ebm = ebm_dict["X_ebm"]
             y_ebm = ebm_dict["y_ebm"]
 
@@ -248,14 +250,25 @@ class TabEBM:
 
             # Prepare batch data for TabPFN (optimized)
             batch_dict = self._prepare_tabpfn_batch_data(X_sgld, y_sgld)
-            X_sgld_tensor = batch_dict["X_train"][0].to(self.device).requires_grad_(requires_grad=True)
+            X_sgld_tensor = (
+                batch_dict["X_train"][0]
+                .to(self.device)
+                .requires_grad_(requires_grad=True)
+            )
 
             # Pre-generate all noise for SGLD steps (memory/computation savings)
-            noise_tensor = torch.randn(noise_shape, device=self.device, dtype=X_sgld_tensor.dtype)
+            noise_tensor = torch.randn(
+                noise_shape, device=self.device, dtype=X_sgld_tensor.dtype
+            )
 
             # SGLD sampling loop (optimized)
             X_sgld_tensor = self._perform_sgld_sampling(
-                X_sgld_tensor, noise_tensor, sgld_step_size, sgld_noise_std, sgld_steps, debug
+                X_sgld_tensor,
+                noise_tensor,
+                sgld_step_size,
+                sgld_noise_std,
+                sgld_steps,
+                debug,
             )
 
             # Store results
@@ -303,7 +316,11 @@ class TabEBM:
         return {"X": X, "y": y}
 
     def _get_or_create_ebm_dataset(
-        self, X: np.ndarray, y: np.ndarray, target_class: int, distance_negative_class: float
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        target_class: int,
+        distance_negative_class: float,
     ) -> dict[str, torch.Tensor]:
         """Create EBM dataset with caching for better performance.
 
@@ -327,7 +344,9 @@ class TabEBM:
 
         return {"X_ebm": X_ebm, "y_ebm": y_ebm}
 
-    def _fit_predictor_cached(self, X_ebm: torch.Tensor, y_ebm: torch.Tensor, target_class: int) -> None:
+    def _fit_predictor_cached(
+        self, X_ebm: torch.Tensor, y_ebm: torch.Tensor, target_class: int
+    ) -> None:
         """Fit predictor with caching to avoid redundant model training.
 
         This method caches fitted models per class to avoid retraining when
@@ -363,7 +382,12 @@ class TabEBM:
         self._fitted_models_cache[cache_key] = True
 
     def _initialize_sgld_starting_points(
-        self, X_ebm: torch.Tensor, y_ebm: torch.Tensor, num_samples: int, starting_point_noise_std: float, seed: int
+        self,
+        X_ebm: torch.Tensor,
+        y_ebm: torch.Tensor,
+        num_samples: int,
+        starting_point_noise_std: float,
+        seed: int,
     ) -> dict[str, torch.Tensor]:
         """Optimized initialization of SGLD starting points.
 
@@ -385,18 +409,24 @@ class TabEBM:
 
         # Efficient random sampling
         num_real_samples = real_samples.shape[0]
-        start_indices = torch.randint(0, num_real_samples, (num_samples,), device=self.device)
+        start_indices = torch.randint(
+            0, num_real_samples, (num_samples,), device=self.device
+        )
         X_start = real_samples[start_indices]
         y_start = torch.zeros(num_samples, dtype=torch.long, device=self.device)
 
         # Add noise to starting points (vectorized operation)
         if starting_point_noise_std > 0:
-            noise = torch.randn_like(X_start, device=self.device) * starting_point_noise_std
+            noise = (
+                torch.randn_like(X_start, device=self.device) * starting_point_noise_std
+            )
             X_start = X_start + noise
 
         return {"X_start": X_start, "y_start": y_start}
 
-    def _prepare_tabpfn_batch_data(self, X: torch.Tensor, y: torch.Tensor) -> dict[str, Any]:
+    def _prepare_tabpfn_batch_data(
+        self, X: torch.Tensor, y: torch.Tensor
+    ) -> dict[str, Any]:
         """Optimized preparation of TabPFN batch data with reduced overhead.
 
         Args:
@@ -407,7 +437,12 @@ class TabEBM:
             Dictionary containing prepared batch data
         """
         # Use efficient train/test split with no validation data
-        splitter = partial(TabEBM.train_test_split_allow_full_train, test_size=0, random_state=42, shuffle=False)
+        splitter = partial(
+            TabEBM.train_test_split_allow_full_train,
+            test_size=0,
+            random_state=42,
+            shuffle=False,
+        )
 
         # Convert to CPU for preprocessing (TabPFN requirement)
         X_cpu = X.cpu()
@@ -489,7 +524,9 @@ class TabEBM:
             # SGLD update with pre-computed noise
             with torch.no_grad():
                 X_sgld_updated = (
-                    X_sgld_list[0] - sgld_step_size * X_sgld_list[0].grad + sgld_noise_std * noise_tensor[t]
+                    X_sgld_list[0]
+                    - sgld_step_size * X_sgld_list[0].grad
+                    + sgld_noise_std * noise_tensor[t]
                 )
 
                 # Update tensor in-place to maintain gradient tracking
@@ -589,7 +626,9 @@ class TabEBM:
 
             # Generate points with random ±distance_negative_class coordinates
             while len(surrogate_set) < 4:
-                point = np.random.choice([-distance_negative_class, distance_negative_class], num_features)
+                point = np.random.choice(
+                    [-distance_negative_class, distance_negative_class], num_features
+                )
                 point_tuple = tuple(point)
 
                 # Add both the point and its negation for symmetry
@@ -607,13 +646,20 @@ class TabEBM:
             X_ebm = np.concatenate([X, X_surrogates], axis=0)
 
             # Create binary labels: 0 for real data, 1 for surrogates
-            y_ebm = np.concatenate([np.zeros(X.shape[0], dtype=np.int64), np.ones(num_surrogates, dtype=np.int64)])
+            y_ebm = np.concatenate(
+                [
+                    np.zeros(X.shape[0], dtype=np.int64),
+                    np.ones(num_surrogates, dtype=np.int64),
+                ]
+            )
 
             return X_ebm, y_ebm
 
         elif isinstance(X, torch.Tensor):
             # PyTorch tensor processing
-            X_surrogates = torch.tensor(surrogate_negatives, dtype=X.dtype, device=X.device)
+            X_surrogates = torch.tensor(
+                surrogate_negatives, dtype=X.dtype, device=X.device
+            )
             X_ebm = torch.cat([X, X_surrogates], dim=0)
 
             # Create binary labels: 0 for real data, 1 for surrogates

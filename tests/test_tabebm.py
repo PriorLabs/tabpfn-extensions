@@ -198,7 +198,9 @@ class TestTabEBM:
 
         # Results should be different with different step sizes
         for class_key in synthetic_data_1:
-            assert not np.allclose(synthetic_data_1[class_key], synthetic_data_2[class_key], atol=1e-6)
+            assert not np.allclose(
+                synthetic_data_1[class_key], synthetic_data_2[class_key], atol=1e-6
+            )
 
     def test_model_caching(self, tabebm_model, classification_data):
         """Test that model fitting is cached properly."""
@@ -252,7 +254,9 @@ class TestTabEBMStaticMethods:
 
     def test_to_numpy_with_invalid_input(self):
         """Test to_numpy with invalid input type."""
-        with pytest.raises(ValueError, match="X must be either a np.ndarray or a torch.Tensor"):
+        with pytest.raises(
+            ValueError, match="X must be either a np.ndarray or a torch.Tensor"
+        ):
             # Use type ignore to test error handling with invalid input
             to_numpy("invalid_input")  # type: ignore
 
@@ -296,7 +300,9 @@ class TestTabEBMStaticMethods:
         """Test add_surrogate_negative_samples with numpy arrays."""
         X = np.random.randn(10, 3)
 
-        X_ebm, y_ebm = TabEBM.add_surrogate_negative_samples(X, distance_negative_class=2.0)
+        X_ebm, y_ebm = TabEBM.add_surrogate_negative_samples(
+            X, distance_negative_class=2.0
+        )
 
         assert isinstance(X_ebm, np.ndarray)
         assert isinstance(y_ebm, np.ndarray)
@@ -309,7 +315,9 @@ class TestTabEBMStaticMethods:
         """Test add_surrogate_negative_samples with PyTorch tensors."""
         X = torch.randn(10, 3)
 
-        X_ebm, y_ebm = TabEBM.add_surrogate_negative_samples(X, distance_negative_class=2.0)
+        X_ebm, y_ebm = TabEBM.add_surrogate_negative_samples(
+            X, distance_negative_class=2.0
+        )
 
         assert isinstance(X_ebm, torch.Tensor)
         assert isinstance(y_ebm, torch.Tensor)
@@ -322,7 +330,9 @@ class TestTabEBMStaticMethods:
         """Test add_surrogate_negative_samples with 2D data (special case)."""
         X = np.random.randn(5, 2)  # 2D data
 
-        X_ebm, y_ebm = TabEBM.add_surrogate_negative_samples(X, distance_negative_class=3.0)
+        X_ebm, y_ebm = TabEBM.add_surrogate_negative_samples(
+            X, distance_negative_class=3.0
+        )
 
         # For 2D, should add exactly 4 corner points
         expected_surrogates = 4
@@ -334,7 +344,9 @@ class TestTabEBMStaticMethods:
         X = np.random.randn(20, 5)
         y = np.random.randint(0, 2, 20)
 
-        X_train, X_val, y_train, y_val = TabEBM.train_test_split_allow_full_train(X, y, test_size=0, random_state=42)
+        X_train, X_val, y_train, y_val = TabEBM.train_test_split_allow_full_train(
+            X, y, test_size=0, random_state=42
+        )
 
         # In full train mode, training data should be the original data
         assert np.array_equal(X_train, X)
@@ -348,7 +360,9 @@ class TestTabEBMStaticMethods:
         X = np.random.randn(20, 5)
         y = np.random.randint(0, 2, 20)
 
-        X_train, X_val, y_train, y_val = TabEBM.train_test_split_allow_full_train(X, y, test_size=0.3, random_state=42)
+        X_train, X_val, y_train, y_val = TabEBM.train_test_split_allow_full_train(
+            X, y, test_size=0.3, random_state=42
+        )
 
         # Should behave like normal train_test_split
         assert X_train.shape[0] + X_val.shape[0] == X.shape[0]
