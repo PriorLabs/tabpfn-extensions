@@ -19,6 +19,12 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 print(f"Data split: {len(X_train)} training samples, {len(X_test)} test samples.\n")
 
+# Calculate ROC AUC
+def calculate_roc_auc(y_true: np.ndarray, y_pred_proba: np.ndarray) -> float:
+    if len(np.unique(y_true)) == 2:
+        return roc_auc_score(y_true, y_pred_proba[:, 1])
+    else:
+        return roc_auc_score(y_true, y_pred_proba, multi_class="ovr", average="weighted")
 
 # 2. Initial model evaluation on test set
 
@@ -26,13 +32,13 @@ base_clf = TabPFNClassifier(device='cuda' if torch.cuda.is_available() else 'cpu
 base_clf.fit(X_train, y_train)
 
 base_pred_proba = base_clf.predict_proba(X_test)
-roc_auc = roc_auc_score(y_test, base_pred_proba[:, 1]) if len(np.unique(y_test)) == 2 else roc_auc_score(y_test, base_pred_proba, multi_class="ovr", average="weighted")
+roc_auc = calculate_roc_auc(y_test, base_pred_proba)
 log_loss_score = log_loss(y_test, base_pred_proba)
 
 print(f"📊 Initial Test ROC: {roc_auc:.4f}")
 print(f"📊 Initial Test Log Loss: {log_loss_score:.4f}\n")
 
-# 2. Initialize and run fine-tuning
+# 3. Initialize and run fine-tuning
 print("--- 2. Initializing and Fitting Model ---\n")
 
 # Instantiate the wrapper with your desired hyperparameters
@@ -47,16 +53,15 @@ finetuned_clf = FinetunedTabPFNClassifier(
     patience=3
 )
 
-# Call .fit() to start the fine-tuning process on the training data
+# 4. Call .fit() to start the fine-tuning process on the training data
 finetuned_clf.fit(X_train, y_train)
 print("\n")
 
-# 3. Evaluate the fine-tuned model
+# 5. Evaluate the fine-tuned model
 print("--- 3. Evaluating Model on Held-out Test Set ---\n")
 y_pred_proba = finetuned_clf.predict_proba(X_test)
-y_pred = finetuned_clf.predict(X_test)
 
-roc_auc = roc_auc_score(y_test, y_pred_proba[:, 1]) if len(np.unique(y_test)) == 2 else roc_auc_score(y_test, y_pred_proba, multi_class="ovr", average="weighted")
+roc_auc = calculate_roc_auc(y_test, y_pred_proba)
 loss = log_loss(y_test, y_pred_proba)
 
 print(f"📊 Final Test ROC: {roc_auc:.4f}")
