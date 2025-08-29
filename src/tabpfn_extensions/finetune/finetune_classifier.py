@@ -94,7 +94,10 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
 
     **kwargs : dict
         Additional keyword arguments to pass to the underlying TabPFNClassifier,
-        such as `n_estimators`.
+        such as `n_estimators`. You can also specify `n_inference_context_samples` 
+        to control the number of samples used for inference context. If not specified,
+        this defaults to the context size used during finetuning 
+        (i.e., `(1 - finetune_split_ratio) * meta_dataset_size`).
     """
     def __init__(self,
                  device: str = 'cuda',
@@ -143,12 +146,23 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         self.X_ = X
         self.y_ = y
 
+        # Calculate the context size used during finetuning
+        # The context size is (1 - finetune_split_ratio) * meta_dataset_size
+        context_size = int((1 - self.finetune_split_ratio) * self.meta_dataset_size)
+        
+        # Use the same SUBSAMPLE_SAMPLES as the context size for consistency
+        # This ensures that the final classifier uses the same context size as during finetuning
+        subsample_samples = self.kwargs.get("n_inference_context_samples", context_size)
+        
         classifier_config = {
         "ignore_pretraining_limits": True,
         "device": self.device,
         "n_estimators": self.kwargs.get("n_estimators", 8),
         "random_state": self.random_state,
         "inference_precision": torch.float32,
+        "inference_config": {
+            "SUBSAMPLE_SAMPLES": subsample_samples
+        }
         }
         
 
@@ -159,9 +173,6 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
 
         eval_config = {
             **classifier_config,
-             "inference_config": {
-                "SUBSAMPLE_SAMPLES": self.kwargs.get("n_inference_context_samples", 10000)
-            }
         }
 
         # 3. Prepare data for the fine-tuning loop
