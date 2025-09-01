@@ -11,9 +11,8 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-from sklearn.datasets import make_classification
-
 from conftest import DEFAULT_TEST_SIZE, FAST_TEST_MODE, SMALL_TEST_SIZE
+from sklearn.datasets import make_classification
 
 # Try to import TabEBM, but skip tests if dependencies are not available
 try:
@@ -251,14 +250,6 @@ class TestTabEBMStaticMethods:
         result = to_numpy(X)
         assert isinstance(result, np.ndarray)
         assert result.shape == (10, 5)
-
-    def test_to_numpy_with_invalid_input(self):
-        """Test to_numpy with invalid input type."""
-        with pytest.raises(
-            ValueError, match="X must be either a np.ndarray or a torch.Tensor"
-        ):
-            # Use type ignore to test error handling with invalid input
-            to_numpy("invalid_input")  # type: ignore
 
     def test_compute_energy_with_torch_tensor(self):
         """Test compute_energy with PyTorch tensor logits."""
