@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
+import logging
 import random
 import warnings
-import logging
 
 # For type checking only
 from typing import TYPE_CHECKING, Any
@@ -356,7 +356,9 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         # If adaptive_tree is on, do a train/validation split
         if self.adaptive_tree:
             if self.verbose:
-                logging.info("Adaptive tree is enabled. Preparing train/validation split.")
+                logging.info(
+                    "Adaptive tree is enabled. Preparing train/validation split."
+                )
             stratify = y_ if (self.task_type == "multiclass") else None
 
             # Basic checks for classification to see if splitting is feasible
@@ -667,7 +669,9 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             if self.adaptive_tree:
                 # Fit leaves on train data, check performance on valid data if available
                 if self.verbose:
-                    logging.info("Fitting leaves on training data for adaptive pruning...")
+                    logging.info(
+                        "Fitting leaves on training data for adaptive pruning..."
+                    )
                 self.fit_leaves(self.train_X, self.train_y)
                 if (
                     hasattr(self, "valid_X")
