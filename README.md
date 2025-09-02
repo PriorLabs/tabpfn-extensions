@@ -41,6 +41,7 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 - **rf_pfn**: Combine TabPFN with decision trees and random forests
 - **unsupervised**: Data generation and outlier detection
 - **embedding**: Get TabPFNs internal dense sample embeddings
+- **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
 
 Detailed documentation for each extension is available in the respective module directories.
 
@@ -103,6 +104,7 @@ graph LR
         unsupervised_type["Select<br/>Unsupervised Task"];
         unsupervised_type --> imputation["Imputation"]
         unsupervised_type --> data_gen["Data<br/>Generation"];
+        unsupervised_type --> tabebm["Data<br/>Augmentation"];
         unsupervised_type --> density["Outlier<br/>Detection"];
         unsupervised_type --> embedding["Get<br/>Embeddings"];
     end
@@ -165,7 +167,7 @@ graph LR
 
     %% 4. APPLY STYLES
     class start,end_node start_node;
-    class local_version,api_client,imputation,data_gen,density,embedding,api_backend_note,ts_features,rfpfn,subsample,many_class,finetuning,shapley,hpo,post_hoc,more_estimators process_node;
+    class local_version,api_client,imputation,data_gen,tabebm,density,embedding,api_backend_note,ts_features,rfpfn,subsample,many_class,finetuning,shapley,hpo,post_hoc,more_estimators process_node;
     class gpu_check,task_type,unsupervised_type,data_check,model_choice,finetune_check,interpretability_check,performance_check decision_node;
     class tuning_complete process_node;
 
@@ -176,6 +178,7 @@ graph LR
     click unsupervised_type "https://github.com/PriorLabs/tabpfn-extensions" "TabPFN Extensions" _blank
     click imputation "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/imputation.py" "TabPFN Imputation Example" _blank
     click data_gen "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/generate_data.py" "TabPFN Data Generation Example" _blank
+    click tabebm "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/tabebm/tabebm_augment_real_world_data.ipynb" "TabEBM Data Augmentation Example" _blank
     click density "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/unsupervised/density_estimation_outlier_detection.py" "TabPFN Density Estimation/Outlier Detection Example" _blank
     click embedding "https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding" "TabPFN Embedding Example" _blank
     click ts_features "https://github.com/PriorLabs/tabpfn-time-series" "TabPFN Time-Series Example" _blank
