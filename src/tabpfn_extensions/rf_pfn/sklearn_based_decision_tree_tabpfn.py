@@ -36,10 +36,8 @@ from tabpfn_extensions.scoring.scoring_utils import (
 )
 from tabpfn_extensions.utils import softmax
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Define a module-level logger
+logger = logging.getLogger(__name__)
 
 ###############################################################################
 #                             BASE DECISION TREE                              #
@@ -303,7 +301,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             The fitted model.
         """
         if self.verbose:
-            logging.info("Starting DecisionTreeTabPFN fit process...")
+            logger.info("Starting DecisionTreeTabPFN fit process...")
         # Initialize attributes (per scikit-learn conventions)
         self._leaf_nodes = []
         self._leaf_train_data = {}
@@ -326,7 +324,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             ensure_all_finite=False,  # scikit-learn sets self.n_features_in_ automatically
         )
         if self.verbose:
-            logging.info(f"Input data shape: X={X.shape}, y={y.shape}")
+            logger.info(f"Input data shape: X={X.shape}, y={y.shape}")
 
         if self.task_type == "multiclass":
             self.classes_ = unique_labels(y)
@@ -356,7 +354,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         # If adaptive_tree is on, do a train/validation split
         if self.adaptive_tree:
             if self.verbose:
-                logging.info(
+                logger.info(
                     "Adaptive tree is enabled. Preparing train/validation split."
                 )
             stratify = y_ if (self.task_type == "multiclass") else None
@@ -367,7 +365,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                 # Disable adaptive tree in extreme cases
                 if counts.min() == 1 or len(unique_classes) < 2:
                     if self.verbose:
-                        logging.info(
+                        logger.info(
                             "Disabling adaptive tree: minimum class count is 1 or only one class present."
                         )
                     self.adaptive_tree = False
@@ -378,7 +376,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                     )
             if len(y_) < 10:
                 if self.verbose:
-                    logging.info("Disabling adaptive tree: fewer than 10 samples.")
+                    logger.info("Disabling adaptive tree: fewer than 10 samples.")
                 self.adaptive_tree = False
 
             if self.adaptive_tree:
@@ -401,7 +399,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                     stratify=stratify,
                 )
                 if self.verbose:
-                    logging.info(
+                    logger.info(
                         f"Train/Valid split created: "
                         f"Train size={len(y_train)}, Valid size={len(y_valid)}"
                     )
@@ -409,7 +407,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                 # Safety check - if split is empty, revert
                 if len(y_train) == 0 or len(y_valid) == 0:
                     if self.verbose:
-                        logging.info(
+                        logger.info(
                             "Disabling adaptive tree: train or validation split is empty."
                         )
                     self.adaptive_tree = False
@@ -428,7 +426,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                     and (len(np.unique(y_train)) != len(np.unique(y_valid)))
                 ):
                     if self.verbose:
-                        logging.info(
+                        logger.info(
                             "Disabling adaptive tree: train and validation sets have different classes."
                         )
                     self.adaptive_tree = False
@@ -444,7 +442,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         else:
             # Not adaptive, everything is train
             if self.verbose:
-                logging.info("Adaptive tree is disabled. Using all data for training.")
+                logger.info("Adaptive tree is disabled. Using all data for training.")
             X_train, X_preproc_train, y_train, sw_train = (
                 X,
                 X_preprocessed,
@@ -455,12 +453,12 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
 
         # Build the sklearn decision tree
         if self.verbose:
-            logging.info("Fitting the initial scikit-learn decision tree structure...")
+            logger.info("Fitting the initial scikit-learn decision tree structure...")
         self._decision_tree = self._init_decision_tree()
         self._decision_tree.fit(X_preproc_train, y_train, sample_weight=sw_train)
         self._tree = self._decision_tree  # for sklearn compatibility
         if self.verbose:
-            logging.info(
+            logger.info(
                 f"Decision tree fitting complete. Tree has {self._tree.tree_.node_count} nodes."
             )
 
@@ -481,7 +479,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         # We will do a leaf-fitting step on demand (lazy) in predict
         self._need_post_fit = True
         if self.verbose:
-            logging.info("Leaf fitting is deferred until the first predict() call.")
+            logger.info("Leaf fitting is deferred until the first predict() call.")
 
         # If verbose, optionally do it right away:
         if self.verbose:
@@ -504,7 +502,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
     def _post_fit(self) -> None:
         """Hook after the decision tree is fitted. Can be used for final prints/logs."""
         if self.verbose:
-            logging.info("Base tree structure has been fitted.")
+            logger.info("Base tree structure has been fitted.")
 
     def _preprocess_data_for_tree(self, X: np.ndarray) -> np.ndarray:
         """Handle missing data prior to feeding into the decision tree.
@@ -664,12 +662,12 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         # If we haven't yet done the final leaf fit, do it here
         if self._need_post_fit:
             if self.verbose:
-                logging.info("First predict call: executing deferred leaf fitting.")
+                logger.info("First predict call: executing deferred leaf fitting.")
             self._need_post_fit = False
             if self.adaptive_tree:
                 # Fit leaves on train data, check performance on valid data if available
                 if self.verbose:
-                    logging.info(
+                    logger.info(
                         "Fitting leaves on training data for adaptive pruning..."
                     )
                 self.fit_leaves(self.train_X, self.train_y)
@@ -679,7 +677,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                     and self.valid_y is not None
                 ):
                     if self.verbose:
-                        logging.info(
+                        logger.info(
                             "Evaluating node performance on validation set for pruning decisions."
                         )
                     # Force a pass to evaluate node performance
@@ -691,7 +689,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                     )
             # Now fit leaves again using the entire dataset (train + valid, effectively)
             if self.verbose:
-                logging.info("Fitting leaves on the full dataset.")
+                logger.info("Fitting leaves on the full dataset.")
             self.fit_leaves(self.X, self.y)
 
         # Assign TabPFNs categorical features if needed
@@ -702,7 +700,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         X_leaf_nodes = self._apply_tree(X)
         n_samples, n_nodes, n_estims = X_leaf_nodes.shape
         if self.verbose:
-            logging.info(
+            logger.info(
                 f"Starting prediction for {n_samples} samples across {n_nodes} nodes."
             )
 
@@ -761,7 +759,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                     == 0.0
                 )
                 if self.verbose:
-                    logging.info(
+                    logger.info(
                         f"Processing Node {leaf_id}: "
                         f"Train Samples={X_train_leaf.shape[0]}, "
                         f"Test Samples={len(test_sample_indices)}, "
@@ -776,7 +774,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                     and not (leaf_id == 0 and self.adaptive_tree)
                 ):
                     if self.verbose:
-                        logging.info(
+                        logger.info(
                             f"  -> Skipping Node {leaf_id}: Not a final leaf and fit_nodes is False."
                         )
                     if do_pruning:
@@ -796,7 +794,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
 
                     if should_skip_previously_pruned:
                         if self.verbose:
-                            logging.info(
+                            logger.info(
                                 f"  -> Skipping Node {leaf_id}: Node was previously pruned."
                             )
                         continue
@@ -808,7 +806,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                         and self.adaptive_tree_skip_class_missing
                     ):
                         if self.verbose:
-                            logging.info(
+                            logger.info(
                                 f"  -> Skipping Node {leaf_id}: Not all classes are present in training data."
                             )
                         self._node_prediction_type[est_id][leaf_id] = "previous"
@@ -828,7 +826,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                         )
                     ):
                         if self.verbose:
-                            logging.info(
+                            logger.info(
                                 f"  -> Skipping Node {leaf_id}: Does not meet sample size requirements for adaptive fitting."
                             )
                         if do_pruning:
@@ -880,7 +878,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                         y_prob[est_id][leaf_id],
                     )
                     if self.verbose:
-                        logging.info(
+                        logger.info(
                             f"  -> Pruning Result for Node {leaf_id}: "
                             f"Type='{self._node_prediction_type[est_id][leaf_id]}', "
                             f"Score={y_metric[est_id][leaf_id]:.4f}"
@@ -890,7 +888,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
                     y_prob[est_id][leaf_id] = y_prob_replacement
 
         if self.verbose:
-            logging.info("Prediction process finished.")
+            logger.info("Prediction process finished.")
         # Final predictions come from the last estimators last node
         return y_prob[n_estims - 1][n_nodes - 1]
 
@@ -1242,7 +1240,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
         # If only one class, fill probability 1.0 for that class
         if len(classes_in_leaf) == 1:
             if self.verbose:
-                logging.info(
+                logger.info(
                     f"  -> Node {leaf_id}: Only one class present. Predicting 1.0 for class {classes_in_leaf[0]}."
                 )
             y_eval_prob[indices, classes_in_leaf[0]] = 1.0
@@ -1252,7 +1250,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
         leaf_seed = leaf_id + self.tree_seed
         try:
             if self.verbose:
-                logging.info(f"  -> Node {leaf_id}: Fitting TabPFNClassifier.")
+                logger.info(f"  -> Node {leaf_id}: Fitting TabPFNClassifier.")
             self.tabpfn.random_state = leaf_seed
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
@@ -1279,7 +1277,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
                 stacklevel=2,
             )
             if self.verbose:
-                logging.warning(
+                logger.warning(
                     f"  -> Node {leaf_id}: TabPFN failed due to constant features. Using class ratio fallback."
                 )
             _, counts = np.unique(y_train_leaf, return_counts=True)
@@ -1331,7 +1329,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
     def _post_fit(self) -> None:
         """Optional hook after the decision tree is fitted."""
         if self.verbose:
-            logging.info("Classifier tree structure has been fitted.")
+            logger.info("Classifier tree structure has been fitted.")
 
 
 ###############################################################################
@@ -1455,7 +1453,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         # If no training data or just 1 sample, fall back to 0 or single value
         if len(X_train_leaf) < 1:
             if self.verbose:
-                logging.info(
+                logger.info(
                     f"  -> Node {leaf_id}: No training samples. Predicting 0.0."
                 )
             warnings.warn(
@@ -1465,7 +1463,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
             return y_eval
         elif len(X_train_leaf) == 1:
             if self.verbose:
-                logging.info(
+                logger.info(
                     f"  -> Node {leaf_id}: Only one training sample. Predicting its value."
                 )
             y_eval[indices] = y_train_leaf[0]
@@ -1474,7 +1472,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         # If all y are identical, return that constant
         if np.all(y_train_leaf == y_train_leaf[0]):
             if self.verbose:
-                logging.info(
+                logger.info(
                     f"  -> Node {leaf_id}: All target values are constant. Predicting {y_train_leaf[0]}."
                 )
             y_eval[indices] = y_train_leaf[0]
@@ -1484,7 +1482,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         leaf_seed = leaf_id + self.tree_seed
         try:
             if self.verbose:
-                logging.info(f"  -> Node {leaf_id}: Fitting TabPFNRegressor.")
+                logger.info(f"  -> Node {leaf_id}: Fitting TabPFNRegressor.")
             self.tabpfn.random_state = leaf_seed
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
@@ -1504,7 +1502,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
                 stacklevel=2,
             )
             if self.verbose:
-                logging.warning(
+                logger.warning(
                     f"  -> Node {leaf_id}: TabPFN failed ({e}). Using mean fallback."
                 )
             y_eval[indices] = np.mean(y_train_leaf)
@@ -1560,4 +1558,4 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
     def _post_fit(self) -> None:
         """Optional hook after the regressor's tree is fitted."""
         if self.verbose:
-            logging.info("Regressor tree structure has been fitted.")
+            logger.info("Regressor tree structure has been fitted.")
