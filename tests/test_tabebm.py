@@ -11,8 +11,9 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-from conftest import DEFAULT_TEST_SIZE, FAST_TEST_MODE, SMALL_TEST_SIZE
 from sklearn.datasets import make_classification
+
+from conftest import DEFAULT_TEST_SIZE, FAST_TEST_MODE, SMALL_TEST_SIZE
 
 # Try to import TabEBM, but skip tests if dependencies are not available
 try:
