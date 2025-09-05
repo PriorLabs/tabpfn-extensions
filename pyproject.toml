@@ -233,9 +233,12 @@ exclude = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*.py" = [
     "S101",
-    "D101",
-    "D102",
-    "D103",
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "D105",  # Missing docstring in magic method
+    "D106",  # Missing docstring in public nested class
+    "D107",   # Missing docstring in `__init__`
     "ANN001",
     "ANN201",
     "FBT001",
