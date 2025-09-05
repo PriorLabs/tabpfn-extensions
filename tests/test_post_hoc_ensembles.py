@@ -224,14 +224,12 @@ class TestPHESpecificFeatures:
         model = AutoTabPFNRegressor(
             ignore_pretraining_limits=True,
             max_time=5,
-            phe_fit_args={"verbosity": 2},
         )
         model.fit(X, y)
 
         # Test with ignore_pretraining_limits=False (should fail)
         model_no_flag = AutoTabPFNRegressor(
             ignore_pretraining_limits=False,
-            phe_fit_args={"verbosity": 2},
             max_time=5,
         )
 
