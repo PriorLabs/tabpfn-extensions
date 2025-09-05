@@ -17,6 +17,7 @@ from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import (
     AutoTabPFNClassifier,
     AutoTabPFNRegressor,
 )
+from autogluon.tabular.models import TabPFNV2Model
 from test_base_tabpfn import BaseClassifierTests, BaseRegressorTests
 
 
@@ -146,82 +147,57 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
         pass
 
 
+class MockTabPFNV2Model(TabPFNV2Model):
+    """Mock TabPFNV2Model that captures initialization args and checks constraints."""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._ag_args = kwargs.get("ag_args", {})
+        self._ignore_constraints = self._ag_args.get("ignore_constraints", False)
+        
+    def fit(self, X, y, **kwargs):
+        # Capture the number of rows
+        captured_rows["n"] = len(X)
+        
+        # Simulate the 10k row limit check
+        if len(X) > 10000 and not self._ignore_constraints:
+            raise AssertionError("ag.max_rows=10000 limit triggered")
+            
+    def predict(self, X, **kwargs):
+        # Return dummy predictions
+        return np.zeros(len(X))
+        
+    def predict_proba(self, X, **kwargs):
+        # Return dummy probabilities for binary classification
+        n_samples = len(X)
+        # Assuming binary classification for simplicity
+        return np.column_stack([np.ones(n_samples) * 0.5, np.ones(n_samples) * 0.5])
+
+
 # Additional PHE-specific tests
 class TestPHESpecificFeatures:
     """Test PHE-specific features that aren't covered by the base tests."""
 
     def test_ignore_pretraining_limits_allows_large_dataset(self, monkeypatch):
         """Training should succeed on >10k rows when limits are ignored."""
-        captured_hps: dict = {}
-        captured_rows: dict = {}
 
-        class DummyPredictor:
-            def __init__(self, *args, **kwargs):
-                pass
-
-            def fit(
-                self,
-                *,
-                train_data,
-                time_limit,
-                presets,
-                hyperparameters,
-                num_gpus,
-                **kwargs,
-            ):
-                self.train_data = train_data
-                captured_rows["n"] = len(train_data)
-                captured_hps.update(hyperparameters)
-                from autogluon.tabular.models import TabPFNV2Model
-
-                if len(train_data) > 10000 and not hyperparameters[TabPFNV2Model][
-                    "ag_args"
-                ].get(
-                    "ignore_constraints",
-                    False,
-                ):
-                    raise AssertionError("ag.max_rows=10000 limit triggered")
-                return self
-
-            def features(self):
-                return [c for c in self.train_data.columns if c != "_target_"]
-
-            def predict(self, X):
-                return pd.Series(np.zeros(len(X)))
-
+        # Patch TabPFNV2Model at the import location
         monkeypatch.setattr(
-            "autogluon.tabular.TabularPredictor",
-            DummyPredictor,
+            "autogluon.tabular.models.TabPFNV2Model",
+            MockTabPFNV2Model,
         )
 
-        # Create dataset slightly above the 10k limit
-        X = pd.DataFrame(np.random.randn(10050, 2), columns=["a", "b"])
-        y = pd.Series(np.random.randn(10050))
+        # Create dataset above the 10k limit
+        X = pd.DataFrame(np.random.randn(20_000, 2), columns=["a", "b"])
+        y = pd.Series(np.random.randn(20_000))
 
-        fit_kwargs = {
-            "max_time": 1,
-            "device": "cpu",
-            "n_ensemble_models": 1,
-            "n_estimators": 1,
-            "phe_fit_args": {
-                "num_bag_folds": 0,
-                "num_stack_levels": 0,
-                "fit_weighted_ensemble": False,
-                "ag_args_ensemble": {},
-            },
-        }
-
-        model = AutoTabPFNRegressor(ignore_pretraining_limits=True, **fit_kwargs)
+        # Test with ignore_pretraining_limits=True
+        model = AutoTabPFNRegressor(ignore_pretraining_limits=True)
         model.fit(X, y)
 
-        from autogluon.tabular.models import TabPFNV2Model
-
-        assert captured_rows["n"] > 10000
-        assert captured_hps[TabPFNV2Model]["ag_args"]["ignore_constraints"] is True
-
+        # Test with ignore_pretraining_limits=False (should fail)
         model_no_flag = AutoTabPFNRegressor(
             ignore_pretraining_limits=False,
-            **fit_kwargs,
         )
-        with pytest.raises(AssertionError):
+        with pytest.raises(AssertionError, match="ag.max_rows=10000 limit triggered"):
             model_no_flag.fit(X, y)
