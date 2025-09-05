@@ -236,8 +236,8 @@ class AutoTabPFNBase(BaseEstimator):
 
         def _add_ignore_constraints_inplace(config: dict[str, Any]) -> None:
             """Add AutoGluon ag_args to bypass training constraints when requested."""
-            ag_args = config.setdefault("ag_args", {})
-            ag_args["ignore_constraints"] = self.ignore_pretraining_limits
+            ag_args_fit = config.setdefault("ag_args_fit", {})
+            ag_args_fit["ignore_constraints"] = self.ignore_pretraining_limits
 
         if isinstance(tabpfn_configs, list):
             for cfg in tabpfn_configs:
