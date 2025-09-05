@@ -152,7 +152,6 @@ class TestPHESpecificFeatures:
 
     def test_ignore_pretraining_limits_allows_large_dataset(self, monkeypatch):
         """Training should succeed on >10k rows when limits are ignored."""
-
         captured_hps: dict = {}
         captured_rows: dict = {}
 
