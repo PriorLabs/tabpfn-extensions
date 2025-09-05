@@ -39,7 +39,7 @@ else:
                 "TunedTabPFNClassifier requires hyperopt. "
                 "Install with 'pip install \"tabpfn-extensions[hpo]\"'"
             )
-    
+
     class TunedTabPFNRegressor:
         def __init__(self, *args, **kwargs):
             raise ImportError(
