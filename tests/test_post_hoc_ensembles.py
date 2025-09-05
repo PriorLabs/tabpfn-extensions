@@ -4,21 +4,20 @@ This file tests the PHE implementations in tabpfn_extensions.post_hoc_ensembles.
 """
 
 from __future__ import annotations
+
 import os
 
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.utils.estimator_checks import check_estimator
 from sklearn.dummy import DummyClassifier, DummyRegressor
-from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import TaskType
+from sklearn.utils.estimator_checks import check_estimator
 
 from conftest import FAST_TEST_MODE
 from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import (
     AutoTabPFNClassifier,
     AutoTabPFNRegressor,
 )
-from autogluon.tabular.models import TabPFNV2Model
 from test_base_tabpfn import BaseClassifierTests, BaseRegressorTests
 
 
@@ -207,7 +206,6 @@ class TestPHESpecificFeatures:
         self, monkeypatch: pytest.MonkeyPatch
     ):
         """Training should succeed on >10k rows when limits are ignored."""
-
         # Patch TabPFN models
         monkeypatch.setattr(
             "tabpfn.TabPFNClassifier",
