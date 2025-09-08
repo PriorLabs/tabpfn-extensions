@@ -5,7 +5,10 @@ import torch
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import train_test_split
 
-from tabpfn_extensions import TabPFNClassifier, unsupervised
+from tabpfn_extensions import TabPFNClassifier
+from tabpfn_extensions.unsupervised import TabPFNUnsupervisedModel
+from tabpfn_extensions.unsupervised.experiments import GenerateSyntheticDataExperiment
+
 
 # Load the breast cancer dataset
 df = load_breast_cancer(return_X_y=False)
@@ -30,7 +33,7 @@ from tabpfn_extensions import TabPFNRegressor
 reg = TabPFNRegressor(n_estimators=3)
 
 # Initialize unsupervised model
-model_unsupervised = unsupervised.TabPFNUnsupervisedModel(
+model_unsupervised = TabPFNUnsupervisedModel(
     tabpfn_clf=clf,
     tabpfn_reg=reg,
 )
@@ -39,7 +42,7 @@ model_unsupervised = unsupervised.TabPFNUnsupervisedModel(
 feature_indices = [0, 1]
 
 # Create and run synthetic experiment
-exp_synthetic = unsupervised.experiments.GenerateSyntheticDataExperiment(
+exp_synthetic = GenerateSyntheticDataExperiment(
     task_type="unsupervised",
 )
 

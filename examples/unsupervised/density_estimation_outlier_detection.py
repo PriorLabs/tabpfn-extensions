@@ -9,7 +9,11 @@ The unsupervised model runs multiple TabPFN models for outlier detection.
 import torch
 from sklearn.datasets import load_breast_cancer
 
-from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor, unsupervised
+from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor
+from tabpfn_extensions.unsupervised.experiments import (
+    OutlierDetectionUnsupervisedExperiment,
+)
+from tabpfn_extensions.unsupervised import TabPFNUnsupervisedModel
 
 # Load data
 df = load_breast_cancer(return_X_y=False)
@@ -18,13 +22,13 @@ attribute_names = df["feature_names"]
 
 clf = TabPFNClassifier(n_estimators=3)
 reg = TabPFNRegressor(n_estimators=3)
-model_unsupervised = unsupervised.TabPFNUnsupervisedModel(
+model_unsupervised = TabPFNUnsupervisedModel(
     tabpfn_clf=clf,
     tabpfn_reg=reg,
 )
 
 # Run outlier detection
-exp_outlier = unsupervised.experiments.OutlierDetectionUnsupervisedExperiment(
+exp_outlier = OutlierDetectionUnsupervisedExperiment(
     task_type="unsupervised",
 )
 results = exp_outlier.run(
