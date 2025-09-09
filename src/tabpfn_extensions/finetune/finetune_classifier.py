@@ -27,11 +27,12 @@ from tabpfn.utils import meta_dataset_collator
 # Configure logging to show INFO level messages (including validation metrics)
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 # Also ensure the root logger is set to INFO level
 logging.getLogger().setLevel(logging.INFO)
+
 
 def evaluate_model(
     classifier: TabPFNClassifier,
