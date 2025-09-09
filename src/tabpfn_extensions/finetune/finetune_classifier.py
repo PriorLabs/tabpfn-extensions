@@ -1,3 +1,6 @@
+#  Copyright (c) Prior Labs GmbH 2025.
+#  Licensed under the Apache License, Version 2.0
+
 from __future__ import annotations
 
 import logging
@@ -21,6 +24,14 @@ from tabpfn.finetune_utils import clone_model_for_evaluation
 from tabpfn.model_loading import load_fitted_tabpfn_model, save_fitted_tabpfn_model
 from tabpfn.utils import meta_dataset_collator
 
+# Configure logging to show INFO level messages (including validation metrics)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+)
+
+# Also ensure the root logger is set to INFO level
+logging.getLogger().setLevel(logging.INFO)
 
 def evaluate_model(
     classifier: TabPFNClassifier,
@@ -62,13 +73,12 @@ def evaluate_model(
 
 
 class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
-    """
-    A scikit-learn compatible wrapper for fine-tuning the TabPFNClassifier.
+    """A scikit-learn compatible wrapper for fine-tuning the TabPFNClassifier.
 
     This class encapsulates the fine-tuning loop, allowing you to fine-tune
     TabPFN on a specific dataset using the familiar .fit() and .predict() API.
 
-    Parameters
+    Parameters:
     ----------
     device : str, default='cuda'
         The device to run the model on, e.g., 'cuda' or 'cpu'.
@@ -140,10 +150,9 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         assert self.meta_batch_size == 1, "meta_batch_size must be 1 for finetuning"
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> FinetunedTabPFNClassifier:
-        """
-        Fine-tunes the TabPFN model on the provided training data.
+        """Fine-tunes the TabPFN model on the provided training data.
 
-        Parameters
+        Parameters:
         ----------
         X : array-like of shape (n_samples, n_features)
             The training input samples.
@@ -151,12 +160,11 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         y : array-like of shape (n_samples,)
             The target values.
 
-        Returns
+        Returns:
         -------
         self : object
             Returns the instance itself.
         """
-
         self.X_ = X
         self.y_ = y
 
@@ -228,7 +236,7 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         loss_function = torch.nn.CrossEntropyLoss()
 
         # Fine-tuning loop
-        print("--- 🚀 Starting Fine-tuning ---")
+        logging.info("--- 🚀 Starting Fine-tuning ---")
 
         # Early stopping variables
         best_roc_auc = -np.inf
@@ -248,9 +256,6 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                 cat_ixs,
                 confs,
             ) in progress_bar:
-                print(f"X_context_batch shape: {X_context_batch[0].shape}")
-                print(f"X_query_batch shape: {X_query_batch[0].shape}")
-
                 if len(np.unique(y_context_batch)) != len(np.unique(y_query_batch)):
                     continue
 
@@ -294,7 +299,7 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                 y_val,
             )  # pyright: ignore[reportArgumentType]
 
-            print(
+            logging.info(
                 f"📊 Epoch {epoch + 1} Evaluation | Val ROC: {roc_auc:.4f}, Val Log Loss: {log_loss_score:.4f}\n",
             )
 
@@ -315,12 +320,12 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                         )
                 else:
                     patience_counter += 1
-                    print(
+                    logging.info(
                         f"⚠️  No improvement for {patience_counter} epochs. Best ROC AUC: {best_roc_auc:.4f}",
                     )
 
                 if patience_counter >= self.patience:
-                    print(
+                    logging.info(
                         f"🛑 Early stopping triggered. Best ROC AUC: {best_roc_auc:.4f}",
                     )
                     # Restore the best model using TabPFN's official load function
@@ -333,7 +338,7 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                         best_model_path.unlink(missing_ok=True)
                     break
 
-        print("--- ✅ Fine-tuning Finished ---")
+        logging.info("--- ✅ Fine-tuning Finished ---")
 
         # Clean up temporary file if early stopping didn't trigger
         if best_model_path is not None and best_model_path.exists():
@@ -352,15 +357,14 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predict class probabilities for X.
+        """Predict class probabilities for X.
 
-        Parameters
+        Parameters:
         ----------
         X : array-like of shape (n_samples, n_features)
             The input samples.
 
-        Returns
+        Returns:
         -------
         p : array of shape (n_samples, n_classes)
             The class probabilities of the input samples.
@@ -370,15 +374,14 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         return self.finetuned_inference_classifier_.predict_proba(X)  # type: ignore
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """
-        Predict the class for X.
+        """Predict the class for X.
 
-        Parameters
+        Parameters:
         ----------
         X : array-like of shape (n_samples, n_features)
             The input samples.
 
-        Returns
+        Returns:
         -------
         y_pred : array of shape (n_samples,)
             The predicted classes.
