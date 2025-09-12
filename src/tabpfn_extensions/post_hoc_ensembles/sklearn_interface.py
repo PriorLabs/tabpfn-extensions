@@ -19,6 +19,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.utils import infer_categorical_features, infer_device_and_type
 
@@ -350,6 +351,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         tags.estimator_type = "classifier"
         return tags
 
+    @set_extension("post_hoc_ensembles")
     def fit(
         self,
         X: pd.DataFrame | np.ndarray,
@@ -383,6 +385,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         super().fit(X, y_encoded)
         return self
 
+    @set_extension("post_hoc_ensembles")
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
 
@@ -498,6 +501,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         tags.estimator_type = "regressor"
         return tags
 
+    @set_extension("post_hoc_ensembles")
     def fit(
         self,
         X: pd.DataFrame | np.ndarray,
@@ -515,6 +519,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
         return self
 
+    @set_extension("post_hoc_ensembles")
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
 

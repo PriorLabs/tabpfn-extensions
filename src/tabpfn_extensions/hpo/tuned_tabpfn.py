@@ -49,6 +49,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 from tabpfn_extensions.misc.sklearn_compat import validate_data
@@ -444,6 +445,7 @@ class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
             and self.best_model_ is not None  # Ensure best_model_ is not None
         )
 
+    @set_extension("hpo")
     def predict(self, X: np.ndarray) -> np.ndarray:
         if not self.__sklearn_is_fitted__():
             raise ValueError(
@@ -467,6 +469,7 @@ class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
 
         return self._label_encoder.inverse_transform(self.best_model_.predict(X))
 
+    @set_extension("hpo")
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         if not self.__sklearn_is_fitted__():
             raise ValueError(
@@ -517,6 +520,7 @@ class TunedTabPFNRegressor(TunedTabPFNBase, RegressorMixin):
             and self.best_model_ is not None  # Ensure best_model_ is not None
         )
 
+    @set_extension("hpo")
     def predict(self, X: np.ndarray) -> np.ndarray:
         if not self.__sklearn_is_fitted__():
             raise ValueError(

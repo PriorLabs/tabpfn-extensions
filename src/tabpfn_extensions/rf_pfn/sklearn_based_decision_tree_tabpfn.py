@@ -14,6 +14,7 @@ import torch
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
+
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -27,6 +28,7 @@ from sklearn.utils.validation import (
     _check_sample_weight,
     check_is_fitted,
 )
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 from tabpfn_extensions.scoring.scoring_utils import (
@@ -242,6 +244,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             tags.estimator_type = "regressor"
         return tags
 
+    @set_extension("rf_pfn")
     def fit(
         self,
         X: NDArray[np.float64],
@@ -555,6 +558,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         """
         return self.get_tree().tree_
 
+    @set_extension("rf_pfn")
     def fit_leaves(
         self,
         train_X: np.ndarray,
@@ -1189,6 +1193,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
 
         return y_eval_prob
 
+    @set_extension("rf_pfn")
     def predict(self, X: np.ndarray, check_input: bool = True) -> np.ndarray:
         """Predict class labels for X.
 
@@ -1209,6 +1214,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
         proba = self.predict_proba(X, check_input=check_input)
         return np.argmax(proba, axis=1)
 
+    @set_extension("rf_pfn")
     def predict_proba(self, X: np.ndarray, check_input: bool = True) -> np.ndarray:
         """Predict class probabilities for X using the TabPFN leaves.
 
@@ -1393,6 +1399,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
 
         return y_eval
 
+    @set_extension("rf_pfn")
     def predict(self, X: np.ndarray, check_input: bool = True) -> np.ndarray:
         """Predict regression values using the TabPFN leaves.
 
@@ -1417,6 +1424,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         check_is_fitted(self, ["_tree", "X", "y"])
         return self._predict_internal(X, check_input=check_input)
 
+    @set_extension("rf_pfn")
     def predict_full(self, X: np.ndarray) -> np.ndarray:
         """Convenience method to predict with no input checks (optional).
 

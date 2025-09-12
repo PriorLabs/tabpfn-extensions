@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from hyperopt import hp
+from tabpfn_common_utils.telemetry import set_extension
 
 
 def enumerate_preprocess_transforms():
@@ -83,6 +84,7 @@ class TabPFNSearchSpace:
     """
 
     @staticmethod
+    @set_extension("hpo")
     def get_classifier_space(
         n_ensemble_range: tuple[int, int] = (1, 8),
         temp_range: tuple[float, float] = (0.75, 1.0),
@@ -111,6 +113,7 @@ class TabPFNSearchSpace:
         }
 
     @staticmethod
+    @set_extension("hpo")
     def get_regressor_space(
         n_ensemble_range: tuple[int, int] = (1, 8),
         temp_range: tuple[float, float] = (0.75, 1.0),
@@ -140,6 +143,7 @@ class TabPFNSearchSpace:
         return space
 
 
+@set_extension("hpo")
 def get_param_grid_hyperopt(task_type: str) -> dict:
     """Generate the full hyperopt search space for TabPFN optimization.
 

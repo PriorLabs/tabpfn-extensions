@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 
@@ -80,6 +81,7 @@ class TabPFNEmbedding:
                     "Make sure you're using the full TabPFN implementation (pip install tabpfn).",
                 )
 
+    @set_extension("embedding")
     def fit(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
         """Trains the TabPFN model on the given dataset.
 
@@ -94,6 +96,7 @@ class TabPFNEmbedding:
             raise ValueError("No model has been set.")
         self.model.fit(X_train, y_train)
 
+    @set_extension("embedding")
     def get_embeddings(
         self,
         X_train: np.ndarray,

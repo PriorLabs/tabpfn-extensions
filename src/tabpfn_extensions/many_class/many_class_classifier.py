@@ -90,6 +90,7 @@ from sklearn.utils.validation import (
     # _check_feature_names_in is used if X is validated by wrapper directly
     # but we aim to use the custom validate_data
 )
+from tabpfn_common_utils.telemetry import set_extension
 
 # Custom validate_data import
 from tabpfn_extensions.misc.sklearn_compat import validate_data
@@ -288,6 +289,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
                 pass
         return codebook, stats
 
+    @set_extension("many_class")
     def fit(self, X, y, **fit_params) -> ManyClassClassifier:
         """Prepare classifier using custom validate_data.
         Actual fitting of sub-estimators happens in predict_proba if mapping is needed.
@@ -358,6 +360,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
         return self
 
+    @set_extension("many_class")
     def predict_proba(self, X) -> np.ndarray:
         """Predict class probabilities for X. Sub-estimators are fitted here if mapping is used."""
         # Attributes to check if fitted, adapt from user's ["_tree", "X", "y"]
@@ -436,6 +439,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
         return final_probabilities
 
+    @set_extension("many_class")
     def predict(self, X) -> np.ndarray:
         """Predict multi-class targets for X."""
         # Attributes to check if fitted, adapt from user's ["_tree", "X", "y"]

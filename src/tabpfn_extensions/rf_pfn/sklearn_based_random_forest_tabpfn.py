@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.utils.multiclass import unique_labels
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 
@@ -90,6 +91,7 @@ class RandomForestTabPFNBase:
                     "Please use TabPFNRegressor with RandomForestTabPFNRegressor.",
                 )
 
+    @set_extension("rf_pfn")
     def fit(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None):
         """Fits RandomForestTabPFN.
 
@@ -387,6 +389,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
             adaptive_tree_skip_class_missing=self.adaptive_tree_skip_class_missing,
         )
 
+    @set_extension("rf_pfn")
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Predict class for X.
 
@@ -415,6 +418,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
         else:
             return np.argmax(proba, axis=1)
 
+    @set_extension("rf_pfn")
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """Predict class probabilities for X.
 
@@ -655,6 +659,7 @@ class RandomForestTabPFNRegressor(RandomForestTabPFNBase, RandomForestRegressor)
             adaptive_tree_min_valid_samples_fraction_of_train=self.adaptive_tree_min_valid_samples_fraction_of_train,
         )
 
+    @set_extension("rf_pfn")
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Predict regression target for X.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+from tabpfn_common_utils.telemetry import set_extension
 
 
 class Experiment:
@@ -19,6 +20,7 @@ class Experiment:
         self.settings = kwargs
         self.results = None
 
+    @set_extension("benchmarking")
     def run(self, tabpfn, **kwargs):
         """Runs the experiment.
 
