@@ -116,6 +116,7 @@ def _fit_and_predict_proba(
     raise AttributeError("Base estimator must implement the predict_proba method.")
 
 
+@set_extension("many_class")
 class ManyClassClassifier(BaseEstimator, ClassifierMixin):
     """Output-Code multiclass strategy to extend classifiers beyond their class limit.
 
@@ -289,7 +290,6 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
                 pass
         return codebook, stats
 
-    @set_extension("many_class")
     def fit(self, X, y, **fit_params) -> ManyClassClassifier:
         """Prepare classifier using custom validate_data.
         Actual fitting of sub-estimators happens in predict_proba if mapping is needed.
@@ -360,7 +360,6 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
         return self
 
-    @set_extension("many_class")
     def predict_proba(self, X) -> np.ndarray:
         """Predict class probabilities for X. Sub-estimators are fitted here if mapping is used."""
         # Attributes to check if fitted, adapt from user's ["_tree", "X", "y"]
@@ -439,7 +438,6 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
         return final_probabilities
 
-    @set_extension("many_class")
     def predict(self, X) -> np.ndarray:
         """Predict multi-class targets for X."""
         # Attributes to check if fitted, adapt from user's ["_tree", "X", "y"]

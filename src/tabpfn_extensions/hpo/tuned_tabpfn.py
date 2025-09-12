@@ -92,6 +92,7 @@ class MetricType(str, Enum):
     MAE = "mae"
 
 
+@set_extension("hpo")
 class TunedTabPFNBase(BaseEstimator):
     """Base class for tuned TabPFN models with proper categorical handling."""
 
@@ -445,7 +446,6 @@ class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
             and self.best_model_ is not None  # Ensure best_model_ is not None
         )
 
-    @set_extension("hpo")
     def predict(self, X: np.ndarray) -> np.ndarray:
         if not self.__sklearn_is_fitted__():
             raise ValueError(
@@ -469,7 +469,6 @@ class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
 
         return self._label_encoder.inverse_transform(self.best_model_.predict(X))
 
-    @set_extension("hpo")
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         if not self.__sklearn_is_fitted__():
             raise ValueError(
@@ -520,7 +519,6 @@ class TunedTabPFNRegressor(TunedTabPFNBase, RegressorMixin):
             and self.best_model_ is not None  # Ensure best_model_ is not None
         )
 
-    @set_extension("hpo")
     def predict(self, X: np.ndarray) -> np.ndarray:
         if not self.__sklearn_is_fitted__():
             raise ValueError(

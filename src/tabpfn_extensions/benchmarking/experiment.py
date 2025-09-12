@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from tabpfn_common_utils.telemetry import set_extension
 
 
+@set_extension("benchmarking")
 class Experiment:
     """Base class for experiments.
     Experiments should be reproducible, i.e. the settings should give all the information
@@ -20,7 +21,6 @@ class Experiment:
         self.settings = kwargs
         self.results = None
 
-    @set_extension("benchmarking")
     def run(self, tabpfn, **kwargs):
         """Runs the experiment.
 

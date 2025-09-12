@@ -56,6 +56,7 @@ def enumerate_preprocess_transforms():
     return transforms
 
 
+@set_extension("hpo")
 class TabPFNSearchSpace:
     """Utility class for creating and customizing TabPFN hyperparameter search spaces.
 
@@ -84,7 +85,6 @@ class TabPFNSearchSpace:
     """
 
     @staticmethod
-    @set_extension("hpo")
     def get_classifier_space(
         n_ensemble_range: tuple[int, int] = (1, 8),
         temp_range: tuple[float, float] = (0.75, 1.0),
@@ -113,7 +113,6 @@ class TabPFNSearchSpace:
         }
 
     @staticmethod
-    @set_extension("hpo")
     def get_regressor_space(
         n_ensemble_range: tuple[int, int] = (1, 8),
         temp_range: tuple[float, float] = (0.75, 1.0),

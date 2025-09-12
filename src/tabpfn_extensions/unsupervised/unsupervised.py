@@ -60,6 +60,7 @@ from tabpfn_extensions.utils import (  # type: ignore
 )
 
 
+@set_extension("unsupervised")
 class TabPFNUnsupervisedModel(BaseEstimator):
     """TabPFN experiments model for imputation, outlier detection, and synthetic data generation.
 
@@ -205,7 +206,6 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             # Update the estimator in the list
             self.estimators[idx] = estimator
 
-    @set_extension("unsupervised")
     def fit(
         self,
         X: np.ndarray | torch.Tensor | pd.DataFrame,
@@ -534,7 +534,6 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         return model, X_predict, y_predict
 
-    @set_extension("unsupervised")
     def impute(
         self,
         X: torch.Tensor | np.ndarray | pd.DataFrame,
@@ -673,7 +672,6 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         self.X_ = X_store
         return pdf
 
-    @set_extension("unsupervised")
     def outliers_pmf(self, X: torch.Tensor, n_permutations: int = 10) -> torch.Tensor:
         """Calculate outlier scores based on probability mass functions for categorical features.
 
@@ -699,7 +697,6 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         self.X_ = X_store
         return pmf
 
-    @set_extension("unsupervised")
     def outliers(
         self,
         X: torch.Tensor | np.ndarray | pd.DataFrame,
@@ -772,7 +769,6 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         densities_tensor = torch.stack(densities_clean)
         return densities_tensor.mean(dim=0)
 
-    @set_extension("unsupervised")
     def generate_synthetic_data(
         self,
         n_samples: int = 100,
@@ -832,7 +828,6 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             fast_mode=fast_mode,
         )
 
-    @set_extension("unsupervised")
     def get_embeddings(self, X: torch.tensor, per_column: bool = False) -> torch.tensor:
         """Get the transformer embeddings for the test data X.
 

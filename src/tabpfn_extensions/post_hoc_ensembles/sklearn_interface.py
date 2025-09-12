@@ -263,6 +263,7 @@ class AutoTabPFNBase(BaseEstimator):
         return {"allow_nan": True, "non_deterministic": True}
 
 
+@set_extension("post_hoc_ensembles")
 class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN classifiers.
 
@@ -351,7 +352,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         tags.estimator_type = "classifier"
         return tags
 
-    @set_extension("post_hoc_ensembles")
     def fit(
         self,
         X: pd.DataFrame | np.ndarray,
@@ -385,7 +385,6 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         super().fit(X, y_encoded)
         return self
 
-    @set_extension("post_hoc_ensembles")
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
 
@@ -417,6 +416,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         return {"balance_probabilities": self.balance_probabilities}
 
 
+@set_extension("post_hoc_ensembles")
 class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN regressors.
 
@@ -501,7 +501,6 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         tags.estimator_type = "regressor"
         return tags
 
-    @set_extension("post_hoc_ensembles")
     def fit(
         self,
         X: pd.DataFrame | np.ndarray,
@@ -519,7 +518,6 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
 
         return self
 
-    @set_extension("post_hoc_ensembles")
     def predict(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         check_is_fitted(self)
 

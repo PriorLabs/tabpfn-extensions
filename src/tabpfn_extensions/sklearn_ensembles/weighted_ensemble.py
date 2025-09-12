@@ -9,6 +9,7 @@ from sklearn.model_selection import cross_val_score
 from tabpfn_common_utils.telemetry import set_extension
 
 
+@set_extension("sklearn_ensembles")
 class WeightedAverageEnsemble(BaseEstimator, ClassifierMixin):
     def __init__(self, estimators, weight_threshold=0.0, cv=5, n_max=None):
         self.estimators = estimators
@@ -17,7 +18,6 @@ class WeightedAverageEnsemble(BaseEstimator, ClassifierMixin):
         self.ensemble = None
         self.cv = cv
 
-    @set_extension("sklearn_ensembles")
     def fit(self, X, y):
         scores = []
         for _name, clf in self.estimators:
@@ -56,10 +56,8 @@ class WeightedAverageEnsemble(BaseEstimator, ClassifierMixin):
         self.ensemble.fit(X, y)
         return self
 
-    @set_extension("sklearn_ensembles")
     def predict(self, X):
         return self.ensemble.predict(X)
 
-    @set_extension("sklearn_ensembles")
     def predict_proba(self, X):
         return self.ensemble.predict_proba(X)

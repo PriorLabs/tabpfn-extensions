@@ -42,6 +42,7 @@ from tabpfn_extensions.utils import softmax
 ###############################################################################
 
 
+@set_extension("rf_pfn")
 class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
     """Abstract base class combining a scikit-learn Decision Tree with TabPFN at the leaves.
 
@@ -244,7 +245,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             tags.estimator_type = "regressor"
         return tags
 
-    @set_extension("rf_pfn")
     def fit(
         self,
         X: NDArray[np.float64],
@@ -558,7 +558,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         """
         return self.get_tree().tree_
 
-    @set_extension("rf_pfn")
     def fit_leaves(
         self,
         train_X: np.ndarray,
@@ -1100,6 +1099,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
 ###############################################################################
 
 
+@set_extension("rf_pfn")
 class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
     """Decision tree that uses TabPFNClassifier at the leaves."""
 
@@ -1193,7 +1193,6 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
 
         return y_eval_prob
 
-    @set_extension("rf_pfn")
     def predict(self, X: np.ndarray, check_input: bool = True) -> np.ndarray:
         """Predict class labels for X.
 
@@ -1214,7 +1213,6 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
         proba = self.predict_proba(X, check_input=check_input)
         return np.argmax(proba, axis=1)
 
-    @set_extension("rf_pfn")
     def predict_proba(self, X: np.ndarray, check_input: bool = True) -> np.ndarray:
         """Predict class probabilities for X using the TabPFN leaves.
 
@@ -1245,6 +1243,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
 ###############################################################################
 
 
+@set_extension("rf_pfn")
 class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
     """Decision tree that uses TabPFNRegressor at the leaves."""
 
@@ -1399,7 +1398,6 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
 
         return y_eval
 
-    @set_extension("rf_pfn")
     def predict(self, X: np.ndarray, check_input: bool = True) -> np.ndarray:
         """Predict regression values using the TabPFN leaves.
 
@@ -1424,7 +1422,6 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         check_is_fitted(self, ["_tree", "X", "y"])
         return self._predict_internal(X, check_input=check_input)
 
-    @set_extension("rf_pfn")
     def predict_full(self, X: np.ndarray) -> np.ndarray:
         """Convenience method to predict with no input checks (optional).
 
