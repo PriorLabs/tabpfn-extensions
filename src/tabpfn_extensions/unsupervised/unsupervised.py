@@ -49,6 +49,7 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.base import BaseEstimator
+from tabpfn_common_utils.telemetry import set_extension
 from tqdm import tqdm
 
 # Import TabPFN models from extensions (which handles backend compatibility)
@@ -59,6 +60,7 @@ from tabpfn_extensions.utils import (  # type: ignore
 )
 
 
+@set_extension("unsupervised")
 class TabPFNUnsupervisedModel(BaseEstimator):
     """TabPFN experiments model for imputation, outlier detection, and synthetic data generation.
 

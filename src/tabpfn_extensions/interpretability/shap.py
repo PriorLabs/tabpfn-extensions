@@ -40,10 +40,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.utils import is_tabpfn
 
 
+@set_extension("interpretability")
 def calculate_shap_subset(args: tuple) -> np.ndarray:
     """Calculate SHAP values for a specific feature in a parallel context.
 
@@ -67,6 +69,7 @@ def calculate_shap_subset(args: tuple) -> np.ndarray:
     return explainer.shap_values(X_subset)[:, feature_idx]
 
 
+@set_extension("interpretability")
 def parallel_permutation_shap(
     model: Any,
     X: np.ndarray | pd.DataFrame,
@@ -179,6 +182,7 @@ def plot_shap_feature(
         )
 
 
+@set_extension("interpretability")
 def get_shap_values(
     estimator: Any,
     test_x: pd.DataFrame | np.ndarray | torch.Tensor,
@@ -251,6 +255,7 @@ def get_shap_values(
     return shap_values
 
 
+@set_extension("interpretability")
 def get_tabpfn_explainer(
     estimator: Any,
     test_x: pd.DataFrame,
@@ -280,6 +285,7 @@ def get_tabpfn_explainer(
     )
 
 
+@set_extension("interpretability")
 def get_default_explainer(
     estimator: Any,
     test_x: pd.DataFrame,

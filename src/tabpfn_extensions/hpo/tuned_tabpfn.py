@@ -49,6 +49,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 from tabpfn_extensions.misc.sklearn_compat import validate_data
@@ -91,6 +92,7 @@ class MetricType(str, Enum):
     MAE = "mae"
 
 
+@set_extension("hpo")
 class TunedTabPFNBase(BaseEstimator):
     """Base class for tuned TabPFN models with proper categorical handling."""
 

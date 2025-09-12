@@ -15,10 +15,12 @@ from sklearn.metrics import (
     r2_score,
     roc_auc_score,
 )
+from tabpfn_common_utils.telemetry import set_extension
 
 CLF_LABEL_METRICS = ["accuracy", "f1"]
 
 
+@set_extension("scoring")
 def safe_roc_auc_score(y_true, y_score, **kwargs):
     """Compute the Area Under the Receiver Operating Characteristic Curve (ROC AUC) score.
 
@@ -95,6 +97,7 @@ def safe_roc_auc_score(y_true, y_score, **kwargs):
             return 1.0
 
 
+@set_extension("scoring")
 def score_classification(
     optimize_metric: Literal["roc", "auroc", "accuracy", "f1", "log_loss"],
     y_true,
@@ -154,6 +157,7 @@ def score_classification(
     raise ValueError(f"Unknown metric {optimize_metric}")
 
 
+@set_extension("scoring")
 def score_regression(
     optimize_metric: Literal["rmse", "mse", "mae", "r2"],
     y_true,
