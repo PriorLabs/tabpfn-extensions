@@ -118,7 +118,7 @@ class TabEBM:
         sgld_steps: int = 200,
         distance_negative_class: float = 5,
         seed: int = 42,
-        debug: bool = False,
+        verbose: bool = False,
     ) -> dict[str, np.ndarray]:
         """Generate synthetic samples using Stochastic Gradient Langevin Dynamics (SGLD).
 
@@ -139,7 +139,7 @@ class TabEBM:
             distance_negative_class: Distance for placing surrogate negative samples
                                    from the origin (used to create binary classification)
             seed: Random seed for reproducibility
-            debug: Whether to print debug information during sampling
+            verbose: Whether to print verbose information during sampling
 
         Returns:
             Dictionary mapping class names to generated samples:
@@ -163,7 +163,7 @@ class TabEBM:
             sgld_steps=sgld_steps,
             distance_negative_class=distance_negative_class,
             seed=seed,
-            debug=debug,
+            verbose=verbose,
         )
 
         # Extract sampling results and format output
@@ -186,7 +186,7 @@ class TabEBM:
         sgld_steps: int = 200,
         distance_negative_class: float = 5,
         seed: int = 42,
-        debug: bool = False,
+        verbose: bool = False,
     ) -> dict[str, dict[str, np.ndarray]]:
         """Optimized internal SGLD sampling method with caching and batch processing.
 
@@ -208,14 +208,11 @@ class TabEBM:
             starting_point_noise_std, sgld_step_size, sgld_noise_std, sgld_steps: SGLD parameters
             distance_negative_class: Distance for surrogate negative samples
             seed: Random seed
-            debug: Debug flag
+            verbose: verbose flag
 
         Returns:
             Dictionary containing sampling results for each class
         """
-        if debug:
-            pass
-
         # Pre-compute unique classes for iteration
         unique_classes = np.unique(y)
         synthetic_data_per_class = {}
@@ -228,9 +225,6 @@ class TabEBM:
         seed_everything(seed)
 
         for target_class in unique_classes:
-            if debug:
-                pass
-
             # Create or retrieve cached EBM dataset and model
             ebm_dict = self._get_or_create_ebm_dataset(
                 X, y, target_class, distance_negative_class
@@ -268,7 +262,7 @@ class TabEBM:
                 sgld_step_size,
                 sgld_noise_std,
                 sgld_steps,
-                debug,
+                verbose,
             )
 
             # Store results
@@ -481,7 +475,7 @@ class TabEBM:
         sgld_step_size: float,
         sgld_noise_std: float,
         sgld_steps: int,
-        debug: bool,
+        verbose: bool,
     ) -> torch.Tensor:
         """Optimized SGLD sampling loop with reduced memory allocations.
 
@@ -494,7 +488,7 @@ class TabEBM:
             sgld_step_size: SGLD step size
             sgld_noise_std: SGLD noise standard deviation
             sgld_steps: Number of SGLD steps
-            debug: Debug flag
+            verbose: verbose flag
 
         Returns:
             Final samples after SGLD sampling
@@ -517,8 +511,8 @@ class TabEBM:
             # Backward pass
             total_energy.backward()
 
-            # Debug output (optional)
-            if debug and t % 10 == 0:  # Print every 10 steps to reduce overhead
+            # verbose output (optional)
+            if verbose and t % 10 == 0:  # Print every 10 steps to reduce overhead
                 print(f"Step {t}, Grad norm: {X_sgld_list[0].grad.norm().item()}")
 
             # SGLD update with pre-computed noise
