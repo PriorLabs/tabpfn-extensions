@@ -19,6 +19,8 @@ Official code for the paper ["TabEBM: A Tabular Data Augmentation Method with Di
 
 Authored by [Andrei Margeloiu\*](https://www.linkedin.com/in/andreimargeloiu/), [Xiangjian Jiang\*](https://silencex12138.github.io/), [Nikola Simidjievski](https://simidjievskin.github.io/), [Mateja Jamnik](https://www.cl.cam.ac.uk/~mj201/), University of Cambridge, UK
 
+**Primary Maintainer:** Xiangjian Jiang
+
 ## 📌 Overview
 
 ![image-20241001125640288](https://s2.loli.net/2024/10/01/5loipZJdOrtVS3Q.png)
