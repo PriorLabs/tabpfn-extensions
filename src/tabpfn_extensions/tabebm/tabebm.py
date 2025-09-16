@@ -511,10 +511,6 @@ class TabEBM:
             # Backward pass
             total_energy.backward()
 
-            # verbose output (optional)
-            if verbose and t % 10 == 0:  # Print every 10 steps to reduce overhead
-                print(f"Step {t}, Grad norm: {X_sgld_list[0].grad.norm().item()}")
-
             # SGLD update with pre-computed noise
             with torch.no_grad():
                 X_sgld_updated = (
