@@ -519,7 +519,7 @@ class TabEBM:
 
             # Debug output (optional)
             if debug and t % 10 == 0:  # Print every 10 steps to reduce overhead
-                X_sgld_list[0].grad.norm().item()
+                print(f"Step {t}, Grad norm: {X_sgld_list[0].grad.norm().item()}")
 
             # SGLD update with pre-computed noise
             with torch.no_grad():
