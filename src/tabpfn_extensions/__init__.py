@@ -33,5 +33,5 @@ __all__ = [
     "TunedTabPFNRegressor",
 ]
 
-# Opt in to telemetry
+# Prompt the user to opt in for telemetry and subscribe to the newsletter
 opt_in()
