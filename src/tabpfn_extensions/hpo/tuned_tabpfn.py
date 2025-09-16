@@ -92,7 +92,6 @@ class MetricType(str, Enum):
     MAE = "mae"
 
 
-@set_extension("hpo")
 class TunedTabPFNBase(BaseEstimator):
     """Base class for tuned TabPFN models with proper categorical handling."""
 
@@ -400,6 +399,7 @@ class TunedTabPFNBase(BaseEstimator):
         return tags
 
 
+@set_extension("hpo")
 class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
     """TabPFN Classifier with hyperparameter tuning and proper categorical handling."""
 
@@ -493,6 +493,7 @@ class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
         return self.best_model_.predict_proba(X)
 
 
+@set_extension("hpo")
 class TunedTabPFNRegressor(TunedTabPFNBase, RegressorMixin):
     """TabPFN Regressor with hyperparameter tuning and proper categorical handling."""
 
