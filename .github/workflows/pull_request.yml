@@ -3,6 +3,9 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   check_python_linting:
@@ -18,7 +21,7 @@ jobs:
         with:
           src: "./src ./tests"
           version: 0.8.6
-          args: 'format --check'
+          args: "format --check"
 
   test_compatibility:
     name: Test Package Compatibility
