@@ -5,7 +5,12 @@ This file tests the RF-PFN implementations in tabpfn_extensions.rf_pfn.
 
 from __future__ import annotations
 
+import random
+from typing_extensions import override
+
+import numpy as np
 import pytest
+import torch
 
 from tabpfn_extensions.rf_pfn.sklearn_based_random_forest_tabpfn import (
     RandomForestTabPFNClassifier,
@@ -53,6 +58,15 @@ class TestRandomForestRegressor(BaseRegressorTests):
             random_state=42,
             max_predict_time=5,  # Limit prediction time
         )
+
+    @pytest.mark.client_compatible
+    @pytest.mark.local_compatible
+    @override
+    def test_with_pandas(self, estimator, pandas_regression_data):
+        torch.random.manual_seed(0)
+        np.random.seed(0)
+        random.seed(0)
+        super().test_with_pandas(estimator, pandas_regression_data)
 
     @pytest.mark.skip(reason="RandomForestTabPFN doesn't fully support text features")
     def test_with_text_features(self, estimator, dataset_generator):

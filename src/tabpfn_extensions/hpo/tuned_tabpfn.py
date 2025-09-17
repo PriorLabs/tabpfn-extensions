@@ -56,6 +56,7 @@ from tabpfn_extensions.scoring.scoring_utils import (
     score_classification,
     score_regression,
 )
+from tabpfn_extensions.utils import DeviceSpecification
 
 # Import TabPFN models from extensions (which handles backend compatibility)
 try:
@@ -102,7 +103,7 @@ class TunedTabPFNBase(BaseEstimator):
         n_validation_size: float = 0.2,
         shuffle_data: bool = True,
         metric: MetricType = MetricType.ACCURACY,
-        device: str = "auto",
+        device: DeviceSpecification = "auto",
         random_state: int | None = None,
         categorical_feature_indices: list[int] | None = None,
         verbose: bool = True,
@@ -211,9 +212,9 @@ class TunedTabPFNBase(BaseEstimator):
             }
             model_params["inference_config"] = inference_config
             # Use device utility for automatic selection
-            from tabpfn_extensions.utils import infer_device_and_type
+            from tabpfn_extensions.utils import infer_device
 
-            model_params["device"] = infer_device_and_type(self.device)
+            model_params["device"] = infer_device(self.device)
             model_params["random_state"] = rng.randint(0, 2**31 - 1)
 
             # Handle model type selection
