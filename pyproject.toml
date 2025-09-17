@@ -94,6 +94,7 @@ dev = [
     # Test
     "pytest>=8.0.0",
     "pytest-xdist>=3.6.0",
+    "pytest-mock>=3.15.1",
 ]
 
 [tool.pytest.ini_options]
