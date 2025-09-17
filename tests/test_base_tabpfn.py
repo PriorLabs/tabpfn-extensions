@@ -7,8 +7,11 @@ The structure is designed to be easily reusable for testing other estimators.
 
 from __future__ import annotations
 
+import random
+
 import numpy as np
 import pytest
+import torch
 from sklearn.base import is_classifier, is_regressor
 from sklearn.exceptions import NotFittedError
 from sklearn.metrics import accuracy_score, r2_score
