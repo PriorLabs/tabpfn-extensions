@@ -9,7 +9,6 @@ from tabpfn_extensions import TabPFNClassifier
 from tabpfn_extensions.unsupervised import TabPFNUnsupervisedModel
 from tabpfn_extensions.unsupervised.experiments import GenerateSyntheticDataExperiment
 
-
 # Load the breast cancer dataset
 df = load_breast_cancer(return_X_y=False)
 X, y = df["data"], df["target"]

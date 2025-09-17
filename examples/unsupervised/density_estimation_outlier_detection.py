@@ -10,10 +10,10 @@ import torch
 from sklearn.datasets import load_breast_cancer
 
 from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor
+from tabpfn_extensions.unsupervised import TabPFNUnsupervisedModel
 from tabpfn_extensions.unsupervised.experiments import (
     OutlierDetectionUnsupervisedExperiment,
 )
-from tabpfn_extensions.unsupervised import TabPFNUnsupervisedModel
 
 # Load data
 df = load_breast_cancer(return_X_y=False)
