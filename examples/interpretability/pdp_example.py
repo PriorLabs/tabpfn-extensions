@@ -28,5 +28,5 @@ disp = partial_dependence_plots(
 )
 disp.figure_.suptitle("Partial dependence")
 
+plt.savefig("pdp_plot.png")
 plt.show()
-plt.savefig("pdp.png")
