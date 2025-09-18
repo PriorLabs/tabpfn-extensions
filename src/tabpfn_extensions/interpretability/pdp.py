@@ -18,7 +18,7 @@ def partial_dependence_plots(
     features: Sequence[int | tuple[int, int]],
     *,
     grid_resolution: int = 20,
-    kind: str = "average",            # "average" or "individual" (ICE)
+    kind: str = "average",  # "average" or "individual" (ICE)
     target_class: int | None = None,  # for classification: which class's proba
     ax: Axes | None = None,
     **kwargs,
@@ -57,7 +57,7 @@ def partial_dependence_plots(
             kind=kind,
             grid_resolution=grid_resolution,
             response_method=response_method,
-            target=target_class,       # ignored unless needed (e.g., predict_proba multiclass)
+            target=target_class,  # ignored unless needed (e.g., predict_proba multiclass)
             ax=ax,
             **kwargs,
         )
