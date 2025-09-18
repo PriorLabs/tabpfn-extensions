@@ -1,5 +1,5 @@
 try:
-    from . import feature_selection, shap, shapiq, pdp
+    from . import feature_selection, pdp, shap, shapiq
 except ImportError:
     raise ImportError(
         "Please install tabpfn-extensions with the 'interpretability' extra: pip install 'tabpfn-extensions[interpretability]'",

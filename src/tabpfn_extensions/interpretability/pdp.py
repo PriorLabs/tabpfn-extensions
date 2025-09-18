@@ -1,12 +1,13 @@
 # Licensed under the Apache License, Version 2.0
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-import numpy as np
 from sklearn.inspection import PartialDependenceDisplay
 
 if TYPE_CHECKING:
+    import numpy as np
     from matplotlib.axes import Axes
     from sklearn.base import BaseEstimator
 
@@ -22,8 +23,7 @@ def partial_dependence_plots(
     ax: Axes | None = None,
     **kwargs,
 ) -> PartialDependenceDisplay:
-    """
-    Plot partial dependence (and ICE) for 1D/2D feature(s).
+    """Plot partial dependence (and ICE) for 1D/2D feature(s).
 
     Args:
         estimator: fitted estimator or TabPFN-like estimator (fit-at-predict-time is fine)

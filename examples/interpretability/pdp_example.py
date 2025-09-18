@@ -1,13 +1,13 @@
-from sklearn.datasets import load_breast_cancer
-from tabpfn_extensions import TabPFNClassifier
-from sklearn.model_selection import train_test_split
-from tabpfn_extensions.interpretability.pdp import partial_dependence_plots
 import matplotlib.pyplot as plt
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
 
+from tabpfn_extensions import TabPFNClassifier
+from tabpfn_extensions.interpretability.pdp import partial_dependence_plots
+
+# Load example dataset
 data = load_breast_cancer()
 X, y = data.data, data.target
-X = X[:30]
-y = y[:30]
 feature_names = list(data.feature_names)
 
 # Split data
@@ -23,8 +23,8 @@ disp = partial_dependence_plots(
     X=X_test,
     features=[0, 1, 2, (0, 3)],
     grid_resolution=30,
-    kind="average",      # try "individual" to see ICE curves
-    target_class=1,      # positive class if using predict_proba
+    kind="average",
+    target_class=1,
 )
 disp.figure_.suptitle("Partial dependence")
 
