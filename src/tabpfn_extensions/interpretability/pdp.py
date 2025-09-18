@@ -39,24 +39,15 @@ def partial_dependence_plots(
         PartialDependenceDisplay
     """
     # Decide response method
-    # - If classifier & predict_proba exists, use that (optionally select a class)
-    # - Else fall back to decision_function/predict
-    response_method = None
-    if hasattr(estimator, "predict_proba"):
-        response_method = "predict_proba"
-    elif hasattr(estimator, "decision_function"):
-        response_method = "decision_function"
-    else:
-        response_method = "auto"
+    response_method = "predict_proba" if hasattr(estimator, "predict_proba") else "auto"
 
-    # Some TabPFN-derivatives expose `show_progress`; silence for speed
     restore_progress = None
     if hasattr(estimator, "show_progress"):
-        restore_progress = estimator.show_progress
+        restore_progress = getattr(estimator, "show_progress", None)
         try:
             estimator.show_progress = False
-        except Exception:
-            restore_progress = None  # be tolerant
+        except (AttributeError, TypeError):
+            restore_progress = None
 
     try:
         disp = PartialDependenceDisplay.from_estimator(
