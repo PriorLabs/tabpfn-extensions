@@ -32,6 +32,3 @@ __all__ = [
     "TunedTabPFNClassifier",
     "TunedTabPFNRegressor",
 ]
-
-# Prompt the user to opt in for telemetry and subscribe to the newsletter
-opt_in()
