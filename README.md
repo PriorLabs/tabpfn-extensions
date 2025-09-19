@@ -211,24 +211,31 @@ See our [Contribution Guide](CONTRIBUTING.md) for more details.
 
 ## 📊 Anonymous Telemetry
 
-This package includes **optional anonymous telemetry**.  It builds on the telemetry in the core [TabPFN](https://github.com/priorlabs/tabpfn) package:
+This project collects **anonymous usage telemetry** by default.
 
-- ✅ No personal data is collected without your explicit consent
-- ✅ No code, model inputs, or outputs are ever sent  
-- ✅ Data is strictly anonymous and cannot be linked to individuals  
+The data is used exclusively to help us understand how the library is being used and to guide future improvements.
 
-### What we collect (from TabPFN)
-- Package version  
-- Python version  
-- How often `fit` and `predict` are called, including simple metadata like the dimensionality of the input (rounded into ranges) and the type of task (classification vs. regression) and extension used.
+- **No personal data is collected**
+- **No code, model inputs, or outputs are ever sent**
+- **Data is strictly anonymous and cannot be linked to individuals**
 
-See the [Telemetry documentation](https://github.com/priorlabs/tabpfn/blob/main/TELEMETRY.md) for the full details of events and metadata.  
+### What we collect
+We only collect high-level, non-identifying information such as:
+- Package version
+- Python version
+- How often fit and inference are called, including simple metadata like the dimensionality of the input and the type of task (e.g., classification vs. regression) (:warning: never the data itself)
 
-This data is processed in line with the **GDPR principles of data minimization and purpose limitation**. You can always opt out globally by setting:
+See the [Telemetry documentation](https://github.com/priorlabs/tabpfn/blob/main/TELEMETRY.md) for the full details of events and metadata.
+
+This data is processed in compliance with the **General Data Protection Regulation (GDPR)** principles of data minimization and purpose limitation.
+
+For more details, please see our [Privacy Policy](https://priorlabs.ai/privacy_policy/).
+
+### How to opt out
+If you prefer not to send telemetry, you can disable it by setting the following environment variable:
 
 ```bash
 export TABPFN_DISABLE_TELEMETRY=1
 ```
 ---
-
 Built with ❤️ by the TabPFN community
