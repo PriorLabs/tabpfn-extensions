@@ -7,8 +7,6 @@ except PackageNotFoundError:
 
 # Create alias for test_utils
 # Import third party extensions
-from tabpfn_common_utils.telemetry.interactive import opt_in
-
 from . import test_utils
 from .embedding import TabPFNEmbedding
 from .hpo import TunedTabPFNClassifier, TunedTabPFNRegressor
@@ -32,6 +30,3 @@ __all__ = [
     "TunedTabPFNClassifier",
     "TunedTabPFNRegressor",
 ]
-
-# Prompt the user to opt in for telemetry and subscribe to the newsletter
-opt_in()
