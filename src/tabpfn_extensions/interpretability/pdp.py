@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from sklearn.inspection import PartialDependenceDisplay
+from tabpfn_common_utils.telemetry import set_extension
 
 if TYPE_CHECKING:
     import numpy as np
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
 
 
+@set_extension("interpretability")
 def partial_dependence_plots(
     estimator: BaseEstimator,
     X: np.ndarray,

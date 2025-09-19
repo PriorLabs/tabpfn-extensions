@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from tabpfn.config import ModelInterfaceConfig, PreprocessorConfig
 from tabpfn.utils import meta_dataset_collator
 from tabpfn_extensions.utils import TabPFNClassifier
+from tabpfn_common_utils.telemetry import set_extension
 
 
 def to_numpy(X: np.ndarray | torch.Tensor | pd.DataFrame | None) -> np.ndarray | None:
@@ -59,6 +60,7 @@ def seed_everything(seed: int) -> None:
 # ========================================================================
 
 
+@set_extension("tabebm")
 class TabEBM:
     """TabEBM: Tabular Energy-Based Model for synthetic data generation.
 
