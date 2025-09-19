@@ -10,6 +10,7 @@ import pandas as pd
 import scipy
 import torch
 from sklearn.model_selection import train_test_split
+from tabpfn_common_utils.telemetry import set_extension
 from torch.utils.data import DataLoader
 
 from tabpfn.config import ModelInterfaceConfig, PreprocessorConfig
@@ -59,6 +60,7 @@ def seed_everything(seed: int) -> None:
 # ========================================================================
 
 
+@set_extension("tabebm")
 class TabEBM:
     """TabEBM: Tabular Energy-Based Model for synthetic data generation.
 
