@@ -10,12 +10,12 @@ import pandas as pd
 import scipy
 import torch
 from sklearn.model_selection import train_test_split
+from tabpfn_common_utils.telemetry import set_extension
 from torch.utils.data import DataLoader
 
 from tabpfn.config import ModelInterfaceConfig, PreprocessorConfig
 from tabpfn.utils import meta_dataset_collator
 from tabpfn_extensions.utils import TabPFNClassifier
-from tabpfn_common_utils.telemetry import set_extension
 
 
 def to_numpy(X: np.ndarray | torch.Tensor | pd.DataFrame | None) -> np.ndarray | None:
