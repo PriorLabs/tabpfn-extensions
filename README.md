@@ -209,6 +209,37 @@ See our [Contribution Guide](CONTRIBUTING.md) for more details.
 
 [![Contributors](https://contrib.rocks/image?repo=priorlabs/tabpfn-extensions)](https://github.com/priorlabs/tabpfn-extensions/graphs/contributors)
 
+## 📊 Anonymous Telemetry
+
+This package includes **optional anonymous telemetry**.  It builds on the telemetry in the core [TabPFN](https://github.com/priorlabs/tabpfn) package:
+
+- ✅ No personal data is collected  
+- ✅ No code, model inputs, or outputs are ever sent  
+- ✅ Data is strictly anonymous and cannot be linked to individuals  
+
+### What we collect (from TabPFN)
+- Package version  
+- Python version  
+- How often `fit` and `predict` are called, including simple metadata like the dimensionality of the input (rounded into ranges) and the type of task (classification vs. regression)  
+
+See the [Telemetry documentation](https://github.com/priorlabs/tabpfn/blob/main/TELEMETRY.md) for the full details of events and metadata.  
+
+This data is processed in line with the **GDPR principles of data minimization and purpose limitation**. You can always opt out globally by setting:
+
+```bash
+export TABPFN_DISABLE_TELEMETRY=1
+```
+
+When you use this package, you may be prompted to opt in to telemetry that uses a persistent anonymous ID.
+This ID helps us see usage patterns across multiple calls (for example, how often people train vs. predict) so we can improve TabPFN over time.
+- If you only opt into telemetry, the ID is random and cannot be tied back to you personally.
+- If you also choose to subscribe to our newsletter, it’s technically possible to connect your telemetry ID with your email. We will only ever use this in aggregate to understand usage better — never to inspect individual activity.
+
+No matter what you choose:
+- ✅ No model inputs, outputs, or datasets are ever sent
+- ✅ No personal data is collected unless you explicitly provide it (e.g. newsletter signup)
+- ✅ Telemetry is optional and can be disabled at any time
+
 ---
 
 Built with ❤️ by the TabPFN community

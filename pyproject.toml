@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tabpfn-extensions"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
     "torch>=2.1,<3",
     "pandas>=1.4.0,<3",
@@ -27,6 +27,8 @@ authors = [
     { name = "Frank Hutter", email = "fh@cs.uni-freiburg.de" },
     { name = "Eddie Bergman" },
     { name = "Klemens Flöge" },
+    { name = "Oscar Key" },
+    { name = "Dominik Safaric" }
 ]
 readme = "README.md"
 description = "TabPFN: Foundation model for tabular data"
