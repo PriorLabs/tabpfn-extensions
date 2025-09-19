@@ -21,7 +21,11 @@ from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
 from tabpfn_common_utils.telemetry import set_extension
 
-from tabpfn_extensions.utils import infer_categorical_features, infer_device_and_type
+from tabpfn_extensions.utils import (
+    DeviceSpecification,
+    infer_categorical_features,
+    infer_device,
+)
 
 
 class TaskType(str, Enum):
@@ -99,7 +103,7 @@ class AutoTabPFNBase(BaseEstimator):
         max_time: int | None = 3600,
         eval_metric: str | None = None,
         presets: list[str] | str | None = None,
-        device: Literal["cpu", "cuda", "auto"] = "auto",
+        device: DeviceSpecification = "auto",
         random_state: int | None | np.random.RandomState = None,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
@@ -154,10 +158,10 @@ class AutoTabPFNBase(BaseEstimator):
         DataFrame, using the provided `feature_names` or generating default names.
         Finally, it resolves the categorical feature indices to be used.
         """
-        self.device_ = infer_device_and_type(self.device)
+        self.device_ = infer_device(self.device)
         if self.n_ensemble_models < 1:
             raise ValueError(
-                f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}"
+                f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}",
             )
         if self.max_time is not None and self.max_time <= 0:
             raise ValueError("max_time must be a positive integer or None.")
@@ -234,6 +238,18 @@ class AutoTabPFNBase(BaseEstimator):
                 "ignore_pretraining_limits": self.ignore_pretraining_limits,
                 **self.get_task_args_(),
             }
+
+        def _add_ignore_constraints_inplace(config: dict[str, Any]) -> None:
+            """Add AutoGluon ag_args to bypass training constraints when requested."""
+            ag_args_fit = config.setdefault("ag_args_fit", {})
+            ag_args_fit["ignore_constraints"] = self.ignore_pretraining_limits
+
+        if isinstance(tabpfn_configs, list):
+            for cfg in tabpfn_configs:
+                _add_ignore_constraints_inplace(cfg)
+        else:
+            _add_ignore_constraints_inplace(tabpfn_configs)
+
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
         # Set GPU count
@@ -406,7 +422,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
         # Re-align predict_proba output to match self.classes_
         proba_df = self.predictor_.predict_proba(
-            pd.DataFrame(X, columns=self._column_names), as_pandas=True
+            pd.DataFrame(X, columns=self._column_names),
+            as_pandas=True,
         )
         original_cols = self.label_encoder_.inverse_transform(proba_df.columns)
         proba_df.columns = original_cols
