@@ -213,7 +213,7 @@ See our [Contribution Guide](CONTRIBUTING.md) for more details.
 
 This package includes **optional anonymous telemetry**.  It builds on the telemetry in the core [TabPFN](https://github.com/priorlabs/tabpfn) package:
 
-- ✅ No personal data is collected  
+- ✅ No personal data is collected without your explicit consent
 - ✅ No code, model inputs, or outputs are ever sent  
 - ✅ Data is strictly anonymous and cannot be linked to individuals  
 
