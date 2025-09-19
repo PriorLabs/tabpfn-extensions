@@ -90,6 +90,7 @@ from sklearn.utils.validation import (
     # _check_feature_names_in is used if X is validated by wrapper directly
     # but we aim to use the custom validate_data
 )
+from tabpfn_common_utils.telemetry import set_extension
 
 # Custom validate_data import
 from tabpfn_extensions.misc.sklearn_compat import validate_data
@@ -115,6 +116,7 @@ def _fit_and_predict_proba(
     raise AttributeError("Base estimator must implement the predict_proba method.")
 
 
+@set_extension("many_class")
 class ManyClassClassifier(BaseEstimator, ClassifierMixin):
     """Output-Code multiclass strategy to extend classifiers beyond their class limit.
 

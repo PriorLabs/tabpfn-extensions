@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pandas as pd
+from tabpfn_common_utils.telemetry import set_extension
 
 if TYPE_CHECKING:
     import numpy as np
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
     import tabpfn
 
 
+@set_extension("interpretability")
 def get_tabpfn_explainer(
     model: tabpfn.TabPFNRegressor | tabpfn.TabPFNClassifier,
     data: pd.DataFrame | np.ndarray,
@@ -91,6 +93,7 @@ def get_tabpfn_explainer(
     )
 
 
+@set_extension("interpretability")
 def get_tabpfn_imputation_explainer(
     model: tabpfn.TabPFNRegressor | tabpfn.TabPFNClassifier,
     data: pd.DataFrame | np.ndarray,
