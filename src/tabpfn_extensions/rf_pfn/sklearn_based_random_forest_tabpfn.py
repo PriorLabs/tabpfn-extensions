@@ -47,6 +47,7 @@ def softmax_numpy(logits: np.ndarray) -> np.ndarray:
     return exp_logits / sum_exp_logits  # Normalize to get probabilities
 
 
+@set_extension("rf_pfn")
 class RandomForestTabPFNBase:
     """Base Class for common functionalities."""
 
@@ -211,6 +212,7 @@ class RandomForestTabPFNBase:
         return self
 
 
+@set_extension("rf_pfn")
 class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifier):
     """RandomForestTabPFNClassifier implements Random Forest using TabPFN at leaf nodes.
 
@@ -389,7 +391,6 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
             adaptive_tree_skip_class_missing=self.adaptive_tree_skip_class_missing,
         )
 
-    @set_extension("rf_pfn")
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Predict class for X.
 
@@ -418,7 +419,6 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
         else:
             return np.argmax(proba, axis=1)
 
-    @set_extension("rf_pfn")
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """Predict class probabilities for X.
 
@@ -508,6 +508,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
         return all_proba
 
 
+@set_extension("rf_pfn")
 class RandomForestTabPFNRegressor(RandomForestTabPFNBase, RandomForestRegressor):
     """RandomForestTabPFNRegressor implements a Random Forest using TabPFN at leaf nodes.
 
@@ -659,7 +660,6 @@ class RandomForestTabPFNRegressor(RandomForestTabPFNBase, RandomForestRegressor)
             adaptive_tree_min_valid_samples_fraction_of_train=self.adaptive_tree_min_valid_samples_fraction_of_train,
         )
 
-    @set_extension("rf_pfn")
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Predict regression target for X.
 
