@@ -19,6 +19,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.utils import (
     DeviceSpecification,
@@ -278,6 +279,7 @@ class AutoTabPFNBase(BaseEstimator):
         return {"allow_nan": True, "non_deterministic": True}
 
 
+@set_extension("post_hoc_ensembles")
 class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN classifiers.
 
@@ -431,6 +433,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         return {"balance_probabilities": self.balance_probabilities}
 
 
+@set_extension("post_hoc_ensembles")
 class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN regressors.
 

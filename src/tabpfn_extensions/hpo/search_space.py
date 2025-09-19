@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from hyperopt import hp
+from tabpfn_common_utils.telemetry import set_extension
 
 
 def enumerate_preprocess_transforms():
@@ -55,6 +56,7 @@ def enumerate_preprocess_transforms():
     return transforms
 
 
+@set_extension("hpo")
 class TabPFNSearchSpace:
     """Utility class for creating and customizing TabPFN hyperparameter search spaces.
 
@@ -140,6 +142,7 @@ class TabPFNSearchSpace:
         return space
 
 
+@set_extension("hpo")
 def get_param_grid_hyperopt(task_type: str) -> dict:
     """Generate the full hyperopt search space for TabPFN optimization.
 
