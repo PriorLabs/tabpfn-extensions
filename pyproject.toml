@@ -92,7 +92,7 @@ dev = [
     # Lint/format
     "pre-commit>=3.0.0",
     # This must be the same version as in .github/workflows/pull_request.yaml.
-    "ruff==0.8.6",
+    "ruff==0.13.2",
     "mypy>=1.0.0",
     # Test
     "pytest>=8.0.0",
