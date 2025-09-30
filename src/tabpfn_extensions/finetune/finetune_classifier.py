@@ -257,7 +257,10 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                 cat_ixs,
                 confs,
             ) in progress_bar:
-                if len(np.unique(y_context_batch)) != len(np.unique(y_query_batch)):
+                
+                ctx = set(np.unique(y_context_batch))
+                qry = set(np.unique(y_query_batch))
+                if not qry.issubset(ctx):
                     continue
 
                 if (
@@ -294,11 +297,11 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
             roc_auc, log_loss_score = evaluate_model(
                 self.finetuned_classifier_,
                 eval_config,
-                X_train,
-                y_train,
-                X_val,
-                y_val,
-            )  # pyright: ignore[reportArgumentType]
+                X_train,  # pyright: ignore[reportArgumentType]
+                y_train,  # pyright: ignore[reportArgumentType]
+                X_val,    # pyright: ignore[reportArgumentType]
+                y_val,    # pyright: ignore[reportArgumentType]
+            )  
 
             logging.info(
                 f"📊 Epoch {epoch + 1} Evaluation | Val ROC: {roc_auc:.4f}, Val Log Loss: {log_loss_score:.4f}\n",
@@ -346,10 +349,10 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
             best_model_path.unlink(missing_ok=True)
 
         finetuned_inference_classifier = clone_model_for_evaluation(
-            self.finetuned_classifier_,
+            self.finetuned_classifier_, # type: ignore
             eval_config,
             TabPFNClassifier,
-        )  # type: ignore
+        )  
         self.finetuned_inference_classifier_ = finetuned_inference_classifier
         self.finetuned_inference_classifier_.fit_mode = "fit_preprocessors"  # type: ignore
         self.finetuned_inference_classifier_.fit(self.X_, self.y_)  # type: ignore
