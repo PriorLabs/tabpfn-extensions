@@ -14,7 +14,7 @@
 > #### 🧪 Experimental Code Notice
 > Please note that the extensions in this repository are experimental.
 > -   They are less rigorously tested than the core `tabpfn` library.
-> -   APIs are subject to change without notice in future releases.    
+> -   APIs are subject to change without notice in future releases.
 > We welcome your feedback and contributions to help improve and stabilize them!
 
 ## Interactive Notebook Tutorial
@@ -150,10 +150,16 @@ graph LR
 
         interpretability_check["Need<br/>Interpretability?"];
 
-        interpretability_check -- Yes --> shapley["Explain with<br/>SHAP"];
+        interpretability_check --> feature_selection["Feature Selection"];
+        interpretability_check --> partial_dependence["Partial Dependence Plots"];
+        interpretability_check --> shapley["Explain with<br/>SHAP"];
+        interpretability_check --> shap_iq["Explain with<br/>SHAP IQ"];
         interpretability_check -- No --> end_node;
 
+        feature_selection --> end_node;
+        partial_dependence --> end_node;
         shapley --> end_node;
+        shap_iq --> end_node;
 
     end
 
@@ -167,7 +173,7 @@ graph LR
 
     %% 4. APPLY STYLES
     class start,end_node start_node;
-    class local_version,api_client,imputation,data_gen,tabebm,density,embedding,api_backend_note,ts_features,rfpfn,subsample,many_class,finetuning,shapley,hpo,post_hoc,more_estimators process_node;
+    class local_version,api_client,imputation,data_gen,tabebm,density,embedding,api_backend_note,ts_features,rfpfn,subsample,many_class,finetuning,feature_selection,partial_dependence,shapley,shap_iq,hpo,post_hoc,more_estimators process_node;
     class gpu_check,task_type,unsupervised_type,data_check,model_choice,finetune_check,interpretability_check,performance_check decision_node;
     class tuning_complete process_node;
 
@@ -185,7 +191,10 @@ graph LR
     click rfpfn "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/rf_pfn/rf_pfn_example.py" "RF-PFN Example" _blank
     click many_class "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/many_class/many_class_classifier_example.py" "Many Class Example" _blank
     click finetuning "https://github.com/PriorLabs/TabPFN/blob/main/examples/finetune_classifier.py" "Finetuning Example" _blank
+    click feature_selection "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/interpretability/feature_selection.py" "Feature Selection Example" _blank
+    click partial_dependence "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/interpretability/pdp_example.py" "Partial Dependence Plots Example" _blank
     click shapley "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/interpretability/shap_example.py" "Shapley Values Example" _blank
+    click shap_iq "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/interpretability/shapiq_example.py" "SHAP IQ Example" _blank
     click post_hoc "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/phe/phe_example.py" "Post-Hoc Ensemble Example" _blank
     click hpo "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/hpo/tuned_tabpfn.py" "HPO Example" _blank
     click subsample "https://github.com/PriorLabs/tabpfn-extensions/blob/main/examples/large_datasets/large_datasets_example.py" "Large Datasets Example" _blank
