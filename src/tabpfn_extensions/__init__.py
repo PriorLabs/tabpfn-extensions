@@ -16,6 +16,7 @@ from .unsupervised import TabPFNUnsupervisedModel
 
 # Import utilities and wrapped TabPFN classes
 from .utils import TabPFNClassifier, TabPFNRegressor, is_tabpfn
+from tabpfn_common_utils.telemetry.interactive import opt_in
 
 __all__ = [
     "test_utils",
@@ -30,3 +31,6 @@ __all__ = [
     "TunedTabPFNClassifier",
     "TunedTabPFNRegressor",
 ]
+
+# Prompt the user to opt in for our newsletter
+opt_in()
