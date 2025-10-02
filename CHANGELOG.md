@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.6] - 2025-10-02
 
 ### Added
-- Allow users to opt in for our newsletter
+- Allow users to opt in for extended anonymous analytics and our newsletter
 
 ### Changed
 
