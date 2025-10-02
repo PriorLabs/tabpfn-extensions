@@ -49,6 +49,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 from tabpfn_extensions.misc.sklearn_compat import validate_data
@@ -56,6 +57,7 @@ from tabpfn_extensions.scoring.scoring_utils import (
     score_classification,
     score_regression,
 )
+from tabpfn_extensions.utils import DeviceSpecification
 
 # Import TabPFN models from extensions (which handles backend compatibility)
 try:
@@ -102,7 +104,7 @@ class TunedTabPFNBase(BaseEstimator):
         n_validation_size: float = 0.2,
         shuffle_data: bool = True,
         metric: MetricType = MetricType.ACCURACY,
-        device: str = "auto",
+        device: DeviceSpecification = "auto",
         random_state: int | None = None,
         categorical_feature_indices: list[int] | None = None,
         verbose: bool = True,
@@ -211,9 +213,9 @@ class TunedTabPFNBase(BaseEstimator):
             }
             model_params["inference_config"] = inference_config
             # Use device utility for automatic selection
-            from tabpfn_extensions.utils import infer_device_and_type
+            from tabpfn_extensions.utils import infer_device
 
-            model_params["device"] = infer_device_and_type(self.device)
+            model_params["device"] = infer_device(self.device)
             model_params["random_state"] = rng.randint(0, 2**31 - 1)
 
             # Handle model type selection
@@ -398,6 +400,7 @@ class TunedTabPFNBase(BaseEstimator):
         return tags
 
 
+@set_extension("hpo")
 class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
     """TabPFN Classifier with hyperparameter tuning and proper categorical handling."""
 
@@ -491,6 +494,7 @@ class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
         return self.best_model_.predict_proba(X)
 
 
+@set_extension("hpo")
 class TunedTabPFNRegressor(TunedTabPFNBase, RegressorMixin):
     """TabPFN Regressor with hyperparameter tuning and proper categorical handling."""
 

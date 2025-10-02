@@ -19,8 +19,13 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
+from tabpfn_common_utils.telemetry import set_extension
 
-from tabpfn_extensions.utils import infer_categorical_features, infer_device_and_type
+from tabpfn_extensions.utils import (
+    DeviceSpecification,
+    infer_categorical_features,
+    infer_device,
+)
 
 
 class TaskType(str, Enum):
@@ -49,7 +54,7 @@ class AutoTabPFNBase(BaseEstimator):
         The evaluation metric for AutoGluon to optimize. If `None`, a default metric
         is chosen based on the problem type (e.g., 'accuracy' for classification).
         For a full list of options, see the AutoGluon documentation.
-    presets : list[str] | str | None, default="best_quality"
+    presets : list[str] | str | None, default=None
         AutoGluon preset to control the quality-time trade-off.
     device : {"cpu", "cuda", "auto"}, default="auto"
         The device to use for training. "auto" will select "cuda" if available, otherwise "cpu".
@@ -97,8 +102,8 @@ class AutoTabPFNBase(BaseEstimator):
         *,
         max_time: int | None = 3600,
         eval_metric: str | None = None,
-        presets: list[str] | str | None = "best_quality",
-        device: Literal["cpu", "cuda", "auto"] = "auto",
+        presets: list[str] | str | None = None,
+        device: DeviceSpecification = "auto",
         random_state: int | None | np.random.RandomState = None,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
@@ -153,10 +158,10 @@ class AutoTabPFNBase(BaseEstimator):
         DataFrame, using the provided `feature_names` or generating default names.
         Finally, it resolves the categorical feature indices to be used.
         """
-        self.device_ = infer_device_and_type(self.device)
+        self.device_ = infer_device(self.device)
         if self.n_ensemble_models < 1:
             raise ValueError(
-                f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}"
+                f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}",
             )
         if self.max_time is not None and self.max_time <= 0:
             raise ValueError("max_time must be a positive integer or None.")
@@ -233,6 +238,18 @@ class AutoTabPFNBase(BaseEstimator):
                 "ignore_pretraining_limits": self.ignore_pretraining_limits,
                 **self.get_task_args_(),
             }
+
+        def _add_ignore_constraints_inplace(config: dict[str, Any]) -> None:
+            """Add AutoGluon ag_args to bypass training constraints when requested."""
+            ag_args_fit = config.setdefault("ag_args_fit", {})
+            ag_args_fit["ignore_constraints"] = self.ignore_pretraining_limits
+
+        if isinstance(tabpfn_configs, list):
+            for cfg in tabpfn_configs:
+                _add_ignore_constraints_inplace(cfg)
+        else:
+            _add_ignore_constraints_inplace(tabpfn_configs)
+
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
 
         # Set GPU count
@@ -262,6 +279,7 @@ class AutoTabPFNBase(BaseEstimator):
         return {"allow_nan": True, "non_deterministic": True}
 
 
+@set_extension("post_hoc_ensembles")
 class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN classifiers.
 
@@ -277,7 +295,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
         Metric for AutoGluon to optimize. Defaults to 'accuracy'.
-    presets : list[str] | str | None, default="best_quality"
+    presets : list[str] | str | None, default=None
         AutoGluon preset to control the quality-time trade-off.
     device : {"cpu", "cuda", "auto"}, default="auto"
         Device for training. "auto" selects "cuda" if available.
@@ -319,7 +337,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         *,
         max_time: int | None = 3600,
         eval_metric: str | None = None,
-        presets: list[str] | str | None = "best_quality",
+        presets: list[str] | str | None = None,
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
         phe_init_args: dict | None = None,
@@ -404,7 +422,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
         # Re-align predict_proba output to match self.classes_
         proba_df = self.predictor_.predict_proba(
-            pd.DataFrame(X, columns=self._column_names), as_pandas=True
+            pd.DataFrame(X, columns=self._column_names),
+            as_pandas=True,
         )
         original_cols = self.label_encoder_.inverse_transform(proba_df.columns)
         proba_df.columns = original_cols
@@ -414,6 +433,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         return {"balance_probabilities": self.balance_probabilities}
 
 
+@set_extension("post_hoc_ensembles")
 class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN regressors.
 
@@ -429,7 +449,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         Maximum time in seconds to train the ensemble.
     eval_metric : str | None, default=None
         Metric for AutoGluon to optimize. Defaults to 'root_mean_squared_error'.
-    presets : list[str] | str | None, default="best_quality"
+    presets : list[str] | str | None, default=None
         AutoGluon preset to control the quality-time trade-off.
     device : {"cpu", "cuda", "auto"}, default="auto"
         Device for training. "auto" selects "cuda" if available.
@@ -466,7 +486,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         *,
         max_time: int | None = 3600,
         eval_metric: str | None = None,
-        presets: list[str] | str | None = "best_quality",
+        presets: list[str] | str | None = None,
         device: Literal["cpu", "cuda", "auto"] = "auto",
         random_state: int | None | np.random.RandomState = None,
         phe_init_args: dict | None = None,
