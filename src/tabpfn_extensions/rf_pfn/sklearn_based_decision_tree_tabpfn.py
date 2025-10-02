@@ -14,6 +14,7 @@ import torch
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
+
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -27,6 +28,7 @@ from sklearn.utils.validation import (
     _check_sample_weight,
     check_is_fitted,
 )
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 from tabpfn_extensions.scoring.scoring_utils import (
@@ -40,6 +42,7 @@ from tabpfn_extensions.utils import softmax
 ###############################################################################
 
 
+@set_extension("rf_pfn")
 class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
     """Abstract base class combining a scikit-learn Decision Tree with TabPFN at the leaves.
 
@@ -1096,6 +1099,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
 ###############################################################################
 
 
+@set_extension("rf_pfn")
 class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
     """Decision tree that uses TabPFNClassifier at the leaves."""
 
@@ -1239,6 +1243,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
 ###############################################################################
 
 
+@set_extension("rf_pfn")
 class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
     """Decision tree that uses TabPFNRegressor at the leaves."""
 

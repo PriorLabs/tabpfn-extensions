@@ -6,6 +6,7 @@ except PackageNotFoundError:
     __version__ = "0.1.0.dev0"
 
 # Create alias for test_utils
+# Import third party extensions
 from . import test_utils
 from .embedding import TabPFNEmbedding
 from .hpo import TunedTabPFNClassifier, TunedTabPFNRegressor

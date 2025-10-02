@@ -49,6 +49,7 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.base import BaseEstimator
+from tabpfn_common_utils.telemetry import set_extension
 from tqdm import tqdm
 
 # Import TabPFN models from extensions (which handles backend compatibility)
@@ -532,6 +533,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         return model, X_predict, y_predict
 
+    @set_extension("unsupervised:impute")
     def impute(
         self,
         X: torch.Tensor | np.ndarray | pd.DataFrame,
@@ -695,6 +697,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         self.X_ = X_store
         return pmf
 
+    @set_extension("unsupervised:outliers")
     def outliers(
         self,
         X: torch.Tensor | np.ndarray | pd.DataFrame,
@@ -767,6 +770,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         densities_tensor = torch.stack(densities_clean)
         return densities_tensor.mean(dim=0)
 
+    @set_extension("unsupervised:synthetic")
     def generate_synthetic_data(
         self,
         n_samples: int = 100,
@@ -826,6 +830,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             fast_mode=fast_mode,
         )
 
+    @set_extension("unsupervised:embeddings")
     def get_embeddings(self, X: torch.tensor, per_column: bool = False) -> torch.tensor:
         """Get the transformer embeddings for the test data X.
 

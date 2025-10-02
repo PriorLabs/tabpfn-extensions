@@ -49,6 +49,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 from tabpfn_extensions.misc.sklearn_compat import validate_data
@@ -399,6 +400,7 @@ class TunedTabPFNBase(BaseEstimator):
         return tags
 
 
+@set_extension("hpo")
 class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
     """TabPFN Classifier with hyperparameter tuning and proper categorical handling."""
 
@@ -492,6 +494,7 @@ class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
         return self.best_model_.predict_proba(X)
 
 
+@set_extension("hpo")
 class TunedTabPFNRegressor(TunedTabPFNBase, RegressorMixin):
     """TabPFN Regressor with hyperparameter tuning and proper categorical handling."""
 
