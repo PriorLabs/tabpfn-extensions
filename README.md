@@ -243,6 +243,21 @@ This data is processed in compliance with the **General Data Protection Regulati
 
 For more details, please see our [Privacy Policy](https://priorlabs.ai/privacy_policy/).
 
+### Additional opt-in features
+
+In addition to the default anonymous telemetry, you can **optionally** enable:
+
+#### 📈 Extended Anonymous Analytics
+Helps us understand common usage patterns across multiple calls.  
+  - Still strictly anonymous  
+  - Never includes data, inputs, or outputs  
+  - Cannot be linked to an individual user  
+
+#### 📰 Newsletter  
+Stay informed about product updates, scientific advances, and community news.  
+  - Requires explicit opt-in  
+  - Your email is only used for the newsletter and never shared  
+
 ### How to opt out
 If you prefer not to send telemetry, you can disable it by setting the following environment variable:
 
