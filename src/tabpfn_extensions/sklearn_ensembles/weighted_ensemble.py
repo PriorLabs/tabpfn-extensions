@@ -6,8 +6,10 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.ensemble import VotingClassifier
 from sklearn.model_selection import cross_val_score
+from tabpfn_common_utils.telemetry import set_extension
 
 
+@set_extension("sklearn_ensembles")
 class WeightedAverageEnsemble(BaseEstimator, ClassifierMixin):
     def __init__(self, estimators, weight_threshold=0.0, cv=5, n_max=None):
         self.estimators = estimators
