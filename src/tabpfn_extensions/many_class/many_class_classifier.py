@@ -99,12 +99,6 @@ from tabpfn_extensions.misc.sklearn_compat import validate_data
 logger = logging.getLogger(__name__)
 
 
-CODEBOOK_DEFAULT_RETRIES = 3
-CODEBOOK_DEFAULT_MIN_HAMMING_FRAC = 0.30
-CODEBOOK_DEFAULT_SELECTION = "max_min_hamming"
-CODEBOOK_HAMMING_MAX_CLASSES = 200
-
-
 # Helper function: Fits a clone of the estimator on a specific sub-problem's
 # training data. This follows the original design where fitting happens during
 # prediction calls.
@@ -213,6 +207,10 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
     """
 
     _required_parameters: ClassVar[list[str]] = ["estimator"]
+    CODEBOOK_MAX_ATTEMPTS: ClassVar[int] = 3
+    CODEBOOK_MIN_DIST_FRACTION: ClassVar[float] = 0.25
+    CODEBOOK_DEFAULT_SELECTION: ClassVar[str] = "max_min_hamming"
+    CODEBOOK_HAMMING_MAX_CLASSES: ClassVar[int] = 200
 
     def __init__(
         self,
@@ -225,10 +223,10 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         random_state: int | None = None,
         verbose: int = 0,
         log_proba_aggregation: bool = True,
-        codebook_retries: int = CODEBOOK_DEFAULT_RETRIES,
-        codebook_min_hamming_frac: float = CODEBOOK_DEFAULT_MIN_HAMMING_FRAC,
-        codebook_selection: Literal["max_min_hamming"] = CODEBOOK_DEFAULT_SELECTION,
-        codebook_hamming_max_classes: int = CODEBOOK_HAMMING_MAX_CLASSES,
+        codebook_retries: int | None = None,
+        codebook_min_hamming_frac: float | None = None,
+        codebook_selection: Literal["max_min_hamming"] | None = None,
+        codebook_hamming_max_classes: int | None = None,
     ):
         self.estimator = estimator
         self.random_state = random_state
@@ -239,18 +237,34 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         self.verbose = verbose
         self.log_proba_aggregation = log_proba_aggregation
         self.fit_params_: dict[str, Any] | None = None
-        if codebook_retries < 1:
+        retries = self.CODEBOOK_MAX_ATTEMPTS if codebook_retries is None else codebook_retries
+        min_frac = (
+            self.CODEBOOK_MIN_DIST_FRACTION
+            if codebook_min_hamming_frac is None
+            else codebook_min_hamming_frac
+        )
+        selection = (
+            self.CODEBOOK_DEFAULT_SELECTION
+            if codebook_selection is None
+            else codebook_selection
+        )
+        max_classes = (
+            self.CODEBOOK_HAMMING_MAX_CLASSES
+            if codebook_hamming_max_classes is None
+            else codebook_hamming_max_classes
+        )
+        if retries < 1:
             raise ValueError("codebook_retries must be at least 1.")
-        if codebook_min_hamming_frac < 0.0:
-            raise ValueError("codebook_min_hamming_frac must be non-negative.")
-        if codebook_hamming_max_classes < 0:
+        if not 0.0 <= min_frac <= 1.0:
+            raise ValueError("codebook_min_hamming_frac must be in [0, 1].")
+        if max_classes < 0:
             raise ValueError("codebook_hamming_max_classes must be non-negative.")
-        if codebook_selection != "max_min_hamming":
+        if selection != "max_min_hamming":
             raise ValueError("Unsupported codebook_selection criterion.")
-        self.codebook_retries = int(codebook_retries)
-        self.codebook_min_hamming_frac = float(codebook_min_hamming_frac)
-        self.codebook_selection = codebook_selection
-        self.codebook_hamming_max_classes = int(codebook_hamming_max_classes)
+        self.codebook_retries = int(retries)
+        self.codebook_min_hamming_frac = float(min_frac)
+        self.codebook_selection = selection
+        self.codebook_hamming_max_classes = int(max_classes)
 
     def _set_verbosity(self) -> None:
         """Configure the module-level logger according to the estimator verbosity."""
