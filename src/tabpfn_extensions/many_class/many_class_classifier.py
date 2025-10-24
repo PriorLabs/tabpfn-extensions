@@ -81,6 +81,7 @@ import numpy as np
 import tqdm  # For pairwise combinations
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.utils import check_random_state
+from sklearn.utils._tags import ClassifierTags
 
 # Imports as specified by the user
 from sklearn.utils.multiclass import unique_labels
@@ -119,21 +120,35 @@ def _fit_and_predict_proba(
     X_pred: np.ndarray,  # Data to predict on
     *,
     categorical_features: list[int] | None = None,
+    fit_params: dict[str, Any] | None = None,
+    alphabet_size: int,
 ) -> np.ndarray:
     """Fit a cloned base estimator on sub-problem data and predict probabilities."""
+
     cloned_estimator = clone(estimator)
     _apply_categorical_features_to_estimator(cloned_estimator, categorical_features)
-    # Base estimator's fit method will handle X_train validation
-    cloned_estimator.fit(X_train, Y_train_subproblem)
 
-    if hasattr(cloned_estimator, "predict_proba"):
-        # Base estimator's predict_proba will handle X_pred validation
-        return cloned_estimator.predict_proba(X_pred)
-    raise AttributeError("Base estimator must implement the predict_proba method.")
+    fit_kwargs: dict[str, Any] = fit_params.copy() if fit_params else {}
+    cloned_estimator.fit(X_train, Y_train_subproblem, **fit_kwargs)
+
+    if not hasattr(cloned_estimator, "predict_proba"):
+        raise AttributeError("Base estimator must implement the predict_proba method.")
+
+    proba = cloned_estimator.predict_proba(X_pred)
+    classes_seen = getattr(cloned_estimator, "classes_", None)
+    if classes_seen is None:
+        raise AttributeError(
+            "Base estimator must expose `classes_` after fitting to align probabilities."
+        )
+
+    full_proba = np.zeros((proba.shape[0], alphabet_size), dtype=np.float64)
+    indices = np.asarray(classes_seen, dtype=int)
+    full_proba[:, indices] = proba
+    return full_proba
 
 
 @set_extension("many_class")
-class ManyClassClassifier(ClassifierMixin, BaseEstimator):
+class ManyClassClassifier(BaseEstimator, ClassifierMixin):
     """Output-Code multiclass strategy to extend classifiers beyond their class limit.
 
     This version adheres closely to an original structural design, with key
@@ -207,6 +222,7 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         self.n_estimators_redundancy = n_estimators_redundancy
         self.verbose = verbose
         self.log_proba_aggregation = log_proba_aggregation
+        self.fit_params_: dict[str, Any] | None = None
 
     def _get_alphabet_size(self) -> int:
         """Helper to get alphabet_size, inferring if necessary."""
@@ -302,11 +318,14 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             "alphabet_size": alphabet_size,
         }
         if n_classes > 1:
-            min_dist = n_estimators
-            for j1, j2 in itertools.combinations(range(n_classes), 2):
-                dist = np.sum(codebook[:, j1] != codebook[:, j2])
-                min_dist = min(min_dist, dist)
-            stats["min_pairwise_hamming_dist"] = int(min_dist)
+            if n_classes <= 200:
+                min_dist = n_estimators
+                for j1, j2 in itertools.combinations(range(n_classes), 2):
+                    dist = np.sum(codebook[:, j1] != codebook[:, j2])
+                    min_dist = min(min_dist, dist)
+                stats["min_pairwise_hamming_dist"] = int(min_dist)
+            else:
+                stats["min_pairwise_hamming_dist"] = None
 
         if self.verbose > 0:
             print("[ManyClassClassifier] Codebook statistics:")
@@ -339,6 +358,7 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         n_classes = len(self.classes_)
 
         alphabet_size = self._get_alphabet_size()
+        self.alphabet_size_ = alphabet_size
         self.no_mapping_needed_ = n_classes <= alphabet_size
         self.codebook_stats_ = {}
         self.estimators_ = None
@@ -346,6 +366,7 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         self.classes_index_ = None
         self.X_train = None
         self.Y_train_per_estimator = None
+        self.fit_params_ = fit_params.copy() if fit_params else {}
 
         if n_classes == 0:
             raise ValueError("Cannot fit with no classes present.")
@@ -434,9 +455,11 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                     self.Y_train_per_estimator[i, :],
                     X,  # Pass validated X to predict on
                     categorical_features=categorical_features,
+                    fit_params=self.fit_params_,
+                    alphabet_size=self.alphabet_size_,
                 )
             )
-        Y_pred_probas_arr = np.array(Y_pred_probas_list, dtype=np.float64)
+        Y_pred_probas_arr = np.stack(Y_pred_probas_list, axis=0)
 
         _n_estimators, n_samples, current_alphabet_size = Y_pred_probas_arr.shape
         if n_samples == 0:
@@ -448,18 +471,28 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             Y_pred_probas_arr = np.log(np.clip(Y_pred_probas_arr, 1e-12, 1.0))
             aggregated_scores = np.zeros((n_samples, n_orig_classes))
             for i in range(_n_estimators):
-                aggregated_scores += Y_pred_probas_arr[i, :, self.code_book_[i]].T
+                row_codes = self.code_book_[i]
+                contributions = np.take_along_axis(
+                    Y_pred_probas_arr[i], row_codes[None, :], axis=1
+                )
+                aggregated_scores += contributions
             aggregated_scores -= aggregated_scores.max(axis=1, keepdims=True)
             exp_scores = np.exp(aggregated_scores)
             exp_scores_sum = exp_scores.sum(axis=1, keepdims=True)
-            exp_scores /= np.where(exp_scores_sum == 0, 1.0, exp_scores_sum)
-            return exp_scores
+            normalizer = np.clip(exp_scores_sum, 1.0, None)
+            probas = exp_scores / normalizer
+            zero_mask = exp_scores_sum.squeeze() == 0
+            if np.any(zero_mask):
+                probas[zero_mask] = 1.0 / n_orig_classes
+            return probas
 
         raw_probabilities = np.zeros((n_samples, n_orig_classes))
         counts = np.zeros(n_orig_classes, dtype=float)
         for i in range(_n_estimators):
             row_codes = self.code_book_[i]
-            contributions = Y_pred_probas_arr[i, :, row_codes].T
+            contributions = np.take_along_axis(
+                Y_pred_probas_arr[i], row_codes[None, :], axis=1
+            )
             mask = row_codes != rest_class_code
             if np.any(mask):
                 raw_probabilities[:, mask] += contributions[:, mask]
@@ -475,9 +508,11 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 stacklevel=2,
             )
         prob_sum = np.sum(averages, axis=1, keepdims=True)
-        safe_sum = np.where(prob_sum == 0, 1.0, prob_sum)
+        safe_sum = np.clip(prob_sum, 1.0, None)
         averages /= safe_sum
-        averages[prob_sum.squeeze() == 0] = 1.0 / n_orig_classes
+        zero_mask = prob_sum.squeeze() == 0
+        if np.any(zero_mask):
+            averages[zero_mask] = 1.0 / n_orig_classes
 
         return averages
 
@@ -518,10 +553,16 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             )
 
     def __sklearn_tags__(self):
-        tags = super().__sklearn_tags__()
+        tags = BaseEstimator.__sklearn_tags__(self)
+        tags.estimator_type = "classifier"
+        tags.classifier_tags = ClassifierTags()
+        tags.target_tags.required = True
         if hasattr(tags, "input_tags"):
             tags.input_tags.allow_nan = True
         return tags
+
+    def _more_tags(self):
+        return {"allow_nan": True}
 
     @property
     def codebook_statistics_(self):

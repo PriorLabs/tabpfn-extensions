@@ -11,6 +11,7 @@ import logging
 
 import numpy as np
 import pytest
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import make_blobs
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
@@ -163,6 +164,50 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
 
         assert wrapped_accuracy >= 0.8
         assert wrapped_accuracy >= base_accuracy - 0.05
+
+    def test_sample_weight_is_forwarded_to_sub_estimators(self):
+        """Ensure fit_params (like sample_weight) reach every cloned estimator."""
+
+        fit_records: list[np.ndarray | None] = []
+
+        class RecordingEstimator(BaseEstimator, ClassifierMixin):
+            def fit(self, X, y, sample_weight=None):
+                if sample_weight is not None:
+                    fit_records.append(np.asarray(sample_weight).copy())
+                else:
+                    fit_records.append(None)
+                self.classes_ = np.unique(y)
+                return self
+
+            def predict(self, X):
+                return np.full(X.shape[0], self.classes_[0], dtype=self.classes_.dtype)
+
+            def predict_proba(self, X):
+                n_samples = X.shape[0]
+                proba = np.full((n_samples, len(self.classes_)), 1.0 / len(self.classes_))
+                return proba
+
+        base_estimator = RecordingEstimator()
+        wrapper = ManyClassClassifier(
+            estimator=base_estimator,
+            alphabet_size=3,
+            n_estimators=6,
+            random_state=0,
+        )
+
+        rng = np.random.RandomState(0)
+        X = rng.randn(30, 2)
+        y = rng.randint(0, 5, size=30)
+        sample_weight = rng.rand(30)
+
+        wrapper.fit(X, y, sample_weight=sample_weight)
+        wrapper.predict_proba(X[:5])
+
+        n_estimators_used = wrapper.code_book_.shape[0]
+        assert len(fit_records) == n_estimators_used
+        for recorded in fit_records:
+            assert recorded is not None
+            np.testing.assert_allclose(recorded, sample_weight)
 
     @pytest.mark.skip(reason="DecisionTreeTabPFN doesn't fully support text features")
     def test_with_text_features(self, estimator, dataset_generator):
