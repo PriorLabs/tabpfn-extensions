@@ -484,8 +484,6 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             self.code_book_, self.codebook_stats_ = generator(
                 n_classes, n_est, alphabet_size, random_state_instance
             )
-            if self.codebook_strategy == "balanced_cluster":
-                self.log_proba_aggregation = True
             self.classes_index_ = {c: i for i, c in enumerate(self.classes_)}
             self.X_train = X  # Store validated X
             y_indices = np.array([self.classes_index_[val] for val in y])
@@ -550,7 +548,11 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         rest_class_code = codebook_stats.get("rest_class_code")
         if has_rest_symbol and rest_class_code is None:
             rest_class_code = current_alphabet_size - 1
-        if self.log_proba_aggregation:
+        use_log_agg = (
+            True if not has_rest_symbol else bool(self.log_proba_aggregation)
+        )
+
+        if use_log_agg:
             Y_pred_probas_arr = np.log(np.clip(Y_pred_probas_arr, 1e-12, 1.0))
             aggregated_scores = np.zeros((n_samples, n_orig_classes))
             for i in range(_n_estimators):
