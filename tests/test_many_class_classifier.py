@@ -11,6 +11,8 @@ import logging
 
 import numpy as np
 import pytest
+from sklearn.datasets import make_blobs
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
@@ -122,6 +124,45 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
             assert hasattr(estimator, "n_features_in_")
             assert estimator.n_features_in_ == X.shape[1]
         print("Large number of classes test completed.")
+
+    def test_wrapper_retains_base_performance_on_sparse_multi_class_problem(self):
+        """Check that the wrapper matches a strong base estimator on a sparse dataset.
+
+        We mimic a 2-class-limited base model by using an alphabet of size 2 on a
+        10-class problem with very few samples per class. The wrapper should come
+        close to the base estimator's accuracy despite the heavy output coding.
+        """
+
+        X, y = make_blobs(
+            n_samples=60,
+            centers=10,
+            cluster_std=0.3,
+            random_state=0,
+        )
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size=0.5,
+            random_state=0,
+            stratify=y,
+        )
+
+        base_estimator = LogisticRegression(max_iter=200)
+        base_estimator.fit(X_train, y_train)
+        base_accuracy = accuracy_score(y_test, base_estimator.predict(X_test))
+
+        wrapped = ManyClassClassifier(
+            estimator=LogisticRegression(max_iter=200),
+            alphabet_size=2,
+            n_estimators=20,
+            random_state=0,
+            log_proba_aggregation=True,
+        )
+        wrapped.fit(X_train, y_train)
+        wrapped_accuracy = accuracy_score(y_test, wrapped.predict(X_test))
+
+        assert wrapped_accuracy >= 0.8
+        assert wrapped_accuracy >= base_accuracy - 0.05
 
     @pytest.mark.skip(reason="DecisionTreeTabPFN doesn't fully support text features")
     def test_with_text_features(self, estimator, dataset_generator):

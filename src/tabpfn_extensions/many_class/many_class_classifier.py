@@ -99,14 +99,30 @@ from tabpfn_extensions.misc.sklearn_compat import validate_data
 # Helper function: Fits a clone of the estimator on a specific sub-problem's
 # training data. This follows the original design where fitting happens during
 # prediction calls.
+def _apply_categorical_features_to_estimator(
+    estimator: BaseEstimator, categorical_features: list[int] | None
+) -> None:
+    """Apply stored categorical feature metadata to an estimator clone."""
+
+    if categorical_features is None:
+        return
+    if hasattr(estimator, "set_categorical_features"):
+        estimator.set_categorical_features(categorical_features)
+    elif hasattr(estimator, "categorical_features"):
+        estimator.categorical_features = categorical_features
+
+
 def _fit_and_predict_proba(
     estimator: BaseEstimator,
     X_train: np.ndarray,
     Y_train_subproblem: np.ndarray,  # Encoded labels for one sub-problem
     X_pred: np.ndarray,  # Data to predict on
+    *,
+    categorical_features: list[int] | None = None,
 ) -> np.ndarray:
     """Fit a cloned base estimator on sub-problem data and predict probabilities."""
     cloned_estimator = clone(estimator)
+    _apply_categorical_features_to_estimator(cloned_estimator, categorical_features)
     # Base estimator's fit method will handle X_train validation
     cloned_estimator.fit(X_train, Y_train_subproblem)
 
@@ -117,7 +133,7 @@ def _fit_and_predict_proba(
 
 
 @set_extension("many_class")
-class ManyClassClassifier(BaseEstimator, ClassifierMixin):
+class ManyClassClassifier(ClassifierMixin, BaseEstimator):
     """Output-Code multiclass strategy to extend classifiers beyond their class limit.
 
     This version adheres closely to an original structural design, with key
@@ -138,6 +154,10 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             for codebook generation.
         verbose (int): Controls verbosity. If > 0, prints codebook stats.
             Defaults to 0.
+        log_proba_aggregation (bool): If True (default), aggregates sub-problem
+            predictions using log-likelihood decoding across the full codebook.
+            When False, falls back to the legacy averaging strategy that ignores
+            the "rest" bucket.
 
     Attributes:
         classes_ (np.ndarray): Unique target labels.
@@ -152,6 +172,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
                                         Shape (n_estimators, n_samples).
         n_features_in_ (int): Number of features seen during `fit`.
         feature_names_in_ (np.ndarray | None): Names of features seen during `fit`.
+        log_proba_aggregation (bool): Strategy flag controlling probability aggregation.
 
     Examples:
         >>> from sklearn.datasets import load_iris
@@ -177,6 +198,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         n_estimators_redundancy: int = 4,
         random_state: int | None = None,
         verbose: int = 0,
+        log_proba_aggregation: bool = True,
     ):
         self.estimator = estimator
         self.random_state = random_state
@@ -184,6 +206,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         self.n_estimators = n_estimators
         self.n_estimators_redundancy = n_estimators_redundancy
         self.verbose = verbose
+        self.log_proba_aggregation = log_proba_aggregation
 
     def _get_alphabet_size(self) -> int:
         """Helper to get alphabet_size, inferring if necessary."""
@@ -286,8 +309,9 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             stats["min_pairwise_hamming_dist"] = int(min_dist)
 
         if self.verbose > 0:
+            print("[ManyClassClassifier] Codebook statistics:")
             for key, value in stats.items():
-                pass
+                print(f"  - {key}: {value}")
         return codebook, stats
 
     def fit(self, X, y, **fit_params) -> ManyClassClassifier:
@@ -305,7 +329,10 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         )
         # After validate_data, set feature_names_in_ if X is a DataFrame
         if hasattr(X, "columns"):
-            self.feature_names_in_ = list(X.columns)
+            self.feature_names_in_ = np.asarray(X.columns, dtype=object)
+        elif hasattr(self, "feature_names_in_"):
+            del self.feature_names_in_
+        self.n_features_in_ = X.shape[1]
 
         random_state_instance = check_random_state(self.random_state)
         self.classes_ = unique_labels(y)  # Use unique_labels as imported
@@ -327,6 +354,9 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             if self.verbose > 0:
                 pass
             cloned_estimator = clone(self.estimator)
+            _apply_categorical_features_to_estimator(
+                cloned_estimator, getattr(self, "categorical_features", None)
+            )
             cloned_estimator.fit(X, y, **fit_params)
             self.estimators_ = [cloned_estimator]
             self.code_book_ = np.zeros((1, 1), dtype=int)
@@ -339,6 +369,9 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
         if self.no_mapping_needed_:
             cloned_estimator = clone(self.estimator)
+            _apply_categorical_features_to_estimator(
+                cloned_estimator, getattr(self, "categorical_features", None)
+            )
             # Base estimator fits on X_validated (already processed by custom validate_data)
             cloned_estimator.fit(X, y, **fit_params)
             self.estimators_ = [cloned_estimator]
@@ -389,15 +422,20 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
                 "Fit method did not properly initialize for mapping. Call fit first."
             )
 
-        Y_pred_probas_list = [
-            _fit_and_predict_proba(
-                self.estimator,
-                self.X_train,  # This is X_validated from fit
-                self.Y_train_per_estimator[i, :],
-                X,  # Pass validated X to predict on
+        iterator = range(self.code_book_.shape[0])
+        iterable = tqdm.tqdm(iterator, disable=(self.verbose <= 0))
+        Y_pred_probas_list = []
+        categorical_features = getattr(self, "categorical_features", None)
+        for i in iterable:
+            Y_pred_probas_list.append(
+                _fit_and_predict_proba(
+                    self.estimator,
+                    self.X_train,  # This is X_validated from fit
+                    self.Y_train_per_estimator[i, :],
+                    X,  # Pass validated X to predict on
+                    categorical_features=categorical_features,
+                )
             )
-            for i in tqdm.tqdm(range(self.code_book_.shape[0]))
-        ]
         Y_pred_probas_arr = np.array(Y_pred_probas_list, dtype=np.float64)
 
         _n_estimators, n_samples, current_alphabet_size = Y_pred_probas_arr.shape
@@ -405,38 +443,43 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             return np.zeros((0, len(self.classes_)))
 
         n_orig_classes = len(self.classes_)
-        rest_class_code = self._get_alphabet_size() - 1
+        rest_class_code = current_alphabet_size - 1
+        if self.log_proba_aggregation:
+            Y_pred_probas_arr = np.log(np.clip(Y_pred_probas_arr, 1e-12, 1.0))
+            aggregated_scores = np.zeros((n_samples, n_orig_classes))
+            for i in range(_n_estimators):
+                aggregated_scores += Y_pred_probas_arr[i, :, self.code_book_[i]].T
+            aggregated_scores -= aggregated_scores.max(axis=1, keepdims=True)
+            exp_scores = np.exp(aggregated_scores)
+            exp_scores_sum = exp_scores.sum(axis=1, keepdims=True)
+            exp_scores /= np.where(exp_scores_sum == 0, 1.0, exp_scores_sum)
+            return exp_scores
 
         raw_probabilities = np.zeros((n_samples, n_orig_classes))
         counts = np.zeros(n_orig_classes, dtype=float)
         for i in range(_n_estimators):
-            for j_orig_class_idx in range(n_orig_classes):
-                code_assigned = self.code_book_[i, j_orig_class_idx]
-                if code_assigned != rest_class_code:
-                    raw_probabilities[:, j_orig_class_idx] += Y_pred_probas_arr[
-                        i, :, code_assigned
-                    ]
-                    counts[j_orig_class_idx] += 1
+            row_codes = self.code_book_[i]
+            contributions = Y_pred_probas_arr[i, :, row_codes].T
+            mask = row_codes != rest_class_code
+            if np.any(mask):
+                raw_probabilities[:, mask] += contributions[:, mask]
+                counts[mask] += 1
 
-        valid_counts_mask = counts > 0
-        final_probabilities = np.zeros_like(raw_probabilities)
-        if np.any(valid_counts_mask):
-            final_probabilities[:, valid_counts_mask] = (
-                raw_probabilities[:, valid_counts_mask] / counts[valid_counts_mask]
-            )
-        if not np.all(valid_counts_mask) and self.verbose > 0:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            averages = raw_probabilities / np.where(counts == 0, 1.0, counts)
+        averages[:, counts == 0] = 0.0
+        if not np.all(counts > 0) and self.verbose > 0:
             warnings.warn(
                 "Some classes had zero specific code assignments during aggregation.",
                 RuntimeWarning,
                 stacklevel=2,
             )
-
-        prob_sum = np.sum(final_probabilities, axis=1, keepdims=True)
+        prob_sum = np.sum(averages, axis=1, keepdims=True)
         safe_sum = np.where(prob_sum == 0, 1.0, prob_sum)
-        final_probabilities /= safe_sum
-        final_probabilities[prob_sum.squeeze() == 0] = 1.0 / n_orig_classes
+        averages /= safe_sum
+        averages[prob_sum.squeeze() == 0] = 1.0 / n_orig_classes
 
-        return final_probabilities
+        return averages
 
     def predict(self, X) -> np.ndarray:
         """Predict multi-class targets for X."""
@@ -462,26 +505,22 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
     def set_categorical_features(self, categorical_features: list[int]) -> None:
         """Attempts to set categorical features on the base estimator."""
         self.categorical_features = categorical_features
-        if hasattr(self.estimator, "set_categorical_features"):
-            self.estimator.set_categorical_features(categorical_features)
-        elif hasattr(self.estimator, "categorical_features"):
-            self.estimator.categorical_features = categorical_features
-        elif self.verbose > 0:
+        _apply_categorical_features_to_estimator(self.estimator, categorical_features)
+        if (
+            not hasattr(self.estimator, "set_categorical_features")
+            and not hasattr(self.estimator, "categorical_features")
+            and self.verbose > 0
+        ):
             warnings.warn(
                 "Base estimator has no known categorical feature support.",
                 UserWarning,
                 stacklevel=2,
             )
 
-    def _more_tags(self) -> dict[str, Any]:
-        return {
-            "allow_nan": True,
-        }
-
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
-        tags.input_tags.allow_nan = True
-        tags.estimator_type = "classifier"
+        if hasattr(tags, "input_tags"):
+            tags.input_tags.allow_nan = True
         return tags
 
     @property
@@ -490,4 +529,4 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         check_is_fitted(self, ["classes_"])  # Minimal check
         if self.no_mapping_needed_:
             return {"message": "No codebook mapping was needed."}
-        return getattr(self, "codebook_stats_", {})
+        return dict(getattr(self, "codebook_stats_", {}))
