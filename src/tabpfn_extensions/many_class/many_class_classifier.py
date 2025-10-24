@@ -78,11 +78,10 @@ import warnings
 from typing import Any, ClassVar
 
 import numpy as np
-import tqdm  # For pairwise combinations
+import tqdm  # Progress bar for sub-estimator fits
 from scipy.spatial.distance import pdist
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.utils import check_random_state
-from sklearn.utils._tags import ClassifierTags
 
 # Imports as specified by the user
 from sklearn.utils.multiclass import unique_labels
@@ -149,7 +148,7 @@ def _fit_and_predict_proba(
 
 
 @set_extension("many_class")
-class ManyClassClassifier(BaseEstimator, ClassifierMixin):
+class ManyClassClassifier(ClassifierMixin, BaseEstimator):
     """Output-Code multiclass strategy to extend classifiers beyond their class limit.
 
     This version adheres closely to an original structural design, with key
@@ -270,7 +269,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             * 2
         )
 
-    def _generate_codebook_balanced(
+    def _generate_codebook_balanced_cluster(
         self,
         n_classes: int,
         n_estimators: int,
@@ -317,10 +316,12 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             "rest_class_code": None,
         }
 
-        if n_classes > 1 and n_classes < 200:
+        if 1 < n_classes < 200:
             distances = pdist(codebook.T, metric="hamming") * n_estimators
             if distances.size > 0:
                 stats["min_pairwise_hamming_dist"] = int(np.rint(np.min(distances)))
+        else:
+            stats["min_pairwise_hamming_dist"] = None
         if self.verbose > 0:
             logger.info(
                 "[ManyClassClassifier] Codebook statistics (balanced_cluster): %s",
@@ -386,10 +387,12 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             "rest_class_code": rest_class_code,
         }
 
-        if n_classes > 1 and n_classes < 200:
+        if 1 < n_classes < 200:
             distances = pdist(codebook.T, metric="hamming") * n_estimators
             if distances.size > 0:
                 stats["min_pairwise_hamming_dist"] = int(np.rint(np.min(distances)))
+        else:
+            stats["min_pairwise_hamming_dist"] = None
 
         if self.verbose > 0:
             logger.info(
@@ -471,7 +474,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
                 pass
             n_est = self._get_n_estimators(n_classes, alphabet_size)
             if self.codebook_strategy == "balanced_cluster":
-                generator = self._generate_codebook_balanced
+                generator = self._generate_codebook_balanced_cluster
             elif self.codebook_strategy == "legacy_rest":
                 generator = self._generate_codebook_legacy_rest
             else:
@@ -481,6 +484,8 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             self.code_book_, self.codebook_stats_ = generator(
                 n_classes, n_est, alphabet_size, random_state_instance
             )
+            if self.codebook_strategy == "balanced_cluster":
+                self.log_proba_aggregation = True
             self.classes_index_ = {c: i for i, c in enumerate(self.classes_)}
             self.X_train = X  # Store validated X
             y_indices = np.array([self.classes_index_[val] for val in y])
@@ -633,16 +638,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
                 stacklevel=2,
             )
 
-    def __sklearn_tags__(self):
-        tags = BaseEstimator.__sklearn_tags__(self)
-        tags.estimator_type = "classifier"
-        tags.classifier_tags = ClassifierTags()
-        tags.target_tags.required = True
-        if hasattr(tags, "input_tags"):
-            tags.input_tags.allow_nan = True
-        return tags
-
-    def _more_tags(self):
+    def _more_tags(self) -> dict[str, Any]:
         return {"allow_nan": True}
 
     @property

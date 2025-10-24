@@ -58,10 +58,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         )
 
     def test_internal_fit_predict_many_classes(self, estimator):
-        """Test fit and predict specifically with more classes than alphabet_size,
-        focusing on the mapping logic of ManyClassClassifier.
-        This uses the 'estimator' fixture which is ManyClassClassifier.
-        """
+        """Test fit/predict when the wrapper must build a codebook."""
         n_classes = 15  # More than default alphabet_size of 10
         n_features = 4
         n_samples = n_classes * 20
@@ -84,8 +81,9 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         assert (
             estimator.estimators_ is None
         )  # Fit happens during predict_proba when mapping
-        assert "coverage_min" in estimator.codebook_statistics_
-        assert estimator.codebook_statistics_["coverage_min"] > 0
+        stats = estimator.codebook_statistics_
+        assert stats.get("coverage_min", 0) > 0
+        assert stats.get("strategy") in {"balanced_cluster", "legacy_rest"}
 
         assert predictions.shape == (X_test.shape[0],)
         assert probabilities.shape == (X_test.shape[0], n_classes)
@@ -93,10 +91,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         assert accuracy_score(y_test, predictions) >= 0.0  # Basic check
 
     def test_failing_scenario_many_classes_replication(self, estimator):
-        """Replicates and tests the scenario with a very large number of classes.
-        This test is specific and doesn't use the main 'estimator' fixture to
-        re-initialize ManyClassClassifier inside the loop with specific verbose settings.
-        """
+        """Exercise multiple class counts to ensure coverage and stats."""
         logging.info("Testing ManyClassClassifier with a large number of classes:")
         for num_classes in [2, 10, 24, 81]:  # Reduced range for test speed
             logging.info(f"  Testing with num_classes = {num_classes}")
@@ -112,10 +107,10 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
                 assert estimator._get_alphabet_size() < num_classes
                 assert estimator.code_book_ is not None
                 assert estimator.code_book_.shape[1] == num_classes
-                assert "coverage_min" in estimator.codebook_statistics_
-                assert (
-                    estimator.codebook_statistics_["coverage_min"] > 0
-                ), f"Coverage min is 0 for {num_classes} classes!"
+                stats = estimator.codebook_statistics_
+                assert stats.get("coverage_min", 0) > 0, (
+                    f"Coverage min is 0 for {num_classes} classes!"
+                )
             else:
                 assert estimator._get_alphabet_size() >= num_classes
 
@@ -133,7 +128,6 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         10-class problem with very few samples per class. The wrapper should come
         close to the base estimator's accuracy despite the heavy output coding.
         """
-
         X, y = make_blobs(
             n_samples=60,
             centers=10,
@@ -168,7 +162,6 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
 
     def test_sample_weight_is_forwarded_to_sub_estimators(self):
         """Ensure fit_params (like sample_weight) reach every cloned estimator."""
-
         fit_records: list[np.ndarray | None] = []
 
         class RecordingEstimator(BaseEstimator, ClassifierMixin):
@@ -212,7 +205,6 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
 
     def test_predict_proba_handles_sub_estimator_missing_codes(self):
         """predict_proba should expand sub-estimator outputs to the full alphabet."""
-
         rng = np.random.RandomState(1)
         X = rng.randn(60, 3)
         y = rng.randint(0, 5, size=60)
@@ -229,7 +221,8 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         # Force the first sub-problem to only observe a strict subset of the alphabet.
         rest_code = wrapper.alphabet_size_ - 1
         class_mask = y == wrapper.classes_[0]
-        assert class_mask.any() and (~class_mask).any()
+        assert class_mask.any()
+        assert (~class_mask).any()
         wrapper.Y_train_per_estimator[0, class_mask] = 0
         wrapper.Y_train_per_estimator[0, ~class_mask] = rest_code
 
