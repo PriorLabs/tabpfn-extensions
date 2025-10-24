@@ -75,7 +75,7 @@ from __future__ import annotations
 import logging
 import math
 import warnings
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 import numpy as np
 import tqdm  # Progress bar for sub-estimator fits
@@ -97,6 +97,12 @@ from tabpfn_common_utils.telemetry import set_extension
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 
 logger = logging.getLogger(__name__)
+
+
+CODEBOOK_DEFAULT_RETRIES = 3
+CODEBOOK_DEFAULT_MIN_HAMMING_FRAC = 0.30
+CODEBOOK_DEFAULT_SELECTION = "max_min_hamming"
+CODEBOOK_HAMMING_MAX_CLASSES = 200
 
 
 # Helper function: Fits a clone of the estimator on a specific sub-problem's
@@ -219,6 +225,10 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         random_state: int | None = None,
         verbose: int = 0,
         log_proba_aggregation: bool = True,
+        codebook_retries: int = CODEBOOK_DEFAULT_RETRIES,
+        codebook_min_hamming_frac: float = CODEBOOK_DEFAULT_MIN_HAMMING_FRAC,
+        codebook_selection: Literal["max_min_hamming"] = CODEBOOK_DEFAULT_SELECTION,
+        codebook_hamming_max_classes: int = CODEBOOK_HAMMING_MAX_CLASSES,
     ):
         self.estimator = estimator
         self.random_state = random_state
@@ -229,6 +239,18 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         self.verbose = verbose
         self.log_proba_aggregation = log_proba_aggregation
         self.fit_params_: dict[str, Any] | None = None
+        if codebook_retries < 1:
+            raise ValueError("codebook_retries must be at least 1.")
+        if codebook_min_hamming_frac < 0.0:
+            raise ValueError("codebook_min_hamming_frac must be non-negative.")
+        if codebook_hamming_max_classes < 0:
+            raise ValueError("codebook_hamming_max_classes must be non-negative.")
+        if codebook_selection != "max_min_hamming":
+            raise ValueError("Unsupported codebook_selection criterion.")
+        self.codebook_retries = int(codebook_retries)
+        self.codebook_min_hamming_frac = float(codebook_min_hamming_frac)
+        self.codebook_selection = codebook_selection
+        self.codebook_hamming_max_classes = int(codebook_hamming_max_classes)
 
     def _set_verbosity(self) -> None:
         """Configure the module-level logger according to the estimator verbosity."""
@@ -251,6 +273,7 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 key: stats.get(key)
                 for key in (
                     "strategy",
+                    "codebook_selection",
                     "n_classes",
                     "alphabet_size",
                     "n_estimators",
@@ -259,6 +282,9 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                     "coverage_mean",
                     "coverage_std",
                     "min_pairwise_hamming_dist",
+                    "mean_pairwise_hamming_dist",
+                    "best_min_pairwise_hamming_dist",
+                    "regeneration_attempts",
                 )
                 if key in stats
             },
@@ -279,6 +305,23 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             getattr(Y_train_per_estimator, "shape", None),
             getattr(proba_arr, "shape", None),
         )
+
+    def _codebook_quality_key(
+        self,
+        *,
+        min_dist: int | None,
+        mean_dist: float | None,
+        stats: dict[str, Any],
+        attempt_seed: int,
+    ) -> tuple[float, float, float, int]:
+        """Produce a comparable quality key for codebook selection."""
+        min_metric = float("-inf") if min_dist is None else float(min_dist)
+        mean_metric = float("-inf") if mean_dist is None else float(mean_dist)
+        coverage_std = stats.get("coverage_std")
+        coverage_metric = (
+            float("-inf") if coverage_std is None else -float(coverage_std)
+        )
+        return (min_metric, mean_metric, coverage_metric, attempt_seed)
 
     def _get_alphabet_size(self) -> int:
         """Helper to get alphabet_size, inferring if necessary."""
@@ -330,7 +373,7 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         strategy: str,
         has_rest_symbol: bool,
         rest_class_code: int | None,
-    ) -> tuple[dict[str, Any], int | None]:
+    ) -> tuple[dict[str, Any], int | None, float | None]:
         """Compute statistics for a generated codebook and return its quality."""
         stats = {
             "coverage_min": int(np.min(coverage_count)),
@@ -343,15 +386,22 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             "strategy": strategy,
             "has_rest_symbol": has_rest_symbol,
             "rest_class_code": rest_class_code,
+            "codebook_selection": self.codebook_selection,
         }
 
         min_dist_count: int | None = None
-        if 1 < n_classes < 200:
+        mean_dist_count: float | None = None
+        if 1 < n_classes < self.codebook_hamming_max_classes:
             distances = pdist(codebook.T, metric="hamming") * n_estimators
             if distances.size > 0:
                 min_dist_count = int(np.rint(np.min(distances)))
+                mean_dist_count = float(np.mean(distances))
         stats["min_pairwise_hamming_dist"] = min_dist_count
-        return stats, min_dist_count
+        if mean_dist_count is not None:
+            stats["mean_pairwise_hamming_dist"] = mean_dist_count
+        else:
+            stats["mean_pairwise_hamming_dist"] = None
+        return stats, min_dist_count, mean_dist_count
 
     def _generate_codebook_balanced_cluster(
         self,
@@ -366,16 +416,27 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 "Balanced codebook generation requires n_classes > alphabet_size."
             )
 
-        class_indices = np.arange(n_classes)
         coverage_count = np.full(n_classes, n_estimators, dtype=int)
-        threshold = max(1, math.ceil(0.25 * n_estimators))
-        max_attempts = 3
+        max_attempts = max(1, self.codebook_retries)
+        target = (
+            math.ceil(self.codebook_min_hamming_frac * n_estimators)
+            if self.codebook_min_hamming_frac > 0
+            else None
+        )
         best_codebook: np.ndarray | None = None
         best_stats: dict[str, Any] | None = None
         best_min_dist: int | None = None
+        best_mean_dist: float | None = None
+        best_quality: tuple[float, float, float, int] | None = None
+        attempts_used = 0
 
         for attempt in range(max_attempts):
+            attempt_seed = int(
+                random_state_instance.randint(0, np.iinfo(np.uint32).max)
+            )
+            attempt_rng = np.random.RandomState(attempt_seed)
             codebook = np.zeros((n_estimators, n_classes), dtype=int)
+            class_indices = np.arange(n_classes)
 
             highlight_rows = min(n_classes, n_estimators)
             for row_idx in range(highlight_rows):
@@ -383,18 +444,19 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 other_classes = np.delete(class_indices, focus_class)
                 codebook[row_idx, focus_class] = 0
                 if alphabet_size > 1 and other_classes.size > 0:
-                    random_state_instance.shuffle(other_classes)
+                    attempt_rng.shuffle(other_classes)
                     other_groups = np.array_split(other_classes, alphabet_size - 1)
                     for offset, group in enumerate(other_groups, start=1):
                         codebook[row_idx, group] = offset
 
             for row_idx in range(highlight_rows, n_estimators):
-                random_state_instance.shuffle(class_indices)
-                class_groups = np.array_split(class_indices, alphabet_size)
+                row_classes = class_indices.copy()
+                attempt_rng.shuffle(row_classes)
+                class_groups = np.array_split(row_classes, alphabet_size)
                 for code, group in enumerate(class_groups):
                     codebook[row_idx, group] = code
 
-            stats, min_dist = self._summarize_codebook(
+            stats, min_dist, mean_dist = self._summarize_codebook(
                 codebook=codebook,
                 coverage_count=coverage_count,
                 n_estimators=n_estimators,
@@ -404,25 +466,48 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 has_rest_symbol=False,
                 rest_class_code=None,
             )
+            attempts_used = attempt + 1
+            quality_key = self._codebook_quality_key(
+                min_dist=min_dist,
+                mean_dist=mean_dist,
+                stats=stats,
+                attempt_seed=attempt_seed,
+            )
+            logger.info(
+                "Codebook attempt %d/%d (balanced_cluster): min_hamming=%s mean_hamming=%s",
+                attempts_used,
+                max_attempts,
+                min_dist,
+                mean_dist,
+            )
 
-            if (
-                best_codebook is None
-                or best_min_dist is None
-                or (
-                    min_dist is not None
-                    and (best_min_dist is None or min_dist > best_min_dist)
-                )
-            ):
+            if best_quality is None or quality_key > best_quality:
+                best_quality = quality_key
                 best_codebook = codebook
                 best_stats = stats
                 best_min_dist = min_dist
+                best_mean_dist = mean_dist
 
-            if min_dist is None or min_dist >= threshold or attempt == max_attempts - 1:
+            if target is not None and min_dist is not None and min_dist >= target:
+                logger.info(
+                    "Early exit after %d attempts: achieved min Hamming %s (target %s)",
+                    attempts_used,
+                    min_dist,
+                    target,
+                )
                 break
 
         if best_codebook is None or best_stats is None:
             raise RuntimeError("Failed to generate a valid balanced codebook.")
 
+        best_stats["regeneration_attempts"] = attempts_used
+        best_stats["best_min_pairwise_hamming_dist"] = best_min_dist
+        best_stats["mean_pairwise_hamming_dist"] = best_mean_dist
+        logger.info(
+            "Selected balanced_cluster codebook after %d attempts with min_hamming=%s",
+            attempts_used,
+            best_min_dist,
+        )
         return best_codebook, best_stats
 
     def _generate_codebook_legacy_rest(
@@ -446,24 +531,33 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             raise ValueError(
                 "alphabet_size must be at least 2 for codebook generation."
             )
-        threshold = max(1, math.ceil(0.25 * n_estimators))
-        max_attempts = 3
+        max_attempts = max(1, self.codebook_retries)
+        target = (
+            math.ceil(self.codebook_min_hamming_frac * n_estimators)
+            if self.codebook_min_hamming_frac > 0
+            else None
+        )
         best_codebook: np.ndarray | None = None
         best_stats: dict[str, Any] | None = None
         best_min_dist: int | None = None
+        best_mean_dist: float | None = None
+        best_quality: tuple[float, float, float, int] | None = None
+        attempts_used = 0
 
         for attempt in range(max_attempts):
+            attempt_seed = int(
+                random_state_instance.randint(0, np.iinfo(np.uint32).max)
+            )
+            attempt_rng = np.random.RandomState(attempt_seed)
             codebook = np.full((n_estimators, n_classes), rest_class_code, dtype=int)
             coverage_count = np.zeros(n_classes, dtype=int)
 
             for row_idx in range(n_estimators):
                 n_assignable_this_row = min(n_codes_available, n_classes)
-                noisy_counts = coverage_count + random_state_instance.uniform(
-                    0, 0.1, n_classes
-                )
+                noisy_counts = coverage_count + attempt_rng.uniform(0, 0.1, n_classes)
                 sorted_indices = np.argsort(noisy_counts)
                 selected_classes_for_row = sorted_indices[:n_assignable_this_row]
-                permuted_codes = random_state_instance.permutation(codes_to_assign)
+                permuted_codes = attempt_rng.permutation(codes_to_assign)
                 codes_to_use = permuted_codes[:n_assignable_this_row]
                 codebook[row_idx, selected_classes_for_row] = codes_to_use
                 coverage_count[selected_classes_for_row] += 1
@@ -476,7 +570,7 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                     f"(e.g., {uncovered_indices[:5]})."
                 )
 
-            stats, min_dist = self._summarize_codebook(
+            stats, min_dist, mean_dist = self._summarize_codebook(
                 codebook=codebook,
                 coverage_count=coverage_count,
                 n_estimators=n_estimators,
@@ -486,25 +580,48 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 has_rest_symbol=True,
                 rest_class_code=rest_class_code,
             )
+            attempts_used = attempt + 1
+            quality_key = self._codebook_quality_key(
+                min_dist=min_dist,
+                mean_dist=mean_dist,
+                stats=stats,
+                attempt_seed=attempt_seed,
+            )
+            logger.info(
+                "Codebook attempt %d/%d (legacy_rest): min_hamming=%s mean_hamming=%s",
+                attempts_used,
+                max_attempts,
+                min_dist,
+                mean_dist,
+            )
 
-            if (
-                best_codebook is None
-                or best_min_dist is None
-                or (
-                    min_dist is not None
-                    and (best_min_dist is None or min_dist > best_min_dist)
-                )
-            ):
+            if best_quality is None or quality_key > best_quality:
+                best_quality = quality_key
                 best_codebook = codebook
                 best_stats = stats
                 best_min_dist = min_dist
+                best_mean_dist = mean_dist
 
-            if min_dist is None or min_dist >= threshold or attempt == max_attempts - 1:
+            if target is not None and min_dist is not None and min_dist >= target:
+                logger.info(
+                    "Early exit after %d attempts: achieved min Hamming %s (target %s)",
+                    attempts_used,
+                    min_dist,
+                    target,
+                )
                 break
 
         if best_codebook is None or best_stats is None:
             raise RuntimeError("Failed to generate a valid legacy codebook.")
 
+        best_stats["regeneration_attempts"] = attempts_used
+        best_stats["best_min_pairwise_hamming_dist"] = best_min_dist
+        best_stats["mean_pairwise_hamming_dist"] = best_mean_dist
+        logger.info(
+            "Selected legacy_rest codebook after %d attempts with min_hamming=%s",
+            attempts_used,
+            best_min_dist,
+        )
         return best_codebook, best_stats
 
     def fit(self, X, y, **fit_params) -> ManyClassClassifier:

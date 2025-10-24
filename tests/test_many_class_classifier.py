@@ -84,6 +84,8 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         stats = estimator.codebook_statistics_
         assert stats.get("coverage_min", 0) > 0
         assert stats.get("strategy") in {"balanced_cluster", "legacy_rest"}
+        assert stats.get("regeneration_attempts", 0) >= 1
+        assert "best_min_pairwise_hamming_dist" in stats
 
         assert predictions.shape == (X_test.shape[0],)
         assert probabilities.shape == (X_test.shape[0], n_classes)
@@ -111,6 +113,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
                 assert stats.get("coverage_min", 0) > 0, (
                     f"Coverage min is 0 for {num_classes} classes!"
                 )
+                assert stats.get("regeneration_attempts", 0) >= 1
             else:
                 assert estimator._get_alphabet_size() >= num_classes
 
