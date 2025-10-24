@@ -263,11 +263,11 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         min_needed_for_potential_coverage = math.ceil(
             n_classes / max(1, alphabet_size - 1)
         )
-        return (
-            max(min_estimators_theory, min_needed_for_potential_coverage)
-            * self.n_estimators_redundancy
-            * 2
-        )
+        base_required = max(min_estimators_theory, min_needed_for_potential_coverage)
+        scaled = base_required * self.n_estimators_redundancy
+        log_cap = 4 * max(1, min_estimators_theory)
+        capped = max(base_required, min(scaled, log_cap))
+        return max(1, capped)
 
     def _generate_codebook_balanced_cluster(
         self,
@@ -481,9 +481,36 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 raise ValueError(
                     "Unsupported codebook_strategy. Expected 'balanced_cluster' or 'legacy_rest'."
                 )
-            self.code_book_, self.codebook_stats_ = generator(
-                n_classes, n_est, alphabet_size, random_state_instance
+            max_attempts = 3
+            threshold = math.ceil(0.25 * n_est)
+            best_codebook: np.ndarray | None = None
+            best_stats: dict[str, Any] | None = None
+            best_distance = -math.inf
+            # Pre-sample seeds to keep determinism tied to random_state
+            seeds = random_state_instance.randint(
+                0, np.iinfo(np.int32).max, size=max_attempts, dtype=np.int64
             )
+            for attempt, seed in enumerate(seeds):
+                attempt_rng = np.random.RandomState(int(seed))
+                codebook, stats = generator(
+                    n_classes, n_est, alphabet_size, attempt_rng
+                )
+                distance = stats.get("min_pairwise_hamming_dist")
+                if distance is None:
+                    stats["codebook_retries"] = attempt
+                    best_codebook, best_stats = codebook, stats
+                    break
+                if distance >= threshold:
+                    stats["codebook_retries"] = attempt
+                    best_codebook, best_stats = codebook, stats
+                    break
+                if distance > best_distance:
+                    best_distance = distance
+                    stats["codebook_retries"] = attempt
+                    best_codebook, best_stats = codebook, stats
+            if best_codebook is None or best_stats is None:
+                raise RuntimeError("Failed to generate a valid codebook.")
+            self.code_book_, self.codebook_stats_ = best_codebook, best_stats
             self.classes_index_ = {c: i for i, c in enumerate(self.classes_)}
             self.X_train = X  # Store validated X
             y_indices = np.array([self.classes_index_[val] for val in y])
@@ -548,9 +575,10 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         rest_class_code = codebook_stats.get("rest_class_code")
         if has_rest_symbol and rest_class_code is None:
             rest_class_code = current_alphabet_size - 1
-        use_log_agg = (
-            True if not has_rest_symbol else bool(self.log_proba_aggregation)
-        )
+        strategy = getattr(self, "codebook_strategy", "legacy_rest")
+        use_log_agg = bool(self.log_proba_aggregation)
+        if strategy == "balanced_cluster" or not has_rest_symbol:
+            use_log_agg = True
 
         if use_log_agg:
             Y_pred_probas_arr = np.log(np.clip(Y_pred_probas_arr, 1e-12, 1.0))

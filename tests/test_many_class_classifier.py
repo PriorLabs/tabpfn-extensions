@@ -25,9 +25,9 @@ from test_base_tabpfn import BaseClassifierTests
 
 # Helper function (as provided in the initial problem description)
 def get_classification_data(num_classes: int, num_features: int, num_samples: int):
-    assert (
-        num_samples >= num_classes
-    ), "Number of samples must be at least the number of classes."
+    assert num_samples >= num_classes, (
+        "Number of samples must be at least the number of classes."
+    )
     X = np.random.randn(num_samples, num_features)
     y = np.concatenate(
         [
@@ -73,9 +73,9 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         predictions = estimator.predict(X_test)
         probabilities = estimator.predict_proba(X_test)
 
-        assert (
-            not estimator.no_mapping_needed_
-        ), "Mapping should have been used for 15 classes."
+        assert not estimator.no_mapping_needed_, (
+            "Mapping should have been used for 15 classes."
+        )
         assert estimator.code_book_ is not None
         assert estimator.code_book_.shape[1] == n_classes
         assert (
@@ -122,12 +122,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         print("Large number of classes test completed.")
 
     def test_wrapper_retains_base_performance_on_sparse_multi_class_problem(self):
-        """Check that the wrapper matches a strong base estimator on a sparse dataset.
-
-        We mimic a 2-class-limited base model by using an alphabet of size 2 on a
-        10-class problem with very few samples per class. The wrapper should come
-        close to the base estimator's accuracy despite the heavy output coding.
-        """
+        """Check wrapper accuracy against a strong base estimator on sparse data."""
         X, y = make_blobs(
             n_samples=60,
             centers=10,
@@ -178,7 +173,9 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
 
             def predict_proba(self, X):
                 n_samples = X.shape[0]
-                proba = np.full((n_samples, len(self.classes_)), 1.0 / len(self.classes_))
+                proba = np.full(
+                    (n_samples, len(self.classes_)), 1.0 / len(self.classes_)
+                )
                 return proba
 
         base_estimator = RecordingEstimator()
