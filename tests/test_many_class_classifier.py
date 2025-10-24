@@ -158,6 +158,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
             n_estimators=20,
             random_state=0,
             log_proba_aggregation=True,
+            codebook_strategy="legacy_rest",
         )
         wrapped.fit(X_train, y_train)
         wrapped_accuracy = accuracy_score(y_test, wrapped.predict(X_test))

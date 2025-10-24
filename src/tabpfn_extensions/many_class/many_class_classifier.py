@@ -72,13 +72,14 @@ Example usage:
 
 from __future__ import annotations
 
-import itertools
+import logging
 import math
 import warnings
 from typing import Any, ClassVar
 
 import numpy as np
 import tqdm  # For pairwise combinations
+from scipy.spatial.distance import pdist
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.utils import check_random_state
 from sklearn.utils._tags import ClassifierTags
@@ -96,6 +97,8 @@ from tabpfn_common_utils.telemetry import set_extension
 # Custom validate_data import
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 
+logger = logging.getLogger(__name__)
+
 
 # Helper function: Fits a clone of the estimator on a specific sub-problem's
 # training data. This follows the original design where fitting happens during
@@ -104,7 +107,6 @@ def _apply_categorical_features_to_estimator(
     estimator: BaseEstimator, categorical_features: list[int] | None
 ) -> None:
     """Apply stored categorical feature metadata to an estimator clone."""
-
     if categorical_features is None:
         return
     if hasattr(estimator, "set_categorical_features"):
@@ -124,7 +126,6 @@ def _fit_and_predict_proba(
     alphabet_size: int,
 ) -> np.ndarray:
     """Fit a cloned base estimator on sub-problem data and predict probabilities."""
-
     cloned_estimator = clone(estimator)
     _apply_categorical_features_to_estimator(cloned_estimator, categorical_features)
 
@@ -161,6 +162,10 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         alphabet_size (int, optional): Maximum number of classes the base
             estimator can handle. If None, attempts to infer from
             `estimator.max_num_classes_`.
+        codebook_strategy (str): Strategy used to create the ECOC codebook.
+            ``"balanced_cluster"`` partitions classes into balanced groups for each
+            estimator and is the default. ``"legacy_rest"`` uses the previous
+            one-vs-rest-style codebook that reserves one symbol as a catch-all.
         n_estimators (int, optional): Number of base estimators (sub-problems).
             If None, calculated based on other parameters.
         n_estimators_redundancy (int): Redundancy factor for auto-calculated
@@ -209,6 +214,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         estimator: BaseEstimator,
         *,
         alphabet_size: int | None = None,
+        codebook_strategy: str = "balanced_cluster",
         n_estimators: int | None = None,
         n_estimators_redundancy: int = 4,
         random_state: int | None = None,
@@ -219,6 +225,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         self.random_state = random_state
         self.alphabet_size = alphabet_size
         self.n_estimators = n_estimators
+        self.codebook_strategy = codebook_strategy
         self.n_estimators_redundancy = n_estimators_redundancy
         self.verbose = verbose
         self.log_proba_aggregation = log_proba_aggregation
@@ -263,17 +270,75 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             * 2
         )
 
-    def _generate_codebook(
+    def _generate_codebook_balanced(
         self,
         n_classes: int,
         n_estimators: int,
         alphabet_size: int,
         random_state_instance: np.random.RandomState,
     ) -> tuple[np.ndarray, dict]:
-        """(Improved) Generate codebook with balanced coverage and stats."""
+        """Generate a dense, balanced codebook using random partitioning."""
         if n_classes <= alphabet_size:
             raise ValueError(
-                "_generate_codebook called when n_classes <= alphabet_size"
+                "Balanced codebook generation requires n_classes > alphabet_size."
+            )
+
+        codebook = np.zeros((n_estimators, n_classes), dtype=int)
+        class_indices = np.arange(n_classes)
+
+        highlight_rows = min(n_classes, n_estimators)
+        for row_idx in range(highlight_rows):
+            focus_class = row_idx % n_classes
+            other_classes = np.delete(class_indices, focus_class)
+            codebook[row_idx, focus_class] = 0
+            if alphabet_size > 1:
+                random_state_instance.shuffle(other_classes)
+                other_groups = np.array_split(other_classes, alphabet_size - 1)
+                for offset, group in enumerate(other_groups, start=1):
+                    codebook[row_idx, group] = offset
+
+        for i in range(highlight_rows, n_estimators):
+            random_state_instance.shuffle(class_indices)
+            class_groups = np.array_split(class_indices, alphabet_size)
+            for code, group in enumerate(class_groups):
+                codebook[i, group] = code
+
+        coverage_count = np.full(n_classes, n_estimators, dtype=int)
+        stats = {
+            "coverage_min": int(np.min(coverage_count)),
+            "coverage_max": int(np.max(coverage_count)),
+            "coverage_mean": float(np.mean(coverage_count)),
+            "coverage_std": float(np.std(coverage_count)),
+            "n_estimators": n_estimators,
+            "n_classes": n_classes,
+            "alphabet_size": alphabet_size,
+            "strategy": "balanced_cluster",
+            "has_rest_symbol": False,
+            "rest_class_code": None,
+        }
+
+        if n_classes > 1 and n_classes < 200:
+            distances = pdist(codebook.T, metric="hamming") * n_estimators
+            if distances.size > 0:
+                stats["min_pairwise_hamming_dist"] = int(np.rint(np.min(distances)))
+        if self.verbose > 0:
+            logger.info(
+                "[ManyClassClassifier] Codebook statistics (balanced_cluster): %s",
+                stats,
+            )
+        return codebook, stats
+
+    def _generate_codebook_legacy_rest(
+        self,
+        n_classes: int,
+        n_estimators: int,
+        alphabet_size: int,
+        random_state_instance: np.random.RandomState,
+    ) -> tuple[np.ndarray, dict]:
+        """Generate a legacy codebook with an explicit rest symbol."""
+        if n_classes <= alphabet_size:
+            raise ValueError(
+                "Legacy codebook generation requires n_classes > alphabet_size."
             )
 
         codes_to_assign = list(range(alphabet_size - 1))
@@ -305,7 +370,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             raise RuntimeError(
                 f"Failed to cover classes within {n_estimators} estimators. "
                 f"{len(uncovered_indices)} uncovered (e.g., {uncovered_indices[:5]}). "
-                f"Increase `n_estimators` or `n_estimators_redundancy`."
+                "Increase `n_estimators` or `n_estimators_redundancy`."
             )
 
         stats = {
@@ -316,21 +381,22 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             "n_estimators": n_estimators,
             "n_classes": n_classes,
             "alphabet_size": alphabet_size,
+            "strategy": "legacy_rest",
+            "has_rest_symbol": True,
+            "rest_class_code": rest_class_code,
         }
-        if n_classes > 1:
-            if n_classes <= 200:
-                min_dist = n_estimators
-                for j1, j2 in itertools.combinations(range(n_classes), 2):
-                    dist = np.sum(codebook[:, j1] != codebook[:, j2])
-                    min_dist = min(min_dist, dist)
-                stats["min_pairwise_hamming_dist"] = int(min_dist)
-            else:
-                stats["min_pairwise_hamming_dist"] = None
+
+        if n_classes > 1 and n_classes < 200:
+            distances = pdist(codebook.T, metric="hamming") * n_estimators
+            if distances.size > 0:
+                stats["min_pairwise_hamming_dist"] = int(np.rint(np.min(distances)))
 
         if self.verbose > 0:
-            print("[ManyClassClassifier] Codebook statistics:")
-            for key, value in stats.items():
-                print(f"  - {key}: {value}")
+            logger.info(
+                "[ManyClassClassifier] Codebook statistics (legacy_rest): %s",
+                stats,
+            )
+
         return codebook, stats
 
     def fit(self, X, y, **fit_params) -> ManyClassClassifier:
@@ -404,7 +470,15 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             if self.verbose > 0:
                 pass
             n_est = self._get_n_estimators(n_classes, alphabet_size)
-            self.code_book_, self.codebook_stats_ = self._generate_codebook(
+            if self.codebook_strategy == "balanced_cluster":
+                generator = self._generate_codebook_balanced
+            elif self.codebook_strategy == "legacy_rest":
+                generator = self._generate_codebook_legacy_rest
+            else:
+                raise ValueError(
+                    "Unsupported codebook_strategy. Expected 'balanced_cluster' or 'legacy_rest'."
+                )
+            self.code_book_, self.codebook_stats_ = generator(
                 n_classes, n_est, alphabet_size, random_state_instance
             )
             self.classes_index_ = {c: i for i, c in enumerate(self.classes_)}
@@ -466,7 +540,11 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             return np.zeros((0, len(self.classes_)))
 
         n_orig_classes = len(self.classes_)
-        rest_class_code = current_alphabet_size - 1
+        codebook_stats = getattr(self, "codebook_stats_", {}) or {}
+        has_rest_symbol = bool(codebook_stats.get("has_rest_symbol", False))
+        rest_class_code = codebook_stats.get("rest_class_code")
+        if has_rest_symbol and rest_class_code is None:
+            rest_class_code = current_alphabet_size - 1
         if self.log_proba_aggregation:
             Y_pred_probas_arr = np.log(np.clip(Y_pred_probas_arr, 1e-12, 1.0))
             aggregated_scores = np.zeros((n_samples, n_orig_classes))
@@ -493,7 +571,10 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             contributions = np.take_along_axis(
                 Y_pred_probas_arr[i], row_codes[None, :], axis=1
             )
-            mask = row_codes != rest_class_code
+            if has_rest_symbol:
+                mask = row_codes != rest_class_code
+            else:
+                mask = np.ones_like(row_codes, dtype=bool)
             if np.any(mask):
                 raw_probabilities[:, mask] += contributions[:, mask]
                 counts[mask] += 1
