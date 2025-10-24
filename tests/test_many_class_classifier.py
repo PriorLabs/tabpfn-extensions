@@ -209,6 +209,34 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
             assert recorded is not None
             np.testing.assert_allclose(recorded, sample_weight)
 
+    def test_predict_proba_handles_sub_estimator_missing_codes(self):
+        """predict_proba should expand sub-estimator outputs to the full alphabet."""
+
+        rng = np.random.RandomState(1)
+        X = rng.randn(60, 3)
+        y = rng.randint(0, 5, size=60)
+
+        wrapper = ManyClassClassifier(
+            estimator=LogisticRegression(max_iter=200),
+            alphabet_size=3,
+            n_estimators=4,
+            random_state=0,
+        )
+
+        wrapper.fit(X, y)
+
+        # Force the first sub-problem to only observe a strict subset of the alphabet.
+        rest_code = wrapper.alphabet_size_ - 1
+        class_mask = y == wrapper.classes_[0]
+        assert class_mask.any() and (~class_mask).any()
+        wrapper.Y_train_per_estimator[0, class_mask] = 0
+        wrapper.Y_train_per_estimator[0, ~class_mask] = rest_code
+
+        probas = wrapper.predict_proba(X[:7])
+
+        assert probas.shape == (7, len(wrapper.classes_))
+        np.testing.assert_allclose(probas.sum(axis=1), 1.0, atol=1e-9)
+
     @pytest.mark.skip(reason="DecisionTreeTabPFN doesn't fully support text features")
     def test_with_text_features(self, estimator, dataset_generator):
         pass

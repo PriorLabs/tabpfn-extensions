@@ -378,7 +378,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             _apply_categorical_features_to_estimator(
                 cloned_estimator, getattr(self, "categorical_features", None)
             )
-            cloned_estimator.fit(X, y, **fit_params)
+            cloned_estimator.fit(X, y, **self.fit_params_)
             self.estimators_ = [cloned_estimator]
             self.code_book_ = np.zeros((1, 1), dtype=int)
             self.codebook_stats_ = {
@@ -394,7 +394,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
                 cloned_estimator, getattr(self, "categorical_features", None)
             )
             # Base estimator fits on X_validated (already processed by custom validate_data)
-            cloned_estimator.fit(X, y, **fit_params)
+            cloned_estimator.fit(X, y, **self.fit_params_)
             self.estimators_ = [cloned_estimator]
             # Ensure n_features_in_ matches the fitted estimator if it has the attribute
             if hasattr(cloned_estimator, "n_features_in_"):
