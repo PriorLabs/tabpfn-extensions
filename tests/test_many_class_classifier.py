@@ -92,6 +92,10 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         assert probabilities.shape == (X_test.shape[0], n_classes)
         assert np.allclose(np.sum(probabilities, axis=1), 1.0)
         assert accuracy_score(y_test, predictions) >= 0.0  # Basic check
+        assert estimator.row_weights_ is not None
+        assert estimator.row_train_support_ is not None
+        assert estimator.row_weights_.shape[0] == estimator.code_book_.shape[0]
+        assert estimator.row_train_support_.shape[0] == estimator.code_book_.shape[0]
 
     def test_failing_scenario_many_classes_replication(self, estimator):
         """Exercise multiple class counts to ensure coverage and stats."""
@@ -262,10 +266,17 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         ]
         assert rows_with_rest, "Expected at least one row to include the rest symbol."
 
-        assert len(fit_y_records) == wrapper.code_book_.shape[0]
+        assert wrapper.row_train_support_ is not None
+        expected_support = np.sum(
+            wrapper.Y_train_per_estimator != rest_code, axis=1
+        )
+        np.testing.assert_array_equal(wrapper.row_train_support_, expected_support)
 
-        for idx in rows_with_rest:
-            assert rest_code not in fit_y_records[idx]
+        assert len(fit_y_records) == int(np.count_nonzero(expected_support))
+        assert len(fit_weight_records) == len(fit_y_records)
+
+        for labels in fit_y_records:
+            assert rest_code not in labels
 
         for weights, labels in zip(fit_weight_records, fit_y_records):
             if weights is not None:

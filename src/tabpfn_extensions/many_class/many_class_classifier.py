@@ -98,6 +98,8 @@ from tabpfn_extensions.misc.sklearn_compat import validate_data
 
 logger = logging.getLogger(__name__)
 
+EPS = 1e-12
+
 
 # Helper function: Fits a clone of the estimator on a specific sub-problem's
 # training data. This follows the original design where fitting happens during
@@ -114,37 +116,52 @@ def _apply_categorical_features_to_estimator(
         estimator.categorical_features = categorical_features
 
 
-def _fit_and_predict_proba(
+def _as_numpy(X: Any) -> np.ndarray:
+    """Best-effort conversion of array-like data to a NumPy ndarray."""
+    if isinstance(X, np.ndarray):
+        return X
+    try:
+        return X.to_numpy()  # pandas objects
+    except AttributeError:
+        return np.asarray(X)
+
+
+def _fit_predict_train_test_proba(
     estimator: BaseEstimator,
-    X_train: np.ndarray,
-    Y_train_subproblem: np.ndarray,  # Encoded labels for one sub-problem
-    X_pred: np.ndarray,  # Data to predict on
+    X_train_row: Any,
+    y_train_row: np.ndarray,
+    X_test: Any,
     *,
     categorical_features: list[int] | None = None,
     fit_params: dict[str, Any] | None = None,
     alphabet_size: int,
-) -> np.ndarray:
-    """Fit a cloned base estimator on sub-problem data and predict probabilities."""
+) -> tuple[np.ndarray, np.ndarray]:
+    """Fit a clone once and return aligned train/test probabilities."""
     cloned_estimator = clone(estimator)
     _apply_categorical_features_to_estimator(cloned_estimator, categorical_features)
 
     fit_kwargs: dict[str, Any] = fit_params.copy() if fit_params else {}
-    cloned_estimator.fit(X_train, Y_train_subproblem, **fit_kwargs)
+    cloned_estimator.fit(X_train_row, y_train_row, **fit_kwargs)
 
     if not hasattr(cloned_estimator, "predict_proba"):
         raise AttributeError("Base estimator must implement the predict_proba method.")
 
-    proba = cloned_estimator.predict_proba(X_pred)
+    X_train_np = _as_numpy(X_train_row)
+    X_test_np = _as_numpy(X_test)
+    proba_both = cloned_estimator.predict_proba(
+        np.concatenate([X_train_np, X_test_np], axis=0)
+    )
     classes_seen = getattr(cloned_estimator, "classes_", None)
     if classes_seen is None:
         raise AttributeError(
             "Base estimator must expose `classes_` after fitting to align probabilities."
         )
 
-    full_proba = np.zeros((proba.shape[0], alphabet_size), dtype=np.float64)
+    full = np.zeros((proba_both.shape[0], alphabet_size), dtype=np.float64)
     indices = np.asarray(classes_seen, dtype=int)
-    full_proba[:, indices] = proba
-    return full_proba
+    full[:, indices] = proba_both
+    n_train = X_train_np.shape[0]
+    return full[n_train:], full[:n_train]
 
 
 def _filter_fit_params_for_mask(
@@ -162,22 +179,33 @@ def _filter_fit_params_for_mask(
 
     filtered: dict[str, Any] = {}
     for key, value in fit_params.items():
-        try:
-            array_value = np.asarray(value)
-        except (TypeError, ValueError):
-            filtered[key] = value
-            continue
-
-        if array_value.ndim > 0 and array_value.shape[0] == n_samples:
-            masked = array_value[mask]
-            if isinstance(value, list):
-                filtered[key] = masked.tolist()
-            elif isinstance(value, tuple):
-                filtered[key] = tuple(masked.tolist())
+        if mask is not None:
+            if hasattr(value, "iloc"):
+                try:
+                    filtered[key] = value.iloc[mask]
+                    continue
+                except (TypeError, ValueError, IndexError):
+                    pass
+            if isinstance(value, (list, tuple)):
+                array_value = np.asarray(value)
             else:
+                try:
+                    array_value = np.asarray(value)
+                except (TypeError, ValueError):
+                    array_value = None
+
+            if array_value is not None and array_value.ndim > 0 and array_value.shape[0] == n_samples:
+                masked = array_value[mask]
+                if isinstance(value, list):
+                    filtered[key] = masked.tolist()
+                    continue
+                if isinstance(value, tuple):
+                    filtered[key] = tuple(masked.tolist())
+                    continue
                 filtered[key] = masked
-        else:
-            filtered[key] = value
+                continue
+
+        filtered[key] = value
 
     return filtered
 
@@ -721,6 +749,12 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         self.X_train = None
         self.Y_train_per_estimator = None
         self.fit_params_ = fit_params.copy() if fit_params else {}
+        self._row_class_used_mask_ = None
+        self.row_weights_ = None
+        self.row_weights_raw_ = None
+        self.row_train_support_ = None
+        self.row_train_entropy_ = None
+        self.row_train_acc_ = None
 
         if n_classes == 0:
             raise ValueError("Cannot fit with no classes present.")
@@ -769,6 +803,13 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             self.code_book_, self.codebook_stats_ = generator(
                 n_classes, n_est, alphabet_size, random_state_instance
             )
+            if self.codebook_strategy == "legacy_rest":
+                rest_code = self.codebook_stats_.get("rest_class_code")
+                if rest_code is None:
+                    rest_code = alphabet_size - 1
+                self._row_class_used_mask_ = self.code_book_ != rest_code
+            else:
+                self._row_class_used_mask_ = np.ones_like(self.code_book_, dtype=bool)
             self._log_codebook_stats(self.codebook_stats_, tag="Codebook stats")
             self.classes_index_ = {c: i for i, c in enumerate(self.classes_)}
             self.X_train = X  # Store validated X
@@ -817,6 +858,9 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         iterable = tqdm.tqdm(iterator, disable=(self.verbose <= 1))
         Y_pred_probas_list: list[np.ndarray] = []
         weights: list[float] = []
+        support_counts: list[int] = []
+        entropies: list[float] = []
+        accuracies: list[float] = []
         categorical_features = getattr(self, "categorical_features", None)
         has_legacy_rest = (
             self.codebook_strategy == "legacy_rest" and has_rest_symbol
@@ -835,54 +879,77 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                     mask_train = candidate_mask
                     X_train_row = self.X_train[mask_train]
                     y_train_row = y_subproblem[mask_train]
+                else:
+                    weights.append(1e-6)
+                    support_counts.append(0)
+                    entropies.append(np.nan)
+                    accuracies.append(np.nan)
+                    Y_pred_probas_list.append(
+                        np.full(
+                            (X.shape[0], self.alphabet_size_),
+                            1.0 / max(self.alphabet_size_, 1),
+                            dtype=np.float64,
+                        )
+                    )
+                    continue
+
+            if y_train_row.size == 0:
+                weights.append(1e-6)
+                support_counts.append(0)
+                entropies.append(np.nan)
+                accuracies.append(np.nan)
+                Y_pred_probas_list.append(
+                    np.full(
+                        (X.shape[0], self.alphabet_size_),
+                        1.0 / max(self.alphabet_size_, 1),
+                        dtype=np.float64,
+                    )
+                )
+                continue
 
             fit_kwargs_row = _filter_fit_params_for_mask(
                 self.fit_params_, mask_train, n_samples=n_train_samples
             )
 
-            Y_pred_probas_list.append(
-                _fit_and_predict_proba(
-                    self.estimator,
-                    X_train_row,
-                    y_train_row,
-                    X,
-                    categorical_features=categorical_features,
-                    fit_params=fit_kwargs_row,
-                    alphabet_size=self.alphabet_size_,
-                )
+            P_test_full, P_train_full = _fit_predict_train_test_proba(
+                self.estimator,
+                X_train_row,
+                y_train_row,
+                X,
+                categorical_features=categorical_features,
+                fit_params=fit_kwargs_row,
+                alphabet_size=self.alphabet_size_,
             )
+            Y_pred_probas_list.append(P_test_full)
+            support_counts.append(int(y_train_row.shape[0]))
 
             weight = 1.0
-            if self.row_weighting in {"train_entropy", "train_acc"}:
-                weight_estimator = clone(self.estimator)
-                _apply_categorical_features_to_estimator(
-                    weight_estimator, categorical_features
-                )
-                weight_estimator.fit(X_train_row, y_train_row, **fit_kwargs_row)
-                if not hasattr(weight_estimator, "predict_proba"):
-                    raise AttributeError(
-                        "Base estimator must implement predict_proba for row weighting."
-                    )
-                train_proba = weight_estimator.predict_proba(X_train_row)
-                train_proba = np.clip(train_proba, 1e-12, 1.0)
-                q = train_proba.shape[1]
+            row_entropy = np.nan
+            row_acc = np.nan
+            if self.row_weighting in {"train_entropy", "train_acc"} and P_train_full.size > 0:
+                P_train = np.clip(P_train_full, EPS, 1.0)
+                q = P_train.shape[1]
                 if self.row_weighting == "train_entropy":
-                    entropy = 0.0
-                    if train_proba.size > 0:
-                        entropy = -float(
-                            np.mean(np.sum(train_proba * np.log(train_proba), axis=1))
-                        )
-                    norm = math.log(q) if q > 1 else 1.0
-                    ratio = 0.0 if norm <= 0 else entropy / norm
+                    row_entropy = float(
+                        -np.mean(np.sum(P_train * np.log(P_train), axis=1))
+                    )
+                    norm = max(math.log(max(q, 2)), EPS)
+                    ratio = row_entropy / norm
                     weight = max(1e-3, 1.0 - ratio)
-                else:  # train_acc
-                    predictions = np.argmax(train_proba, axis=1)
-                    acc = float(np.mean(predictions == y_train_row))
-                    baseline = 1.0 / max(q, 1)
-                    weight = max(1e-3, acc - baseline)
+                else:
+                    preds = np.argmax(P_train, axis=1)
+                    row_acc = float(np.mean(preds == y_train_row))
+                    counts = np.bincount(y_train_row, minlength=q).astype(float)
+                    if counts.sum() > 0:
+                        chance = float((counts / counts.sum()).max())
+                    else:
+                        chance = 1.0 / max(q, 1)
+                    weight = max(1e-3, row_acc - chance)
                 weight = float(weight) ** self.row_weighting_gamma
 
             weights.append(weight)
+            entropies.append(row_entropy)
+            accuracies.append(row_acc)
 
         Y_pred_probas_arr = np.stack(Y_pred_probas_list, axis=0)
         self._log_shapes(
@@ -920,18 +987,34 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 )
             use_log_agg = True
 
-        weights_arr = np.asarray(weights, dtype=float)
-        weights_arr = np.where(np.isfinite(weights_arr), weights_arr, 1.0)
-        weights_arr = np.clip(weights_arr, 1e-6, None)
-        weights_arr /= max(np.mean(weights_arr), 1e-6)
+        raw_weights_arr = np.asarray(weights, dtype=float)
+        raw_weights_arr = np.where(np.isfinite(raw_weights_arr), raw_weights_arr, 1.0)
+        raw_weights_arr = np.clip(raw_weights_arr, 1e-6, None)
+        weights_arr = raw_weights_arr.copy()
+        weight_sum = weights_arr.sum()
+        if weight_sum <= 0:
+            weights_arr = np.ones_like(weights_arr)
+            weight_sum = weights_arr.sum()
+        weights_arr *= len(weights_arr) / max(weight_sum, EPS)
+
+        self.row_weights_raw_ = raw_weights_arr
+        self.row_weights_ = weights_arr.copy()
+        self.row_train_support_ = np.asarray(support_counts, dtype=int)
+        self.row_train_entropy_ = np.asarray(entropies, dtype=float)
+        self.row_train_acc_ = np.asarray(accuracies, dtype=float)
 
         gather_idx = self.code_book_[:, None, :]
         gathered = np.take_along_axis(Y_pred_probas_arr, gather_idx, axis=2)
 
         if use_log_agg:
-            gathered = np.log(np.clip(gathered, 1e-12, 1.0))
-            if has_rest_symbol and has_legacy_rest and self.legacy_mask_rest_log_agg:
-                rest_mask = (self.code_book_ != rest_class_code)[:, None, :]
+            gathered = np.log(np.clip(gathered, EPS, 1.0))
+            if (
+                has_rest_symbol
+                and has_legacy_rest
+                and self.legacy_mask_rest_log_agg
+                and getattr(self, "_row_class_used_mask_", None) is not None
+            ):
+                rest_mask = self._row_class_used_mask_[:, None, :]
                 gathered = gathered * rest_mask
             gathered = gathered * weights_arr[:, None, None]
             aggregated = gathered.sum(axis=0)
@@ -944,13 +1027,12 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 probas[zero_mask] = 1.0 / n_orig_classes
             return probas
 
-        if has_rest_symbol:
-            mask = (self.code_book_ != rest_class_code).astype(float)
-        else:
-            mask = np.ones_like(self.code_book_, dtype=float)
+        row_class_mask = getattr(self, "_row_class_used_mask_", None)
+        if row_class_mask is None:
+            row_class_mask = np.ones_like(self.code_book_, dtype=bool)
+        mask = row_class_mask.astype(float)
         weighted = gathered
-        if has_rest_symbol:
-            weighted = weighted * mask[:, None, :]
+        weighted = weighted * mask[:, None, :]
         weighted = weighted * weights_arr[:, None, None]
         aggregated = weighted.sum(axis=0)
         counts = np.sum(mask * weights_arr[:, None], axis=0)
