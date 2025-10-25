@@ -1,353 +1,141 @@
-# Copyright (c) Prior Labs GmbH 2025.
-# Licensed under the Apache License, Version 2.0
-
-"""ManyClassClassifier: TabPFN extension for handling classification with many classes.
-
-Development Notebook: https://colab.research.google.com/drive/1HWF5IF0IN21G8FZdLVwBbLBkCMu94yBA?usp=sharing
-
-This module provides a classifier that overcomes TabPFN's limitation on the number of
-classes (typically 10) by using a meta-classifier approach based on output coding.
-It works by breaking down multi-class problems into multiple sub-problems, each
-within TabPFN's class limit.
-
-This version aims to be very close to an original structural design, with key
-improvements in codebook generation and using a custom `validate_data` function
-for scikit-learn compatibility.
-
-Key features (compared to a very basic output coder):
-- Improved codebook generation: Uses a strategy that attempts to balance the
-  number of times each class is explicitly represented and guarantees coverage.
-- Codebook statistics: Optionally prints statistics about the generated codebook.
-- Uses a custom `validate_data` for potentially better cross-sklearn-version
-  compatibility for data validation.
-- Robustness: Minor changes for better scikit-learn compatibility (e.g.,
-  ensuring the wrapper is properly "fitted", setting n_features_in_).
-
-Original structural aspects retained:
-- Fitting of base estimators for sub-problems largely occurs during predict_proba calls.
-
-Example usage:
-    ```python
-    import numpy as np
-    from sklearn.model_selection import train_test_split
-    from tabpfn import TabPFNClassifier # Assuming TabPFN is installed
-    from sklearn.datasets import make_classification
-
-    # Create synthetic data with many classes
-    n_classes_total = 15 # TabPFN might struggle with >10 if not configured
-    X, y = make_classification(n_samples=300, n_features=20, n_informative=15,
-                               n_redundant=0, n_classes=n_classes_total,
-                               n_clusters_per_class=1, random_state=42)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3,
-                                                        random_state=42,
-                                                        stratify=y)
-
-    # Create a TabPFN base classifier
-    # Adjust N_ensemble_configurations and device as needed/available
-    # TabPFN's default class limit is often 10 for the public model.
-    base_clf = TabPFNClassifier(device='cpu', N_ensemble_configurations=4)
-
-    # Wrap it with ManyClassClassifier
-    many_class_clf = ManyClassClassifier(
-        estimator=base_clf,
-        alphabet_size=10, # Max classes the base_clf sub-problems will handle
-                          # This should align with TabPFN's actual capability.
-        n_estimators_redundancy=3,
-        random_state=42,
-        log_proba_aggregation=True,
-        verbose=1 # Print codebook stats
-    )
-
-    # Use like any scikit-learn classifier
-    many_class_clf.fit(X_train, y_train)
-    y_pred = many_class_clf.predict(X_test)
-    y_proba = many_class_clf.predict_proba(X_test)
-
-    print(f"Prediction shape: {y_pred.shape}")
-    print(f"Probability shape: {y_proba.shape}")
-    if hasattr(many_class_clf, 'codebook_stats_'):
-        print(f"Codebook Stats: {many_class_clf.codebook_stats_}")
-    ```
-"""
-
 from __future__ import annotations
 
 import logging
 import math
 import warnings
-from typing import Any, ClassVar, Literal
+from typing import Any
 
 import numpy as np
-import tqdm  # Progress bar for sub-estimator fits
-from scipy.spatial.distance import pdist
+import tqdm
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.utils import check_random_state
-
-# Imports as specified by the user
 from sklearn.utils.multiclass import unique_labels
-from sklearn.utils.validation import (
-    # _check_sample_weight, # Import if sample_weight functionality is added
-    check_is_fitted,
-    # _check_feature_names_in is used if X is validated by wrapper directly
-    # but we aim to use the custom validate_data
-)
+from sklearn.utils.validation import check_is_fitted
 from tabpfn_common_utils.telemetry import set_extension
 
-# Custom validate_data import
 from tabpfn_extensions.misc.sklearn_compat import validate_data
+
+from ._strategies import (
+    AggregationConfig,
+    CodebookConfig,
+    RowWeightingConfig,
+    WeightMode,
+    make_aggregator,
+    make_codebook_strategy,
+    make_row_weighter,
+)
+from ._utils import RowRunResult, normalize_weights, run_row
+
+try:  # pragma: no cover - optional sklearn internals
+    from sklearn.utils._tags import _DEFAULT_TAGS as SKLEARN_DEFAULT_TAGS
+except ImportError:  # pragma: no cover
+    SKLEARN_DEFAULT_TAGS = None
 
 logger = logging.getLogger(__name__)
 
-EPS = 1e-12
 
+class _TagDict(dict):
+    """Dictionary with attribute-style access for scikit-learn tags."""
 
-# Helper function: Fits a clone of the estimator on a specific sub-problem's
-# training data. This follows the original design where fitting happens during
-# prediction calls.
-def _apply_categorical_features_to_estimator(
-    estimator: BaseEstimator, categorical_features: list[int] | None
-) -> None:
-    """Apply stored categorical feature metadata to an estimator clone."""
-    if categorical_features is None:
-        return
-    if hasattr(estimator, "set_categorical_features"):
-        estimator.set_categorical_features(categorical_features)
-    elif hasattr(estimator, "categorical_features"):
-        estimator.categorical_features = categorical_features
+    def __getattr__(self, item):
+        try:
+            return self[item]
+        except KeyError as exc:
+            raise AttributeError(item) from exc
 
-
-def _as_numpy(X: Any) -> np.ndarray:
-    """Best-effort conversion of array-like data to a NumPy ndarray."""
-    if isinstance(X, np.ndarray):
-        return X
-    try:
-        return X.to_numpy()  # pandas objects
-    except AttributeError:
-        return np.asarray(X)
-
-
-def _fit_predict_train_test_proba(
-    estimator: BaseEstimator,
-    X_train_row: Any,
-    y_train_row: np.ndarray,
-    X_test: Any,
-    *,
-    categorical_features: list[int] | None = None,
-    fit_params: dict[str, Any] | None = None,
-    alphabet_size: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Fit a clone once and return aligned train/test probabilities."""
-    cloned_estimator = clone(estimator)
-    _apply_categorical_features_to_estimator(cloned_estimator, categorical_features)
-
-    fit_kwargs: dict[str, Any] = fit_params.copy() if fit_params else {}
-    cloned_estimator.fit(X_train_row, y_train_row, **fit_kwargs)
-
-    if not hasattr(cloned_estimator, "predict_proba"):
-        raise AttributeError("Base estimator must implement the predict_proba method.")
-
-    X_train_np = _as_numpy(X_train_row)
-    X_test_np = _as_numpy(X_test)
-    proba_both = cloned_estimator.predict_proba(
-        np.concatenate([X_train_np, X_test_np], axis=0)
-    )
-    classes_seen = getattr(cloned_estimator, "classes_", None)
-    if classes_seen is None:
-        raise AttributeError(
-            "Base estimator must expose `classes_` after fitting to align probabilities."
-        )
-
-    full = np.zeros((proba_both.shape[0], alphabet_size), dtype=np.float64)
-    indices = np.asarray(classes_seen, dtype=int)
-    full[:, indices] = proba_both
-    n_train = X_train_np.shape[0]
-    return full[n_train:], full[:n_train]
-
-
-def _filter_fit_params_for_mask(
-    fit_params: dict[str, Any] | None,
-    mask: np.ndarray | None,
-    *,
-    n_samples: int,
-) -> dict[str, Any]:
-    """Return fit parameters filtered by a boolean mask when available."""
-    if not fit_params:
-        return {}
-
-    if mask is None:
-        return fit_params.copy()
-
-    filtered: dict[str, Any] = {}
-    for key, value in fit_params.items():
-        if mask is not None:
-            if hasattr(value, "iloc"):
-                try:
-                    filtered[key] = value.iloc[mask]
-                    continue
-                except (TypeError, ValueError, IndexError):
-                    pass
-            if isinstance(value, (list, tuple)):
-                array_value = np.asarray(value)
-            else:
-                try:
-                    array_value = np.asarray(value)
-                except (TypeError, ValueError):
-                    array_value = None
-
-            if array_value is not None and array_value.ndim > 0 and array_value.shape[0] == n_samples:
-                masked = array_value[mask]
-                if isinstance(value, list):
-                    filtered[key] = masked.tolist()
-                    continue
-                if isinstance(value, tuple):
-                    filtered[key] = tuple(masked.tolist())
-                    continue
-                filtered[key] = masked
-                continue
-
-        filtered[key] = value
-
-    return filtered
+    def __setattr__(self, key, value):
+        self[key] = value
 
 
 @set_extension("many_class")
-class ManyClassClassifier(ClassifierMixin, BaseEstimator):
-    """Output-Code multiclass strategy to extend classifiers beyond their class limit.
+class ManyClassClassifier(BaseEstimator, ClassifierMixin):
+    """Output-coding wrapper that enables TabPFN-style estimators to handle many classes."""
 
-    This version adheres closely to an original structural design, with key
-    improvements in codebook generation and using a custom `validate_data` function
-    for scikit-learn compatibility. Fitting for sub-problems primarily occurs
-    during prediction.
-
-    Args:
-        estimator: A classifier implementing fit() and predict_proba() methods.
-        alphabet_size (int, optional): Maximum number of classes the base
-            estimator can handle. If None, attempts to infer from
-            `estimator.max_num_classes_`.
-        codebook_strategy (str): Strategy used to create the ECOC codebook.
-            ``"legacy_rest"`` (default) uses a one-vs-rest-style codebook that
-            reserves one symbol as a catch-all. ``"balanced_cluster"`` partitions
-            classes into balanced groups for each estimator.
-        n_estimators (int, optional): Number of base estimators (sub-problems).
-            If None, calculated based on other parameters.
-        n_estimators_redundancy (int): Redundancy factor for auto-calculated
-            `n_estimators`. Defaults to 4.
-        random_state (int, RandomState instance or None): Controls randomization
-            for codebook generation.
-        verbose (int): Controls verbosity. If > 0, prints codebook stats.
-            Defaults to 0.
-        log_proba_aggregation (bool): If True (default), aggregates sub-problem
-            predictions using log-likelihood decoding across the full codebook.
-            When False, falls back to the legacy averaging strategy that ignores
-            the "rest" bucket.
-        codebook_retries (int): Number of deterministic attempts to generate a
-            high-quality codebook. Defaults to 50.
-        codebook_min_hamming_frac (float | None): Early-exit target for the minimum
-            pairwise Hamming distance expressed as a fraction of
-            ``n_estimators``. Values are clamped to ``[0, 1]``; ``None`` disables
-            early stopping. Defaults to ``None``.
-        codebook_selection (Literal["max_min_hamming"]): Selection criterion
-            applied when comparing retry attempts. Currently only
-            ``"max_min_hamming"`` is supported.
-        codebook_hamming_max_classes (int): Maximum number of classes for which
-            exact pairwise Hamming statistics are computed. Defaults to 200.
-        legacy_filter_rest_train (bool): If True, drop "rest" assignments from the
-            training data passed to each sub-estimator when using the legacy
-            codebook strategy. Defaults to False.
-        legacy_mask_rest_log_agg (bool): If True (default), suppress the "rest"
-            symbol's contribution during log-probability aggregation for legacy
-            codebooks.
-        row_weighting (str | None): Optional row-weighting heuristic applied
-            during aggregation. Supported values are ``"train_entropy"`` and
-            ``"train_acc"``. Defaults to ``None``.
-        row_weighting_gamma (float): Exponent applied to row weights. Defaults to
-            1.0.
-
-    Attributes:
-        classes_ (np.ndarray): Unique target labels.
-        code_book_ (np.ndarray | None): Generated codebook if mapping is needed.
-        codebook_stats_ (dict): Statistics about the generated codebook.
-        estimators_ (list | None): Stores the single fitted base estimator *only*
-            if `no_mapping_needed_` is True.
-        no_mapping_needed_ (bool): True if n_classes <= alphabet_size.
-        classes_index_ (dict | None): Maps class labels to indices.
-        X_train (np.ndarray | None): Stored training features if mapping needed.
-        Y_train_per_estimator (np.ndarray | None): Encoded training labels for each sub-problem.
-                                        Shape (n_estimators, n_samples).
-        n_features_in_ (int): Number of features seen during `fit`.
-        feature_names_in_ (np.ndarray | None): Names of features seen during `fit`.
-        log_proba_aggregation (bool): Strategy flag controlling probability aggregation.
-
-    Examples:
-        >>> from sklearn.datasets import load_iris
-        >>> from tabpfn import TabPFNClassifier
-        >>> from tabpfn_extensions.many_class import ManyClassClassifier
-        >>> from sklearn.model_selection import train_test_split
-        >>> X, y = load_iris(return_X_y=True)
-        >>> X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
-        >>> base_clf = TabPFNClassifier()
-        >>> many_clf = ManyClassClassifier(base_clf, alphabet_size=base_clf.max_num_classes_)
-        >>> many_clf.fit(X_train, y_train)
-        >>> y_pred = many_clf.predict(X_test)
-    """
-
-    _required_parameters: ClassVar[list[str]] = ["estimator"]
     def __init__(
         self,
         estimator: BaseEstimator,
         *,
         alphabet_size: int | None = None,
-        codebook_strategy: str = "legacy_rest",
         n_estimators: int | None = None,
         n_estimators_redundancy: int = 4,
         random_state: int | None = None,
         verbose: int = 0,
-        log_proba_aggregation: bool = True,
-        codebook_retries: int = 50,
-        codebook_min_hamming_frac: float | None = None,
-        codebook_selection: Literal["max_min_hamming"] = "max_min_hamming",
-        codebook_hamming_max_classes: int = 200,
-        legacy_filter_rest_train: bool = False,
-        legacy_mask_rest_log_agg: bool = True,
-        row_weighting: str | None = None,
-        row_weighting_gamma: float = 1.0,
-    ):
+        codebook_config: CodebookConfig | str | None = None,
+        row_weighting_config: RowWeightingConfig | WeightMode | str | None = None,
+        aggregation_config: AggregationConfig | None = None,
+    ) -> None:
         self.estimator = estimator
-        self.random_state = random_state
         self.alphabet_size = alphabet_size
         self.n_estimators = n_estimators
-        self.codebook_strategy = codebook_strategy
         self.n_estimators_redundancy = n_estimators_redundancy
+        self.random_state = random_state
         self.verbose = verbose
-        self.log_proba_aggregation = log_proba_aggregation
-        self.legacy_filter_rest_train = bool(legacy_filter_rest_train)
-        self.legacy_mask_rest_log_agg = bool(legacy_mask_rest_log_agg)
-        self.row_weighting = row_weighting
-        self.row_weighting_gamma = float(row_weighting_gamma)
-        self.fit_params_: dict[str, Any] | None = None
-        retries = codebook_retries
-        min_frac = codebook_min_hamming_frac
-        selection = codebook_selection
-        max_classes = codebook_hamming_max_classes
-        if retries < 1:
-            raise ValueError("codebook_retries must be at least 1.")
-        if min_frac is not None and not 0.0 <= min_frac <= 1.0:
-            raise ValueError("codebook_min_hamming_frac must be in [0, 1].")
-        if max_classes < 0:
-            raise ValueError("codebook_hamming_max_classes must be non-negative.")
-        if selection != "max_min_hamming":
-            raise ValueError("Unsupported codebook_selection criterion.")
-        if self.row_weighting not in {None, "train_entropy", "train_acc"}:
-            raise ValueError(
-                "row_weighting must be None, 'train_entropy', or 'train_acc'."
-            )
-        self.codebook_retries = int(retries)
-        self.codebook_min_hamming_frac = None if min_frac is None else float(min_frac)
-        self.codebook_selection = selection
-        self.codebook_hamming_max_classes = int(max_classes)
+
+        self.codebook_config = self._resolve_codebook_config(codebook_config)
+        self.row_weighting_config = self._resolve_row_weighting_config(
+            row_weighting_config
+        )
+        self.aggregation_config = aggregation_config or AggregationConfig()
+        self.log_proba_aggregation = self.aggregation_config.log_likelihood
+
+        self._codebook_strategy = make_codebook_strategy(self.codebook_config)
+        self._row_weighter = make_row_weighter(self.row_weighting_config)
+
+        # Attributes populated during fitting
+        self._fit_params: dict[str, Any] = {}
+        self._row_class_mask_: np.ndarray | None = None
+        self.row_weights_: np.ndarray | None = None
+        self.row_train_support_: np.ndarray | None = None
+        self.row_train_entropy_: np.ndarray | None = None
+        self.row_train_acc_: np.ndarray | None = None
+
+    # ------------------------------------------------------------------
+    # Configuration helpers
+    # ------------------------------------------------------------------
+    def _resolve_codebook_config(
+        self, config: CodebookConfig | str | None
+    ) -> CodebookConfig:
+        if config is None:
+            return CodebookConfig()
+        if isinstance(config, CodebookConfig):
+            return config
+        return CodebookConfig(strategy=config)
+
+    def _resolve_row_weighting_config(
+        self, config: RowWeightingConfig | WeightMode | str | None
+    ) -> RowWeightingConfig:
+        if config is None:
+            return RowWeightingConfig()
+        if isinstance(config, RowWeightingConfig):
+            return config
+        return RowWeightingConfig(mode=config)
+
+    # ------------------------------------------------------------------
+    # Fitting utilities
+    # ------------------------------------------------------------------
+    def _get_alphabet_size(self) -> int:
+        if self.alphabet_size is not None:
+            return self.alphabet_size
+        if hasattr(self.estimator, "max_num_classes_"):
+            inferred = self.estimator.max_num_classes_
+            if inferred is not None:
+                return int(inferred)
+        raise ValueError("alphabet_size must be specified when base estimator has no limit")
+
+    def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
+        if self.n_estimators is not None:
+            return int(self.n_estimators)
+        if alphabet_size <= 1:
+            return max(n_classes, 1)
+        log_cover = math.ceil(math.log(max(n_classes, 2), alphabet_size))
+        cover = math.ceil(n_classes / max(alphabet_size - 1, 1))
+        base = max(log_cover, cover)
+        redundancy = max(1, int(self.n_estimators_redundancy))
+        candidate = base * redundancy
+        cap = max(base, 4 * max(log_cover, 1))
+        return max(base, min(candidate, cap))
 
     def _set_verbosity(self) -> None:
-        """Configure the module-level logger according to the estimator verbosity."""
         level = (
             logging.WARNING
             if self.verbose <= 0
@@ -357,9 +145,8 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         )
         logger.setLevel(level)
 
-    def _log_codebook_stats(self, stats: dict[str, Any], *, tag: str) -> None:
-        if not stats:
-            return
+    @staticmethod
+    def _log_codebook_stats(stats: dict[str, Any], *, tag: str) -> None:
         logger.info(
             "[ManyClassClassifier] %s: %s",
             tag,
@@ -375,7 +162,6 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                     "coverage_mean",
                     "coverage_std",
                     "min_pairwise_hamming_dist",
-                    "mean_pairwise_hamming_dist",
                     "best_min_pairwise_hamming_dist",
                     "regeneration_attempts",
                 )
@@ -383,11 +169,11 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             },
         )
 
+    @staticmethod
     def _log_shapes(
-        self,
         *,
-        X_train: np.ndarray | None,
-        X: np.ndarray,
+        X_train: Any,
+        X: Any,
         Y_train_per_estimator: np.ndarray | None,
         proba_arr: np.ndarray | None,
     ) -> None:
@@ -399,691 +185,210 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             getattr(proba_arr, "shape", None),
         )
 
-    def _codebook_quality_key(
-        self,
-        *,
-        min_dist: int | None,
-        mean_dist: float | None,
-        stats: dict[str, Any],
-        attempt_seed: int,
-    ) -> tuple[float, float, float, int]:
-        """Produce a comparable quality key for codebook selection."""
-        min_metric = float("-inf") if min_dist is None else float(min_dist)
-        mean_metric = float("-inf") if mean_dist is None else float(mean_dist)
-        coverage_std = stats.get("coverage_std")
-        coverage_metric = (
-            float("-inf") if coverage_std is None else -float(coverage_std)
-        )
-        return (min_metric, mean_metric, coverage_metric, attempt_seed)
-
-    def _get_alphabet_size(self) -> int:
-        """Helper to get alphabet_size, inferring if necessary."""
-        provided = self.alphabet_size if self.alphabet_size is not None else None
-        try:
-            # TabPFN specific attribute, or common one for models with class limits
-            inferred = self.estimator.max_num_classes_
-        except AttributeError:
-            # Fallback for estimators not exposing this directly
-            # Might need to be explicitly set for such estimators.
-            if self.verbose > 0:
-                warnings.warn(
-                    "Could not infer alphabet_size from estimator.max_num_classes_. "
-                    "Ensure alphabet_size is correctly set if this is not TabPFN.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            # Default to a common small number if not TabPFN and not set,
-            # though this might not be optimal.
-            inferred = 10
-
-        return provided if provided is not None else inferred
-
-    def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
-        """Helper to calculate the number of estimators."""
-        if self.n_estimators is not None:
-            return self.n_estimators
-        if n_classes <= alphabet_size:
-            return 1  # Only one base estimator needed
-
-        log_base = max(2, alphabet_size)
-        min_estimators_theory = max(1, math.ceil(math.log(n_classes, log_base)))
-        min_needed_for_potential_coverage = math.ceil(
-            n_classes / max(1, alphabet_size - 1)
-        )
-        max_needed = max(min_estimators_theory, min_needed_for_potential_coverage)
-        expanded = max_needed * max(1, self.n_estimators_redundancy)
-        log_cap = 4 * min_estimators_theory
-        capped = min(expanded, log_cap) if log_cap > 0 else expanded
-        return max(max_needed, capped)
-
-    def _summarize_codebook(
-        self,
-        *,
-        codebook: np.ndarray,
-        coverage_count: np.ndarray,
-        n_estimators: int,
-        n_classes: int,
-        alphabet_size: int,
-        strategy: str,
-        has_rest_symbol: bool,
-        rest_class_code: int | None,
-    ) -> tuple[dict[str, Any], int | None, float | None]:
-        """Compute statistics for a generated codebook and return its quality."""
-        stats = {
-            "coverage_min": int(np.min(coverage_count)),
-            "coverage_max": int(np.max(coverage_count)),
-            "coverage_mean": float(np.mean(coverage_count)),
-            "coverage_std": float(np.std(coverage_count)),
-            "n_estimators": n_estimators,
-            "n_classes": n_classes,
-            "alphabet_size": alphabet_size,
-            "strategy": strategy,
-            "has_rest_symbol": has_rest_symbol,
-            "rest_class_code": rest_class_code,
-            "codebook_selection": self.codebook_selection,
-        }
-
-        min_dist_count: int | None = None
-        mean_dist_count: float | None = None
-        if 1 < n_classes < self.codebook_hamming_max_classes:
-            distances = pdist(codebook.T, metric="hamming") * n_estimators
-            if distances.size > 0:
-                min_dist_count = int(np.rint(np.min(distances)))
-                mean_dist_count = float(np.mean(distances))
-        stats["min_pairwise_hamming_dist"] = min_dist_count
-        if mean_dist_count is not None:
-            stats["mean_pairwise_hamming_dist"] = mean_dist_count
-        else:
-            stats["mean_pairwise_hamming_dist"] = None
-        return stats, min_dist_count, mean_dist_count
-
-    def _generate_codebook_balanced_cluster(
-        self,
-        n_classes: int,
-        n_estimators: int,
-        alphabet_size: int,
-        random_state_instance: np.random.RandomState,
-    ) -> tuple[np.ndarray, dict]:
-        """Generate a dense, balanced codebook using random partitioning."""
-        if n_classes <= alphabet_size:
-            raise ValueError(
-                "Balanced codebook generation requires n_classes > alphabet_size."
-            )
-
-        coverage_count = np.full(n_classes, n_estimators, dtype=int)
-        max_attempts = max(1, self.codebook_retries)
-        target = None
-        if self.codebook_min_hamming_frac is not None and self.codebook_min_hamming_frac > 0:
-            target = math.ceil(self.codebook_min_hamming_frac * n_estimators)
-        best_codebook: np.ndarray | None = None
-        best_stats: dict[str, Any] | None = None
-        best_min_dist: int | None = None
-        best_mean_dist: float | None = None
-        best_quality: tuple[float, float, float, int] | None = None
-        attempts_used = 0
-
-        for attempt in range(max_attempts):
-            attempt_seed = int(
-                random_state_instance.randint(0, np.iinfo(np.uint32).max)
-            )
-            attempt_rng = np.random.RandomState(attempt_seed)
-            codebook = np.zeros((n_estimators, n_classes), dtype=int)
-            class_indices = np.arange(n_classes)
-
-            highlight_rows = min(n_classes, n_estimators)
-            for row_idx in range(highlight_rows):
-                focus_class = row_idx % n_classes
-                other_classes = np.delete(class_indices, focus_class)
-                codebook[row_idx, focus_class] = 0
-                if alphabet_size > 1 and other_classes.size > 0:
-                    attempt_rng.shuffle(other_classes)
-                    other_groups = np.array_split(other_classes, alphabet_size - 1)
-                    for offset, group in enumerate(other_groups, start=1):
-                        codebook[row_idx, group] = offset
-
-            for row_idx in range(highlight_rows, n_estimators):
-                row_classes = class_indices.copy()
-                attempt_rng.shuffle(row_classes)
-                class_groups = np.array_split(row_classes, alphabet_size)
-                for code, group in enumerate(class_groups):
-                    codebook[row_idx, group] = code
-
-            stats, min_dist, mean_dist = self._summarize_codebook(
-                codebook=codebook,
-                coverage_count=coverage_count,
-                n_estimators=n_estimators,
-                n_classes=n_classes,
-                alphabet_size=alphabet_size,
-                strategy="balanced_cluster",
-                has_rest_symbol=False,
-                rest_class_code=None,
-            )
-            attempts_used = attempt + 1
-            quality_key = self._codebook_quality_key(
-                min_dist=min_dist,
-                mean_dist=mean_dist,
-                stats=stats,
-                attempt_seed=attempt_seed,
-            )
-            logger.info(
-                "Codebook attempt %d/%d (balanced_cluster): min_hamming=%s mean_hamming=%s",
-                attempts_used,
-                max_attempts,
-                min_dist,
-                mean_dist,
-            )
-
-            if best_quality is None or quality_key > best_quality:
-                best_quality = quality_key
-                best_codebook = codebook
-                best_stats = stats
-                best_min_dist = min_dist
-                best_mean_dist = mean_dist
-
-            if target is not None and min_dist is not None and min_dist >= target:
-                logger.info(
-                    "Early exit after %d attempts: achieved min Hamming %s (target %s)",
-                    attempts_used,
-                    min_dist,
-                    target,
-                )
-                break
-
-        if best_codebook is None or best_stats is None:
-            raise RuntimeError("Failed to generate a valid balanced codebook.")
-
-        best_stats["regeneration_attempts"] = attempts_used
-        best_stats["best_min_pairwise_hamming_dist"] = best_min_dist
-        best_stats["mean_pairwise_hamming_dist"] = best_mean_dist
-        logger.info(
-            "Selected balanced_cluster codebook after %d attempts with min_hamming=%s",
-            attempts_used,
-            best_min_dist,
-        )
-        return best_codebook, best_stats
-
-    def _generate_codebook_legacy_rest(
-        self,
-        n_classes: int,
-        n_estimators: int,
-        alphabet_size: int,
-        random_state_instance: np.random.RandomState,
-    ) -> tuple[np.ndarray, dict]:
-        """Generate a legacy codebook with an explicit rest symbol."""
-        if n_classes <= alphabet_size:
-            raise ValueError(
-                "Legacy codebook generation requires n_classes > alphabet_size."
-            )
-
-        codes_to_assign = list(range(alphabet_size - 1))
-        n_codes_available = len(codes_to_assign)
-        rest_class_code = alphabet_size - 1
-
-        if n_codes_available == 0:
-            raise ValueError(
-                "alphabet_size must be at least 2 for codebook generation."
-            )
-        max_attempts = max(1, self.codebook_retries)
-        target = None
-        if self.codebook_min_hamming_frac is not None and self.codebook_min_hamming_frac > 0:
-            target = math.ceil(self.codebook_min_hamming_frac * n_estimators)
-        best_codebook: np.ndarray | None = None
-        best_stats: dict[str, Any] | None = None
-        best_min_dist: int | None = None
-        best_mean_dist: float | None = None
-        best_quality: tuple[float, float, float, int] | None = None
-        attempts_used = 0
-
-        for attempt in range(max_attempts):
-            attempt_seed = int(
-                random_state_instance.randint(0, np.iinfo(np.uint32).max)
-            )
-            attempt_rng = np.random.RandomState(attempt_seed)
-            codebook = np.full((n_estimators, n_classes), rest_class_code, dtype=int)
-            coverage_count = np.zeros(n_classes, dtype=int)
-
-            for row_idx in range(n_estimators):
-                n_assignable_this_row = min(n_codes_available, n_classes)
-                noisy_counts = coverage_count + attempt_rng.uniform(0, 0.1, n_classes)
-                sorted_indices = np.argsort(noisy_counts)
-                selected_classes_for_row = sorted_indices[:n_assignable_this_row]
-                permuted_codes = attempt_rng.permutation(codes_to_assign)
-                codes_to_use = permuted_codes[:n_assignable_this_row]
-                codebook[row_idx, selected_classes_for_row] = codes_to_use
-                coverage_count[selected_classes_for_row] += 1
-
-            if np.any(coverage_count == 0):
-                uncovered_indices = np.where(coverage_count == 0)[0]
-                raise RuntimeError(
-                    "Failed to cover classes within "
-                    f"{n_estimators} estimators. {len(uncovered_indices)} uncovered "
-                    f"(e.g., {uncovered_indices[:5]})."
-                )
-
-            stats, min_dist, mean_dist = self._summarize_codebook(
-                codebook=codebook,
-                coverage_count=coverage_count,
-                n_estimators=n_estimators,
-                n_classes=n_classes,
-                alphabet_size=alphabet_size,
-                strategy="legacy_rest",
-                has_rest_symbol=True,
-                rest_class_code=rest_class_code,
-            )
-            attempts_used = attempt + 1
-            quality_key = self._codebook_quality_key(
-                min_dist=min_dist,
-                mean_dist=mean_dist,
-                stats=stats,
-                attempt_seed=attempt_seed,
-            )
-            logger.info(
-                "Codebook attempt %d/%d (legacy_rest): min_hamming=%s mean_hamming=%s",
-                attempts_used,
-                max_attempts,
-                min_dist,
-                mean_dist,
-            )
-
-            if best_quality is None or quality_key > best_quality:
-                best_quality = quality_key
-                best_codebook = codebook
-                best_stats = stats
-                best_min_dist = min_dist
-                best_mean_dist = mean_dist
-
-            if target is not None and min_dist is not None and min_dist >= target:
-                logger.info(
-                    "Early exit after %d attempts: achieved min Hamming %s (target %s)",
-                    attempts_used,
-                    min_dist,
-                    target,
-                )
-                break
-
-        if best_codebook is None or best_stats is None:
-            raise RuntimeError("Failed to generate a valid legacy codebook.")
-
-        best_stats["regeneration_attempts"] = attempts_used
-        best_stats["best_min_pairwise_hamming_dist"] = best_min_dist
-        best_stats["mean_pairwise_hamming_dist"] = best_mean_dist
-        logger.info(
-            "Selected legacy_rest codebook after %d attempts with min_hamming=%s",
-            attempts_used,
-            best_min_dist,
-        )
-        return best_codebook, best_stats
-
+    # ------------------------------------------------------------------
+    # Estimator API
+    # ------------------------------------------------------------------
     def fit(self, X, y, **fit_params) -> ManyClassClassifier:
-        """Prepare classifier using custom validate_data.
-        Actual fitting of sub-estimators happens in predict_proba if mapping is needed.
-        """
         self._set_verbosity()
-        # Use the custom validate_data for y
-        # Assuming it handles conversion to 1D and basic checks.
-        # y_numeric=True is common for classification targets.
-        X, y = validate_data(
+        X_validated, y_validated = validate_data(
             self,
             X,
             y,
-            ensure_all_finite=False,  # scikit-learn sets self.n_features_in_ automatically
+            ensure_all_finite=False,
         )
-        # After validate_data, set feature_names_in_ if X is a DataFrame
-        if hasattr(X, "columns"):
-            self.feature_names_in_ = np.asarray(X.columns, dtype=object)
-        elif hasattr(self, "feature_names_in_"):
-            del self.feature_names_in_
-        self.n_features_in_ = X.shape[1]
 
-        random_state_instance = check_random_state(self.random_state)
-        self.classes_ = unique_labels(y)  # Use unique_labels as imported
+        self._fit_params = dict(fit_params)
+        self.fit_params_ = self._fit_params
+        self.classes_ = unique_labels(y_validated)
+        self.alphabet_size_ = self._get_alphabet_size()
+        if self.alphabet_size_ < 2:
+            raise ValueError("alphabet_size must be >= 2.")
+
+        self.n_features_in_ = X_validated.shape[1]
+        if hasattr(X_validated, "columns"):
+            self.feature_names_in_ = np.asarray(list(X_validated.columns), dtype=object)
+        else:
+            self.feature_names_in_ = None
+
         n_classes = len(self.classes_)
+        rng = check_random_state(self.random_state)
+        self.no_mapping_needed_ = n_classes <= self.alphabet_size_
 
-        alphabet_size = self._get_alphabet_size()
-        self.alphabet_size_ = alphabet_size
-        self.no_mapping_needed_ = n_classes <= alphabet_size
-        self.codebook_stats_ = {}
-        self.estimators_ = None
-        self.code_book_ = None
-        self.classes_index_ = None
-        self.X_train = None
-        self.Y_train_per_estimator = None
-        self.fit_params_ = fit_params.copy() if fit_params else {}
-        self._row_class_used_mask_ = None
         self.row_weights_ = None
-        self.row_weights_raw_ = None
         self.row_train_support_ = None
         self.row_train_entropy_ = None
         self.row_train_acc_ = None
-
-        if n_classes == 0:
-            raise ValueError("Cannot fit with no classes present.")
-        if n_classes == 1:
-            # Gracefully handle single-class case: fit estimator, set trivial codebook
-            if self.verbose > 0:
-                pass
-            cloned_estimator = clone(self.estimator)
-            _apply_categorical_features_to_estimator(
-                cloned_estimator, getattr(self, "categorical_features", None)
-            )
-            cloned_estimator.fit(X, y, **self.fit_params_)
-            self.estimators_ = [cloned_estimator]
-            self.code_book_ = np.zeros((1, 1), dtype=int)
-            self.codebook_stats_ = {
-                "n_classes": 1,
-                "n_estimators": 1,
-                "alphabet_size": 1,
-            }
-            return self
+        self._row_class_mask_ = None
 
         if self.no_mapping_needed_:
-            cloned_estimator = clone(self.estimator)
-            _apply_categorical_features_to_estimator(
-                cloned_estimator, getattr(self, "categorical_features", None)
-            )
-            # Base estimator fits on X_validated (already processed by custom validate_data)
-            cloned_estimator.fit(X, y, **self.fit_params_)
-            self.estimators_ = [cloned_estimator]
-            # Ensure n_features_in_ matches the fitted estimator if it has the attribute
-            if hasattr(cloned_estimator, "n_features_in_"):
-                self.n_features_in_ = cloned_estimator.n_features_in_
+            estimator = self._clone_base_estimator()
+            estimator.fit(X_validated, y_validated, **self._fit_params)
+            self.estimators_ = [estimator]
+            self.code_book_ = None
+            self.codebook_stats_ = {"strategy": "no_mapping"}
+            self.classes_index_ = None
+            self.X_train = None
+            self.Y_train_per_estimator = None
+            return self
 
-        else:  # Mapping is needed
-            if self.verbose > 0:
-                pass
-            n_est = self._get_n_estimators(n_classes, alphabet_size)
-            if self.codebook_strategy == "balanced_cluster":
-                generator = self._generate_codebook_balanced_cluster
-            elif self.codebook_strategy == "legacy_rest":
-                generator = self._generate_codebook_legacy_rest
-            else:
-                raise ValueError(
-                    "Unsupported codebook_strategy. Expected 'balanced_cluster' or 'legacy_rest'."
-                )
-            self.code_book_, self.codebook_stats_ = generator(
-                n_classes, n_est, alphabet_size, random_state_instance
-            )
-            if self.codebook_strategy == "legacy_rest":
-                rest_code = self.codebook_stats_.get("rest_class_code")
-                if rest_code is None:
-                    rest_code = alphabet_size - 1
-                self._row_class_used_mask_ = self.code_book_ != rest_code
-            else:
-                self._row_class_used_mask_ = np.ones_like(self.code_book_, dtype=bool)
-            self._log_codebook_stats(self.codebook_stats_, tag="Codebook stats")
-            self.classes_index_ = {c: i for i, c in enumerate(self.classes_)}
-            self.X_train = X  # Store validated X
-            y_indices = np.array([self.classes_index_[val] for val in y])
-            self.Y_train_per_estimator = self.code_book_[:, y_indices]
+        n_estimators = self._get_n_estimators(n_classes, self.alphabet_size_)
+        codebook, stats = self._codebook_strategy.generate(
+            n_classes, n_estimators, self.alphabet_size_, rng
+        )
+        self._log_codebook_stats(stats, tag="Codebook stats")
+
+        self.code_book_ = codebook
+        self.codebook_stats_ = stats
+        self.estimators_ = None
+        self.classes_index_ = {label: idx for idx, label in enumerate(self.classes_)}
+
+        self.X_train = X_validated
+        y_indices = np.array([self.classes_index_[label] for label in y_validated])
+        self.Y_train_per_estimator = self.code_book_[:, y_indices]
+
+        if stats.get("has_rest_symbol", False):
+            rest_code = stats.get("rest_class_code")
+            self._row_class_mask_ = self.code_book_ != rest_code
+        else:
+            self._row_class_mask_ = np.ones_like(self.code_book_, dtype=bool)
 
         return self
 
     def predict_proba(self, X) -> np.ndarray:
-        """Predict class probabilities for X. Sub-estimators are fitted here if mapping is used."""
-        # Attributes to check if fitted, adapt from user's ["_tree", "X", "y"]
-        # Key attributes for this classifier: classes_ must be set, n_features_in_ for X dim check.
-        self._set_verbosity()
         check_is_fitted(self, ["classes_", "n_features_in_"])
+        self._set_verbosity()
 
-        # Use the custom validate_data for X in predict methods as well
-        # reset=False as n_features_in_ should already be set from fit
-        # Align DataFrame columns if needed
-        X = validate_data(
+        X_validated = validate_data(
             self,
             X,
-            ensure_all_finite=False,  # As requested
+            ensure_all_finite=False,
         )
 
-        if self.no_mapping_needed_:
+        if getattr(self, "no_mapping_needed_", False):
             if not self.estimators_:
                 raise RuntimeError("Estimator not fitted. Call fit first.")
-            return self.estimators_[0].predict_proba(X)
-
-        if (
-            self.X_train is None
-            or self.Y_train_per_estimator is None
-            or self.code_book_ is None
-        ):
-            raise RuntimeError(
-                "Fit method did not properly initialize for mapping. Call fit first."
+            proba = self.estimators_[0].predict_proba(X_validated)
+            self._log_shapes(
+                X_train=None,
+                X=X_validated,
+                Y_train_per_estimator=None,
+                proba_arr=proba,
             )
+            return proba
 
-        codebook_stats = getattr(self, "codebook_stats_", {}) or {}
-        has_rest_symbol = bool(codebook_stats.get("has_rest_symbol", False))
-        rest_class_code = codebook_stats.get("rest_class_code")
-        if has_rest_symbol and rest_class_code is None:
-            rest_class_code = self.alphabet_size_ - 1
+        if self.code_book_ is None or self.Y_train_per_estimator is None:
+            raise RuntimeError("Fit method did not initialize mapping structures.")
 
-        iterator = range(self.code_book_.shape[0])
-        iterable = tqdm.tqdm(iterator, disable=(self.verbose <= 1))
-        Y_pred_probas_list: list[np.ndarray] = []
-        weights: list[float] = []
-        support_counts: list[int] = []
-        entropies: list[float] = []
-        accuracies: list[float] = []
         categorical_features = getattr(self, "categorical_features", None)
-        has_legacy_rest = (
-            self.codebook_strategy == "legacy_rest" and has_rest_symbol
-        )
-        n_train_samples = self.X_train.shape[0]
+        iterator = range(self.code_book_.shape[0])
+        iterable = tqdm.tqdm(iterator, disable=(self.verbose < 2))
 
-        for i in iterable:
-            y_subproblem = self.Y_train_per_estimator[i, :]
-            mask_train: np.ndarray | None = None
-            X_train_row = self.X_train
-            y_train_row = y_subproblem
+        has_rest = bool(self.codebook_stats_.get("has_rest_symbol", False))
+        rest_code = self.codebook_stats_.get("rest_class_code") if has_rest else None
 
-            if has_legacy_rest and self.legacy_filter_rest_train:
-                candidate_mask = y_subproblem != rest_class_code
-                if np.any(candidate_mask):
-                    mask_train = candidate_mask
-                    X_train_row = self.X_train[mask_train]
-                    y_train_row = y_subproblem[mask_train]
-                else:
-                    weights.append(1e-6)
-                    support_counts.append(0)
-                    entropies.append(np.nan)
-                    accuracies.append(np.nan)
-                    Y_pred_probas_list.append(
-                        np.full(
-                            (X.shape[0], self.alphabet_size_),
-                            1.0 / max(self.alphabet_size_, 1),
-                            dtype=np.float64,
-                        )
-                    )
-                    continue
+        row_results: list[RowRunResult] = []
+        entropies: list[float | None] = []
+        accuracies: list[float | None] = []
+        supports: list[int] = []
+        raw_weights: list[float] = []
 
-            if y_train_row.size == 0:
-                weights.append(1e-6)
-                support_counts.append(0)
-                entropies.append(np.nan)
-                accuracies.append(np.nan)
-                Y_pred_probas_list.append(
-                    np.full(
-                        (X.shape[0], self.alphabet_size_),
-                        1.0 / max(self.alphabet_size_, 1),
-                        dtype=np.float64,
-                    )
-                )
-                continue
-
-            fit_kwargs_row = _filter_fit_params_for_mask(
-                self.fit_params_, mask_train, n_samples=n_train_samples
-            )
-
-            P_test_full, P_train_full = _fit_predict_train_test_proba(
+        for row_idx in iterable:
+            row_codes = self.Y_train_per_estimator[row_idx]
+            mask = None
+            if has_rest and self.codebook_config.legacy_filter_rest_train:
+                mask = row_codes != rest_code
+            result = run_row(
                 self.estimator,
-                X_train_row,
-                y_train_row,
-                X,
-                categorical_features=categorical_features,
-                fit_params=fit_kwargs_row,
+                self.X_train,
+                row_codes,
+                X_validated,
                 alphabet_size=self.alphabet_size_,
+                categorical_features=categorical_features,
+                mask=mask,
+                fit_params=self._fit_params,
+                row_weighter=self._row_weighter,
             )
-            Y_pred_probas_list.append(P_test_full)
-            support_counts.append(int(y_train_row.shape[0]))
+            row_results.append(result)
+            entropies.append(result.entropy)
+            accuracies.append(result.accuracy)
+            supports.append(result.support)
+            raw_weights.append(result.weight)
 
-            weight = 1.0
-            row_entropy = np.nan
-            row_acc = np.nan
-            if self.row_weighting in {"train_entropy", "train_acc"} and P_train_full.size > 0:
-                P_train = np.clip(P_train_full, EPS, 1.0)
-                q = P_train.shape[1]
-                if self.row_weighting == "train_entropy":
-                    row_entropy = float(
-                        -np.mean(np.sum(P_train * np.log(P_train), axis=1))
-                    )
-                    norm = max(math.log(max(q, 2)), EPS)
-                    ratio = row_entropy / norm
-                    weight = max(1e-3, 1.0 - ratio)
-                else:
-                    preds = np.argmax(P_train, axis=1)
-                    row_acc = float(np.mean(preds == y_train_row))
-                    counts = np.bincount(y_train_row, minlength=q).astype(float)
-                    if counts.sum() > 0:
-                        chance = float((counts / counts.sum()).max())
-                    else:
-                        chance = 1.0 / max(q, 1)
-                    weight = max(1e-3, row_acc - chance)
-                weight = float(weight) ** self.row_weighting_gamma
+        if not row_results:
+            raise RuntimeError("No ECOC rows were generated; check configuration.")
 
-            weights.append(weight)
-            entropies.append(row_entropy)
-            accuracies.append(row_acc)
+        proba_rows = np.stack([result.proba_test for result in row_results], axis=0)
+        weights = normalize_weights(np.asarray(raw_weights, dtype=float))
 
-        Y_pred_probas_arr = np.stack(Y_pred_probas_list, axis=0)
-        self._log_shapes(
-            X_train=self.X_train,
-            X=X,
-            Y_train_per_estimator=self.Y_train_per_estimator,
-            proba_arr=Y_pred_probas_arr,
+        self.row_weights_ = weights
+        self.row_train_support_ = np.asarray(supports, dtype=int)
+        self.row_train_entropy_ = np.asarray(
+            [np.nan if val is None else float(val) for val in entropies], dtype=float
+        )
+        self.row_train_acc_ = np.asarray(
+            [np.nan if val is None else float(val) for val in accuracies], dtype=float
         )
 
-        _n_estimators, n_samples, current_alphabet_size = Y_pred_probas_arr.shape
-        if n_samples == 0:
-            return np.zeros((0, len(self.classes_)))
+        rest_mask = None
+        if has_rest and self._row_class_mask_ is not None:
+            rest_mask = self._row_class_mask_.astype(float)
 
-        n_orig_classes = len(self.classes_)
-        codebook_stats = getattr(self, "codebook_stats_", {}) or {}
-        has_rest_symbol = bool(codebook_stats.get("has_rest_symbol", False))
-        rest_class_code = codebook_stats.get("rest_class_code")
-        if has_rest_symbol and rest_class_code is None:
-            rest_class_code = current_alphabet_size - 1
-        use_log_agg = bool(self.log_proba_aggregation)
-        if self.codebook_strategy == "balanced_cluster":
-            if not use_log_agg and self.verbose > 0:
-                warnings.warn(
-                    "Using log-likelihood decoding for 'balanced_cluster' (more accurate).",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            use_log_agg = True
-        elif not has_rest_symbol:
-            if not use_log_agg and self.verbose > 0:
-                warnings.warn(
-                    "Using log-likelihood decoding for codebooks without a rest symbol (more accurate).",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            use_log_agg = True
-
-        raw_weights_arr = np.asarray(weights, dtype=float)
-        raw_weights_arr = np.where(np.isfinite(raw_weights_arr), raw_weights_arr, 1.0)
-        raw_weights_arr = np.clip(raw_weights_arr, 1e-6, None)
-        weights_arr = raw_weights_arr.copy()
-        weight_sum = weights_arr.sum()
-        if weight_sum <= 0:
-            weights_arr = np.ones_like(weights_arr)
-            weight_sum = weights_arr.sum()
-        weights_arr *= len(weights_arr) / max(weight_sum, EPS)
-
-        self.row_weights_raw_ = raw_weights_arr
-        self.row_weights_ = weights_arr.copy()
-        self.row_train_support_ = np.asarray(support_counts, dtype=int)
-        self.row_train_entropy_ = np.asarray(entropies, dtype=float)
-        self.row_train_acc_ = np.asarray(accuracies, dtype=float)
-
-        gather_idx = self.code_book_[:, None, :]
-        gathered = np.take_along_axis(Y_pred_probas_arr, gather_idx, axis=2)
-
-        if use_log_agg:
-            gathered = np.log(np.clip(gathered, EPS, 1.0))
-            if (
-                has_rest_symbol
-                and has_legacy_rest
-                and self.legacy_mask_rest_log_agg
-                and getattr(self, "_row_class_used_mask_", None) is not None
-            ):
-                rest_mask = self._row_class_used_mask_[:, None, :]
-                gathered = gathered * rest_mask
-            gathered = gathered * weights_arr[:, None, None]
-            aggregated = gathered.sum(axis=0)
-            aggregated -= aggregated.max(axis=1, keepdims=True)
-            exp_scores = np.exp(aggregated)
-            denom = np.clip(exp_scores.sum(axis=1, keepdims=True), 1.0, None)
-            probas = exp_scores / denom
-            zero_mask = denom.squeeze() == 0
-            if np.any(zero_mask):
-                probas[zero_mask] = 1.0 / n_orig_classes
-            return probas
-
-        row_class_mask = getattr(self, "_row_class_used_mask_", None)
-        if row_class_mask is None:
-            row_class_mask = np.ones_like(self.code_book_, dtype=bool)
-        mask = row_class_mask.astype(float)
-        weighted = gathered
-        weighted = weighted * mask[:, None, :]
-        weighted = weighted * weights_arr[:, None, None]
-        aggregated = weighted.sum(axis=0)
-        counts = np.sum(mask * weights_arr[:, None], axis=0)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            averages = aggregated / np.where(counts == 0, 1.0, counts)[None, :]
-        averages[:, counts == 0] = 0.0
-        if has_rest_symbol and not np.all(counts > 0) and self.verbose > 0:
+        use_log = self.aggregation_config.log_likelihood
+        if not has_rest and not use_log:
             warnings.warn(
-                "Some classes had zero specific code assignments during aggregation.",
-                RuntimeWarning,
+                "Using log-likelihood decoding for strategy without rest symbol.",
+                UserWarning,
                 stacklevel=2,
             )
-        row_sum = averages.sum(axis=1, keepdims=True)
-        denom = np.clip(row_sum, 1.0, None)
-        averages /= denom
-        zero_mask = row_sum.squeeze() == 0
-        if np.any(zero_mask):
-            averages[zero_mask] = 1.0 / n_orig_classes
+            use_log = True
 
-        return averages
+        aggregator = make_aggregator(
+            use_log,
+            mask_rest=has_rest and self.aggregation_config.legacy_mask_rest_log_agg,
+        )
+
+        probabilities = aggregator.aggregate(
+            proba_rows,
+            self.code_book_,
+            weights,
+            rest_mask=rest_mask,
+        )
+
+        self._log_shapes(
+            X_train=self.X_train,
+            X=X_validated,
+            Y_train_per_estimator=self.Y_train_per_estimator,
+            proba_arr=probabilities,
+        )
+
+        return probabilities
 
     def predict(self, X) -> np.ndarray:
-        """Predict multi-class targets for X."""
-        # Attributes to check if fitted, adapt from user's ["_tree", "X", "y"]
-        check_is_fitted(self, ["classes_", "n_features_in_"])
-        # X will be validated by predict_proba or base_estimator.predict
-
-        if self.no_mapping_needed_ or (
-            hasattr(self, "estimators_")
-            and self.estimators_ is not None
-            and len(self.estimators_) == 1
-        ):
-            if not self.estimators_:
-                raise RuntimeError("Estimator not fitted. Call fit first.")
-            # Base estimator's predict validates X
-            return self.estimators_[0].predict(X)
-
         probas = self.predict_proba(X)
-        if probas.shape[0] == 0:
+        if probas.size == 0:
             return np.array([], dtype=self.classes_.dtype)
         return self.classes_[np.argmax(probas, axis=1)]
 
+    # ------------------------------------------------------------------
+    # Helper utilities
+    # ------------------------------------------------------------------
+    def _clone_base_estimator(self) -> BaseEstimator:
+        cloned = clone(self.estimator)
+        categorical = getattr(self, "categorical_features", None)
+        if categorical is not None:
+            if hasattr(cloned, "set_categorical_features"):
+                cloned.set_categorical_features(categorical)
+            elif hasattr(cloned, "categorical_features"):
+                cloned.categorical_features = categorical
+        return cloned
+
     def set_categorical_features(self, categorical_features: list[int]) -> None:
-        """Attempts to set categorical features on the base estimator."""
         self.categorical_features = categorical_features
-        _apply_categorical_features_to_estimator(self.estimator, categorical_features)
-        if (
-            not hasattr(self.estimator, "set_categorical_features")
-            and not hasattr(self.estimator, "categorical_features")
-            and self.verbose > 0
-        ):
+        if hasattr(self.estimator, "set_categorical_features"):
+            self.estimator.set_categorical_features(categorical_features)
+        elif hasattr(self.estimator, "categorical_features"):
+            self.estimator.categorical_features = categorical_features
+        elif self.verbose > 0:
             warnings.warn(
                 "Base estimator has no known categorical feature support.",
                 UserWarning,
@@ -1093,10 +398,17 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
     def _more_tags(self) -> dict[str, Any]:
         return {"allow_nan": True}
 
+    def __sklearn_tags__(self):  # type: ignore[override]
+        merged = dict(SKLEARN_DEFAULT_TAGS) if SKLEARN_DEFAULT_TAGS is not None else {}
+        merged.update(self._more_tags())
+        merged.setdefault("allow_nan", True)
+        merged.setdefault("requires_fit", True)
+        merged.setdefault("estimator_type", "classifier")
+        return _TagDict(merged)
+
     @property
-    def codebook_statistics_(self):
-        """Returns statistics about the generated codebook."""
-        check_is_fitted(self, ["classes_"])  # Minimal check
-        if self.no_mapping_needed_:
+    def codebook_statistics_(self) -> dict[str, Any]:
+        check_is_fitted(self, ["classes_"])
+        if getattr(self, "no_mapping_needed_", False):
             return {"message": "No codebook mapping was needed."}
         return dict(getattr(self, "codebook_stats_", {}))

@@ -19,7 +19,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 
 # Assuming tabpfn_extensions.many_class is in the python path
-from tabpfn_extensions.many_class import ManyClassClassifier
+from tabpfn_extensions.many_class import (
+    AggregationConfig,
+    CodebookConfig,
+    ManyClassClassifier,
+)
 from test_base_tabpfn import BaseClassifierTests
 
 
@@ -55,7 +59,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
             alphabet_size=10,
             n_estimators_redundancy=2,
             random_state=42,
-            codebook_min_hamming_frac=None,
+            codebook_config=CodebookConfig(strategy="legacy_rest"),
         )
 
     def test_internal_fit_predict_many_classes(self, estimator):
@@ -159,8 +163,8 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
             alphabet_size=2,
             n_estimators=20,
             random_state=0,
-            log_proba_aggregation=True,
-            codebook_strategy="legacy_rest",
+            codebook_config="legacy_rest",
+            aggregation_config=AggregationConfig(log_likelihood=True),
         )
         wrapped.fit(X_train, y_train)
         wrapped_accuracy = accuracy_score(y_test, wrapped.predict(X_test))
@@ -245,9 +249,12 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
             alphabet_size=3,
             n_estimators=5,
             random_state=0,
-            legacy_filter_rest_train=True,
-            legacy_mask_rest_log_agg=True,
-            log_proba_aggregation=True,
+            codebook_config=CodebookConfig(
+                strategy="legacy_rest", legacy_filter_rest_train=True
+            ),
+            aggregation_config=AggregationConfig(
+                log_likelihood=True, legacy_mask_rest_log_agg=True
+            ),
         )
         wrapper.fit(X, y, sample_weight=sample_weight)
 
