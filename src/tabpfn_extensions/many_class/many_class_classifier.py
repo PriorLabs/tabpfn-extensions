@@ -75,6 +75,7 @@ from __future__ import annotations
 import logging
 import math
 import warnings
+from importlib import import_module
 from typing import Any, ClassVar, Literal
 
 import numpy as np
@@ -97,6 +98,68 @@ from tabpfn_common_utils.telemetry import set_extension
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 
 logger = logging.getLogger(__name__)
+
+_PRIME_POWER_CANDIDATES: tuple[int, ...] = (2, 3, 4, 5, 7, 8, 9, 11, 13, 16)
+
+
+def _is_prime_power(value: int) -> bool:
+    """Return True if ``value`` is a prime power (``p**k`` for prime ``p``)."""
+    if value < 2:
+        return False
+    remaining = value
+    factor = 2
+    while factor * factor <= remaining:
+        exponent = 0
+        while remaining % factor == 0:
+            remaining //= factor
+            exponent += 1
+        if exponent > 0 and remaining == 1:
+            return True
+        factor += 1 if factor == 2 else 2  # Skip even numbers after 2
+    return remaining == value  # value itself is prime
+
+
+def _fix_to_prime_power(requested: int) -> int:
+    """Map ``requested`` to a supported prime power alphabet size."""
+    if requested < 2:
+        return 2
+    if requested in _PRIME_POWER_CANDIDATES:
+        return requested
+    if requested <= _PRIME_POWER_CANDIDATES[-1]:
+        for candidate in _PRIME_POWER_CANDIDATES:
+            if candidate >= requested:
+                return candidate
+    if _is_prime_power(requested):
+        return requested
+    return _PRIME_POWER_CANDIDATES[-1]
+
+
+def _pairwise_hamming(matrix: np.ndarray) -> np.ndarray:
+    """Compute pairwise Hamming distances (counts) between row vectors."""
+    if matrix.size == 0 or matrix.shape[0] < 2:
+        return np.array([], dtype=float)
+    return pdist(matrix, metric="hamming") * matrix.shape[1]
+
+
+def _sample_messages(
+    field: Any, *, dimension: int, count: int, rng: np.random.RandomState
+) -> list[Any]:
+    """Sample ``count`` unique messages from ``GF(q)**dimension``."""
+    messages: list[Any] = []
+    seen: set[tuple[int, ...]] = set()
+    max_trials = max(count * 10, 1000)
+    trials = 0
+    while len(messages) < count:
+        candidate = field(rng.randint(0, field.order, size=dimension))
+        key = tuple(int(component) for component in candidate)
+        if key in seen:
+            trials += 1
+            if trials > max_trials:
+                raise RuntimeError("Unable to sample enough unique BCH messages.")
+            continue
+        seen.add(key)
+        messages.append(candidate)
+    return messages
 
 
 # Helper function: Fits a clone of the estimator on a specific sub-problem's
@@ -165,6 +228,8 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             ``"balanced_cluster"`` partitions classes into balanced groups for each
             estimator and is the default. ``"legacy_rest"`` uses the previous
             one-vs-rest-style codebook that reserves one symbol as a catch-all.
+            ``"bch"`` constructs algebraic BCH codes (requires the optional
+            :mod:`galois` package) to maximise pairwise class separation.
         n_estimators (int, optional): Number of base estimators (sub-problems).
             If None, calculated based on other parameters.
         n_estimators_redundancy (int): Redundancy factor for auto-calculated
@@ -237,7 +302,9 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         self.verbose = verbose
         self.log_proba_aggregation = log_proba_aggregation
         self.fit_params_: dict[str, Any] | None = None
-        retries = self.CODEBOOK_MAX_ATTEMPTS if codebook_retries is None else codebook_retries
+        retries = (
+            self.CODEBOOK_MAX_ATTEMPTS if codebook_retries is None else codebook_retries
+        )
         min_frac = (
             self.CODEBOOK_MIN_DIST_FRACTION
             if codebook_min_hamming_frac is None
@@ -288,6 +355,11 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 for key in (
                     "strategy",
                     "codebook_selection",
+                    "q",
+                    "m",
+                    "n_full",
+                    "k",
+                    "design_delta",
                     "n_classes",
                     "alphabet_size",
                     "n_estimators",
@@ -339,11 +411,10 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
 
     def _get_alphabet_size(self) -> int:
         """Helper to get alphabet_size, inferring if necessary."""
-        if self.alphabet_size is not None:
-            return self.alphabet_size
+        provided = self.alphabet_size if self.alphabet_size is not None else None
         try:
             # TabPFN specific attribute, or common one for models with class limits
-            return self.estimator.max_num_classes_
+            inferred = self.estimator.max_num_classes_
         except AttributeError:
             # Fallback for estimators not exposing this directly
             # Might need to be explicitly set for such estimators.
@@ -356,7 +427,20 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 )
             # Default to a common small number if not TabPFN and not set,
             # though this might not be optimal.
-            return 10
+            inferred = 10
+
+        base_size = provided if provided is not None else inferred
+        if self.codebook_strategy == "bch":
+            adjusted = _fix_to_prime_power(base_size)
+            if adjusted != base_size:
+                warnings.warn(
+                    "Adjusted alphabet_size to the nearest supported prime power "
+                    f"for BCH strategy: {base_size} -> {adjusted}.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            return adjusted
+        return base_size
 
     def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
         """Helper to calculate the number of estimators."""
@@ -523,6 +607,190 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             best_min_dist,
         )
         return best_codebook, best_stats
+
+    def _generate_codebook_bch(
+        self,
+        n_classes: int,
+        n_estimators: int,
+        alphabet_size: int,
+        random_state_instance: np.random.RandomState,
+    ) -> tuple[np.ndarray, dict[str, Any]]:
+        """Generate a BCH-derived codebook with puncturing retries."""
+        try:
+            galois = import_module("galois")
+        except ImportError as exc:  # pragma: no cover - exercised in tests via importorskip
+            raise ImportError(
+                "The 'bch' codebook strategy requires the optional 'galois' package. "
+                "Install it via `pip install galois` or the `many_class` extra."
+            ) from exc
+
+        q = _fix_to_prime_power(alphabet_size)
+        if q != alphabet_size and self.verbose > 0:
+            warnings.warn(
+                "BCH strategy adjusted alphabet_size to the nearest supported prime power "
+                f"({alphabet_size} -> {q}).",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        GF = galois.GF(q)
+        m = 1
+        while q**m - 1 < n_estimators:
+            m += 1
+        n_full = q**m - 1
+
+        delta_target = max(3, math.floor(0.3 * n_estimators))
+        m_bump_guard = 0
+        best_code: Any | None = None
+        best_delta = delta_target
+        best_k = 0
+
+        while best_code is None:
+            delta = delta_target
+            while delta >= 3:
+                try:
+                    code = galois.BCH(n=n_full, d=delta, field=GF)
+                except ValueError:
+                    delta -= 1
+                    continue
+                k = code.k
+                if q**k >= n_classes:
+                    best_code = code
+                    best_delta = delta
+                    best_k = k
+                    break
+                delta -= 1
+
+            if best_code is None:
+                m += 1
+                m_bump_guard += 1
+                if m_bump_guard > 3:
+                    raise RuntimeError(
+                        "BCH strategy could not satisfy capacity requirements."
+                    )
+                n_full = q**m - 1
+
+        assert best_code is not None  # For type checkers
+
+        max_attempts = max(1, self.codebook_retries)
+        target = (
+            math.ceil(self.codebook_min_hamming_frac * n_estimators)
+            if self.codebook_min_hamming_frac > 0
+            else None
+        )
+        best_cols: np.ndarray | None = None
+        best_quality: tuple[float, float, float, int] | None = None
+        best_eval_min: int | None = None
+        best_eval_mean: float | None = None
+        attempts_used = 0
+
+        eval_seed = int(random_state_instance.randint(0, np.iinfo(np.uint32).max))
+        eval_rng = np.random.RandomState(eval_seed)
+        eval_count = min(n_classes, 256, int(q**best_k))
+        eval_messages = _sample_messages(
+            GF, dimension=best_k, count=eval_count, rng=eval_rng
+        )
+
+        for attempt in range(max_attempts):
+            attempt_seed = int(
+                random_state_instance.randint(0, np.iinfo(np.uint32).max)
+            )
+            attempt_rng = np.random.RandomState(attempt_seed)
+            cols = np.sort(attempt_rng.choice(n_full, size=n_estimators, replace=False))
+
+            if eval_messages:
+                eval_codewords = [
+                    np.asarray(best_code.encode(message), dtype=int)[cols]
+                    for message in eval_messages
+                ]
+                eval_matrix = np.stack(eval_codewords, axis=1)
+                distances = _pairwise_hamming(eval_matrix.T)
+            else:
+                eval_matrix = np.empty((n_estimators, 0), dtype=int)
+                distances = np.array([], dtype=float)
+
+            min_dist = (
+                None if distances.size == 0 else int(np.rint(float(np.min(distances))))
+            )
+            mean_dist = None if distances.size == 0 else float(np.mean(distances))
+
+            attempts_used = attempt + 1
+            quality_key = self._codebook_quality_key(
+                min_dist=min_dist,
+                mean_dist=mean_dist,
+                stats={"coverage_std": 0.0},
+                attempt_seed=attempt_seed,
+            )
+            logger.info(
+                "Codebook attempt %d/%d (bch): min_hamming=%s mean_hamming=%s",
+                attempts_used,
+                max_attempts,
+                min_dist,
+                mean_dist,
+            )
+
+            if best_quality is None or quality_key > best_quality:
+                best_quality = quality_key
+                best_cols = cols
+                best_eval_min = min_dist
+                best_eval_mean = mean_dist
+
+            if target is not None and min_dist is not None and min_dist >= target:
+                logger.info(
+                    "Early exit after %d attempts: achieved min Hamming %s (target %s)",
+                    attempts_used,
+                    min_dist,
+                    target,
+                )
+                break
+
+        if best_cols is None:
+            raise RuntimeError("Failed to generate BCH codebook columns.")
+
+        final_seed = int(random_state_instance.randint(0, np.iinfo(np.uint32).max))
+        final_rng = np.random.RandomState(final_seed)
+        messages = _sample_messages(
+            GF, dimension=best_k, count=n_classes, rng=final_rng
+        )
+        codewords = [
+            np.asarray(best_code.encode(message), dtype=int)[best_cols]
+            for message in messages
+        ]
+        codebook = np.stack(codewords, axis=1)
+
+        coverage_count = np.full(n_classes, n_estimators, dtype=int)
+        stats, min_dist_final, mean_dist_final = self._summarize_codebook(
+            codebook=codebook,
+            coverage_count=coverage_count,
+            n_estimators=n_estimators,
+            n_classes=n_classes,
+            alphabet_size=q,
+            strategy="bch",
+            has_rest_symbol=False,
+            rest_class_code=None,
+        )
+
+        stats.update(
+            {
+                "q": int(q),
+                "m": int(m),
+                "n_full": int(n_full),
+                "k": int(best_k),
+                "design_delta": int(best_delta),
+                "regeneration_attempts": attempts_used,
+                "best_min_pairwise_hamming_dist": min_dist_final,
+                "mean_pairwise_hamming_dist": mean_dist_final,
+                "evaluation_min_pairwise_hamming_dist": best_eval_min,
+                "evaluation_mean_pairwise_hamming_dist": best_eval_mean,
+            }
+        )
+
+        logger.info(
+            "Selected bch codebook after %d attempts with min_hamming=%s",
+            attempts_used,
+            min_dist_final,
+        )
+        return codebook, stats
 
     def _generate_codebook_legacy_rest(
         self,
@@ -714,13 +982,19 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 generator = self._generate_codebook_balanced_cluster
             elif self.codebook_strategy == "legacy_rest":
                 generator = self._generate_codebook_legacy_rest
+            elif self.codebook_strategy == "bch":
+                generator = self._generate_codebook_bch
             else:
                 raise ValueError(
-                    "Unsupported codebook_strategy. Expected 'balanced_cluster' or 'legacy_rest'."
+                    "Unsupported codebook_strategy. Expected 'balanced_cluster', "
+                    "'legacy_rest', or 'bch'."
                 )
             self.code_book_, self.codebook_stats_ = generator(
                 n_classes, n_est, alphabet_size, random_state_instance
             )
+            stats_alphabet = self.codebook_stats_.get("alphabet_size")
+            if stats_alphabet is not None:
+                self.alphabet_size_ = int(stats_alphabet)
             self._log_codebook_stats(self.codebook_stats_, tag="Codebook stats")
             self.classes_index_ = {c: i for i, c in enumerate(self.classes_)}
             self.X_train = X  # Store validated X

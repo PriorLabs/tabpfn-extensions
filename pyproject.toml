@@ -70,7 +70,9 @@ hpo = [
     "hyperopt>=0.2.7",
     "setuptools>=67.0.0",
 ]
-many_class = []
+many_class = [
+    "galois>=0.4.6",
+]
 classifier_as_regressor = []
 rf_pfn = []
 unsupervised = []
