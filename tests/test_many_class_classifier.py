@@ -237,7 +237,9 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
 
             def predict_proba(self, X):
                 n_samples = X.shape[0]
-                return np.full((n_samples, len(self.classes_)), 1.0 / len(self.classes_))
+                return np.full(
+                    (n_samples, len(self.classes_)), 1.0 / len(self.classes_)
+                )
 
         rng = np.random.RandomState(1)
         X = rng.randn(40, 3)
@@ -274,9 +276,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         assert rows_with_rest, "Expected at least one row to include the rest symbol."
 
         assert wrapper.row_train_support_ is not None
-        expected_support = np.sum(
-            wrapper.Y_train_per_estimator != rest_code, axis=1
-        )
+        expected_support = np.sum(wrapper.Y_train_per_estimator != rest_code, axis=1)
         np.testing.assert_array_equal(wrapper.row_train_support_, expected_support)
 
         assert len(fit_y_records) == int(np.count_nonzero(expected_support))
@@ -288,7 +288,6 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         for weights, labels in zip(fit_weight_records, fit_y_records):
             if weights is not None:
                 assert weights.shape[0] == labels.shape[0]
-
 
     def test_predict_proba_handles_sub_estimator_missing_codes(self):
         """predict_proba should expand sub-estimator outputs to the full alphabet."""

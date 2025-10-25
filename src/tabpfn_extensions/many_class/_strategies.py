@@ -59,7 +59,10 @@ class CodebookConfig:
             raise ValueError(f"Unsupported codebook strategy: {self.strategy}")
         if self.retries < 1:
             raise ValueError("codebook retries must be >= 1")
-        if self.min_hamming_frac is not None and not 0.0 <= self.min_hamming_frac <= 1.0:
+        if (
+            self.min_hamming_frac is not None
+            and not 0.0 <= self.min_hamming_frac <= 1.0
+        ):
             raise ValueError("codebook_min_hamming_frac must be in [0, 1].")
         if self.hamming_max_classes < 1:
             raise ValueError("codebook_hamming_max_classes must be >= 1")
@@ -148,7 +151,9 @@ class LegacyRestCodebookStrategy:
         best_stats["best_min_pairwise_hamming_dist"] = (
             None if best_min == -np.inf else int(best_min)
         )
-        best_stats.setdefault("min_pairwise_hamming_dist", best_stats["best_min_pairwise_hamming_dist"])
+        best_stats.setdefault(
+            "min_pairwise_hamming_dist", best_stats["best_min_pairwise_hamming_dist"]
+        )
         return best_codebook, best_stats
 
     def _single_attempt(
@@ -237,7 +242,9 @@ class BalancedClusterCodebookStrategy:
         best_stats["best_min_pairwise_hamming_dist"] = (
             None if best_min == -np.inf else int(best_min)
         )
-        best_stats.setdefault("min_pairwise_hamming_dist", best_stats["best_min_pairwise_hamming_dist"])
+        best_stats.setdefault(
+            "min_pairwise_hamming_dist", best_stats["best_min_pairwise_hamming_dist"]
+        )
         return best_codebook, best_stats
 
     def _single_attempt(

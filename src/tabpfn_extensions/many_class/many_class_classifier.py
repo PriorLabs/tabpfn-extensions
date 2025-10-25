@@ -120,7 +120,9 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             inferred = self.estimator.max_num_classes_
             if inferred is not None:
                 return int(inferred)
-        raise ValueError("alphabet_size must be specified when base estimator has no limit")
+        raise ValueError(
+            "alphabet_size must be specified when base estimator has no limit"
+        )
 
     def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
         if self.n_estimators is not None:

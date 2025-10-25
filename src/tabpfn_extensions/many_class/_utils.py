@@ -128,10 +128,14 @@ def summarize_codebook(
         "n_classes": int(n_classes),
         "alphabet_size": int(alphabet_size),
         "has_rest_symbol": bool(has_rest_symbol),
-        "rest_class_code": int(rest_class_code) if rest_class_code is not None else None,
+        "rest_class_code": int(rest_class_code)
+        if rest_class_code is not None
+        else None,
         "coverage_min": int(np.min(coverage_counts)) if coverage_counts.size else 0,
         "coverage_max": int(np.max(coverage_counts)) if coverage_counts.size else 0,
-        "coverage_mean": float(np.mean(coverage_counts)) if coverage_counts.size else 0.0,
+        "coverage_mean": float(np.mean(coverage_counts))
+        if coverage_counts.size
+        else 0.0,
         "coverage_std": float(np.std(coverage_counts)) if coverage_counts.size else 0.0,
     }
 
@@ -182,7 +186,9 @@ def run_row(
 
     support = len(y_train_row)
     if support == 0:
-        uniform = np.full((as_numpy(X_test).shape[0], alphabet_size), 1.0 / alphabet_size)
+        uniform = np.full(
+            (as_numpy(X_test).shape[0], alphabet_size), 1.0 / alphabet_size
+        )
         return RowRunResult(
             proba_test=uniform,
             proba_train=np.empty((0, alphabet_size)),
@@ -192,7 +198,9 @@ def run_row(
             accuracy=None,
         )
 
-    filtered_params = filter_fit_params_for_mask(fit_params, mask, n_samples=len(X_train))
+    filtered_params = filter_fit_params_for_mask(
+        fit_params, mask, n_samples=len(X_train)
+    )
     cloned_estimator = clone(estimator)
     apply_categorical_features(cloned_estimator, categorical_features)
     cloned_estimator.fit(X_train_row, y_train_row, **filtered_params)
