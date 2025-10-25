@@ -12,6 +12,16 @@ from sklearn.base import BaseEstimator, clone
 EPS_PROBA = 1e-12
 EPS_WEIGHT = 1e-6
 
+
+def _dataclass_kwargs() -> dict[str, Any]:
+    kwargs: dict[str, Any] = {}
+    if sys.version_info >= (3, 10):  # pragma: no cover - environment dependent
+        kwargs["slots"] = True
+    return kwargs
+
+
+DATACLASS_KWARGS = _dataclass_kwargs()
+
 if TYPE_CHECKING:  # pragma: no cover - typing helper
     from ._strategies import RowWeighter
 
@@ -156,12 +166,9 @@ def summarize_codebook(
 
 
 # Python 3.9 compatibility: dataclass(slots=...) is supported from 3.10 onwards.
-_DATACLASS_KWARGS: dict[str, Any] = {}
-if sys.version_info >= (3, 10):  # pragma: no cover - environment dependent
-    _DATACLASS_KWARGS["slots"] = True
 
 
-@dataclass(**_DATACLASS_KWARGS)
+@dataclass(**DATACLASS_KWARGS)
 class RowRunResult:
     proba_test: np.ndarray
     proba_train: np.ndarray

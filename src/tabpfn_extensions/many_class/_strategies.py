@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import math
-import sys
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Literal, Protocol
 
 import numpy as np
 
-from ._utils import EPS_PROBA, EPS_WEIGHT, summarize_codebook
+from ._utils import DATACLASS_KWARGS, EPS_PROBA, EPS_WEIGHT, summarize_codebook
 
 
 class CodebookStrategy(Protocol):
@@ -47,12 +46,7 @@ class WeightMode(str, Enum):
     TRAIN_ACC = "train_acc"
 
 
-_DATACLASS_KWARGS: dict[str, Any] = {}
-if sys.version_info >= (3, 10):  # pragma: no cover - environment dependent
-    _DATACLASS_KWARGS["slots"] = True
-
-
-@dataclass(**_DATACLASS_KWARGS)
+@dataclass(**DATACLASS_KWARGS)
 class CodebookConfig:
     strategy: Literal["legacy_rest", "balanced_cluster"] = "legacy_rest"
     retries: int = 50
@@ -74,7 +68,7 @@ class CodebookConfig:
             raise ValueError("codebook_hamming_max_classes must be >= 1")
 
 
-@dataclass(**_DATACLASS_KWARGS)
+@dataclass(**DATACLASS_KWARGS)
 class RowWeightingConfig:
     mode: WeightMode | str = WeightMode.NONE
     gamma: float = 1.0
@@ -88,7 +82,7 @@ class RowWeightingConfig:
             raise ValueError("Unsupported row weighting mode") from exc
 
 
-@dataclass(**_DATACLASS_KWARGS)
+@dataclass(**DATACLASS_KWARGS)
 class AggregationConfig:
     log_likelihood: bool = True
     legacy_mask_rest_log_agg: bool = True

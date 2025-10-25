@@ -62,7 +62,6 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         self._aggregation_config: AggregationConfig | None = None
         self._codebook_strategy = None
         self._row_weighter = None
-        self.log_proba_aggregation = False
 
         # Attributes populated during fitting
         self.fit_params_: dict[str, Any] | None = None
