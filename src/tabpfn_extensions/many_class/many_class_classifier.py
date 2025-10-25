@@ -26,25 +26,7 @@ from ._strategies import (
 )
 from ._utils import RowRunResult, normalize_weights, run_row
 
-try:  # pragma: no cover - optional sklearn internals
-    from sklearn.utils._tags import _DEFAULT_TAGS as SKLEARN_DEFAULT_TAGS
-except ImportError:  # pragma: no cover
-    SKLEARN_DEFAULT_TAGS = None
-
 logger = logging.getLogger(__name__)
-
-
-class _TagDict(dict):
-    """Dictionary with attribute-style access for scikit-learn tags."""
-
-    def __getattr__(self, item):
-        try:
-            return self[item]
-        except KeyError as exc:
-            raise AttributeError(item) from exc
-
-    def __setattr__(self, key, value):
-        self[key] = value
 
 
 @set_extension("many_class")
@@ -416,12 +398,24 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         return {"allow_nan": True}
 
     def __sklearn_tags__(self):  # type: ignore[override]
-        merged = dict(SKLEARN_DEFAULT_TAGS) if SKLEARN_DEFAULT_TAGS is not None else {}
-        merged.update(self._more_tags())
-        merged.setdefault("allow_nan", True)
-        merged.setdefault("requires_fit", True)
-        merged.setdefault("estimator_type", "classifier")
-        return _TagDict(merged)
+        tags = super().__sklearn_tags__()
+        if isinstance(tags, dict):
+            tags.setdefault("allow_nan", True)
+            tags.setdefault("requires_fit", True)
+            tags.setdefault("estimator_type", "classifier")
+            input_tags = tags.get("input_tags")
+            if isinstance(input_tags, dict):
+                input_tags.setdefault("allow_nan", True)
+            return tags
+
+        # scikit-learn >=1.6 returns a Tags dataclass hierarchy.
+        if hasattr(tags, "input_tags") and hasattr(tags.input_tags, "allow_nan"):
+            tags.input_tags.allow_nan = True
+        if hasattr(tags, "estimator_type"):
+            tags.estimator_type = "classifier"
+        if hasattr(tags, "requires_fit"):
+            tags.requires_fit = True
+        return tags
 
     @property
     def codebook_statistics_(self) -> dict[str, Any]:
