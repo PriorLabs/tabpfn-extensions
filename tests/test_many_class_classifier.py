@@ -83,7 +83,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         )  # Fit happens during predict_proba when mapping
         stats = estimator.codebook_statistics_
         assert stats.get("coverage_min", 0) > 0
-        assert stats.get("strategy") in {"balanced_cluster", "legacy_rest", "bch"}
+        assert stats.get("strategy") in {"balanced_cluster", "legacy_rest"}
         assert stats.get("regeneration_attempts", 0) >= 1
         assert "best_min_pairwise_hamming_dist" in stats
 
@@ -208,48 +208,6 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
             assert recorded is not None
             np.testing.assert_allclose(recorded, sample_weight)
 
-    def test_bch_codebook_generation_produces_expected_stats(self):
-        """Ensure the BCH strategy produces a valid codebook and statistics."""
-        pytest.importorskip("galois")
-        X, y = get_classification_data(
-            num_classes=12,
-            num_features=4,
-            num_samples=12 * 15,
-        )
-        wrapper = ManyClassClassifier(
-            estimator=LogisticRegression(max_iter=200),
-            alphabet_size=6,
-            codebook_strategy="bch",
-            n_estimators=15,
-            random_state=1,
-            verbose=1,
-            log_proba_aggregation=False,
-            codebook_retries=2,
-        )
-
-        numba_logger = logging.getLogger("numba")
-        previous_level = numba_logger.level
-        numba_logger.setLevel(logging.WARNING)
-        try:
-            with pytest.warns(UserWarning, match="[Aa]djusted alphabet_size"):
-                wrapper.fit(X, y)
-
-            stats = wrapper.codebook_statistics_
-            assert stats["strategy"] == "bch"
-            assert stats["alphabet_size"] >= 6
-            assert stats["alphabet_size"] == stats["q"]
-            assert stats.get("regeneration_attempts", 0) >= 1
-            assert "best_min_pairwise_hamming_dist" in stats
-            assert wrapper.alphabet_size_ == stats["alphabet_size"]
-            assert wrapper.code_book_.shape == (15, 12)
-
-            with pytest.warns(UserWarning, match="log-likelihood decoding"):
-                probabilities = wrapper.predict_proba(X[:10])
-        finally:
-            numba_logger.setLevel(previous_level)
-
-        assert probabilities.shape == (10, 12)
-        assert np.allclose(probabilities.sum(axis=1), 1.0)
 
     def test_predict_proba_handles_sub_estimator_missing_codes(self):
         """predict_proba should expand sub-estimator outputs to the full alphabet."""
