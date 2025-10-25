@@ -242,6 +242,16 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             predictions using log-likelihood decoding across the full codebook.
             When False, falls back to the legacy averaging strategy that ignores
             the "rest" bucket.
+        codebook_retries (int): Number of deterministic attempts to generate a
+            high-quality codebook. Defaults to 3.
+        codebook_min_hamming_frac (float): Early-exit target for the minimum
+            pairwise Hamming distance expressed as a fraction of
+            ``n_estimators``. Clamped to ``[0, 1]`` and defaults to 0.25.
+        codebook_selection (Literal["max_min_hamming"]): Selection criterion
+            applied when comparing retry attempts. Currently only
+            ``"max_min_hamming"`` is supported.
+        codebook_hamming_max_classes (int): Maximum number of classes for which
+            exact pairwise Hamming statistics are computed. Defaults to 200.
 
     Attributes:
         classes_ (np.ndarray): Unique target labels.
@@ -272,11 +282,6 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
     """
 
     _required_parameters: ClassVar[list[str]] = ["estimator"]
-    CODEBOOK_MAX_ATTEMPTS: ClassVar[int] = 3
-    CODEBOOK_MIN_DIST_FRACTION: ClassVar[float] = 0.25
-    CODEBOOK_DEFAULT_SELECTION: ClassVar[str] = "max_min_hamming"
-    CODEBOOK_HAMMING_MAX_CLASSES: ClassVar[int] = 200
-
     def __init__(
         self,
         estimator: BaseEstimator,
@@ -288,10 +293,10 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         random_state: int | None = None,
         verbose: int = 0,
         log_proba_aggregation: bool = True,
-        codebook_retries: int | None = None,
-        codebook_min_hamming_frac: float | None = None,
-        codebook_selection: Literal["max_min_hamming"] | None = None,
-        codebook_hamming_max_classes: int | None = None,
+        codebook_retries: int = 3,
+        codebook_min_hamming_frac: float = 0.25,
+        codebook_selection: Literal["max_min_hamming"] = "max_min_hamming",
+        codebook_hamming_max_classes: int = 200,
     ):
         self.estimator = estimator
         self.random_state = random_state
@@ -302,24 +307,10 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         self.verbose = verbose
         self.log_proba_aggregation = log_proba_aggregation
         self.fit_params_: dict[str, Any] | None = None
-        retries = (
-            self.CODEBOOK_MAX_ATTEMPTS if codebook_retries is None else codebook_retries
-        )
-        min_frac = (
-            self.CODEBOOK_MIN_DIST_FRACTION
-            if codebook_min_hamming_frac is None
-            else codebook_min_hamming_frac
-        )
-        selection = (
-            self.CODEBOOK_DEFAULT_SELECTION
-            if codebook_selection is None
-            else codebook_selection
-        )
-        max_classes = (
-            self.CODEBOOK_HAMMING_MAX_CLASSES
-            if codebook_hamming_max_classes is None
-            else codebook_hamming_max_classes
-        )
+        retries = codebook_retries
+        min_frac = codebook_min_hamming_frac
+        selection = codebook_selection
+        max_classes = codebook_hamming_max_classes
         if retries < 1:
             raise ValueError("codebook_retries must be at least 1.")
         if not 0.0 <= min_frac <= 1.0:
