@@ -65,7 +65,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         self.log_proba_aggregation = False
 
         # Attributes populated during fitting
-        self._fit_params: dict[str, Any] = {}
+        self.fit_params_: dict[str, Any] | None = None
         self._row_class_mask_: np.ndarray | None = None
         self.row_weights_: np.ndarray | None = None
         self.row_train_support_: np.ndarray | None = None
@@ -196,8 +196,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             ensure_all_finite=False,
         )
 
-        self._fit_params = dict(fit_params)
-        self.fit_params_ = self._fit_params
+        self.fit_params_ = dict(fit_params)
         self.classes_ = unique_labels(y_validated)
         self.alphabet_size_ = self._get_alphabet_size()
         if self.alphabet_size_ < 2:
@@ -221,7 +220,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
         if self.no_mapping_needed_:
             estimator = self._clone_base_estimator()
-            estimator.fit(X_validated, y_validated, **self._fit_params)
+            estimator.fit(X_validated, y_validated, **self.fit_params_)
             self.estimators_ = [estimator]
             self.code_book_ = None
             self.codebook_stats_ = {"strategy": "no_mapping"}
@@ -304,7 +303,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
                 alphabet_size=self.alphabet_size_,
                 categorical_features=categorical_features,
                 mask=mask,
-                fit_params=self._fit_params,
+                fit_params=self.fit_params_,
                 row_weighter=self._row_weighter,
             )
             row_results.append(result)
