@@ -55,6 +55,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
             alphabet_size=10,
             n_estimators_redundancy=2,
             random_state=42,
+            codebook_min_hamming_frac=None,
         )
 
     def test_internal_fit_predict_many_classes(self, estimator):
@@ -207,6 +208,68 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         for recorded in fit_records:
             assert recorded is not None
             np.testing.assert_allclose(recorded, sample_weight)
+
+    def test_legacy_rest_filtering_drops_rest_samples(self):
+        """Legacy rest strategy can drop rest-labeled samples before fitting."""
+        fit_y_records: list[np.ndarray] = []
+        fit_weight_records: list[np.ndarray | None] = []
+
+        class RecordingEstimator(BaseEstimator, ClassifierMixin):
+            def fit(self, X, y, sample_weight=None):
+                fit_y_records.append(np.asarray(y).copy())
+                if sample_weight is not None:
+                    fit_weight_records.append(np.asarray(sample_weight).copy())
+                else:
+                    fit_weight_records.append(None)
+                self.classes_ = np.unique(y)
+                return self
+
+            def predict(self, X):
+                return np.full(X.shape[0], self.classes_[0], dtype=self.classes_.dtype)
+
+            def predict_proba(self, X):
+                n_samples = X.shape[0]
+                return np.full((n_samples, len(self.classes_)), 1.0 / len(self.classes_))
+
+        rng = np.random.RandomState(1)
+        X = rng.randn(40, 3)
+        y = rng.randint(0, 6, size=40)
+        sample_weight = rng.rand(40)
+
+        wrapper = ManyClassClassifier(
+            estimator=RecordingEstimator(),
+            alphabet_size=3,
+            n_estimators=5,
+            random_state=0,
+            legacy_filter_rest_train=True,
+            legacy_mask_rest_log_agg=True,
+            log_proba_aggregation=True,
+        )
+        wrapper.fit(X, y, sample_weight=sample_weight)
+
+        proba = wrapper.predict_proba(X)
+
+        assert proba.shape == (X.shape[0], len(wrapper.classes_))
+        assert np.allclose(proba.sum(axis=1), 1.0)
+
+        rest_code = wrapper.codebook_statistics_.get("rest_class_code")
+        assert rest_code is not None
+
+        rows_with_rest = [
+            idx
+            for idx in range(wrapper.code_book_.shape[0])
+            if np.any(wrapper.Y_train_per_estimator[idx] == rest_code)
+        ]
+        assert rows_with_rest, "Expected at least one row to include the rest symbol."
+
+        assert len(fit_y_records) == wrapper.code_book_.shape[0]
+
+        for idx in rows_with_rest:
+            assert rest_code not in fit_y_records[idx]
+
+        for weights, labels in zip(fit_weight_records, fit_y_records):
+            if weights is not None:
+                assert weights.shape[0] == labels.shape[0]
 
 
     def test_predict_proba_handles_sub_estimator_missing_codes(self):

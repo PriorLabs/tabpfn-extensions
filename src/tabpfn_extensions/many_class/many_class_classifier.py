@@ -147,6 +147,41 @@ def _fit_and_predict_proba(
     return full_proba
 
 
+def _filter_fit_params_for_mask(
+    fit_params: dict[str, Any] | None,
+    mask: np.ndarray | None,
+    *,
+    n_samples: int,
+) -> dict[str, Any]:
+    """Return fit parameters filtered by a boolean mask when available."""
+    if not fit_params:
+        return {}
+
+    if mask is None:
+        return fit_params.copy()
+
+    filtered: dict[str, Any] = {}
+    for key, value in fit_params.items():
+        try:
+            array_value = np.asarray(value)
+        except (TypeError, ValueError):
+            filtered[key] = value
+            continue
+
+        if array_value.ndim > 0 and array_value.shape[0] == n_samples:
+            masked = array_value[mask]
+            if isinstance(value, list):
+                filtered[key] = masked.tolist()
+            elif isinstance(value, tuple):
+                filtered[key] = tuple(masked.tolist())
+            else:
+                filtered[key] = masked
+        else:
+            filtered[key] = value
+
+    return filtered
+
+
 @set_extension("many_class")
 class ManyClassClassifier(ClassifierMixin, BaseEstimator):
     """Output-Code multiclass strategy to extend classifiers beyond their class limit.
@@ -162,9 +197,9 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             estimator can handle. If None, attempts to infer from
             `estimator.max_num_classes_`.
         codebook_strategy (str): Strategy used to create the ECOC codebook.
-            ``"balanced_cluster"`` partitions classes into balanced groups for each
-            estimator and is the default. ``"legacy_rest"`` uses the previous
-            one-vs-rest-style codebook that reserves one symbol as a catch-all.
+            ``"legacy_rest"`` (default) uses a one-vs-rest-style codebook that
+            reserves one symbol as a catch-all. ``"balanced_cluster"`` partitions
+            classes into balanced groups for each estimator.
         n_estimators (int, optional): Number of base estimators (sub-problems).
             If None, calculated based on other parameters.
         n_estimators_redundancy (int): Redundancy factor for auto-calculated
@@ -179,14 +214,26 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             the "rest" bucket.
         codebook_retries (int): Number of deterministic attempts to generate a
             high-quality codebook. Defaults to 3.
-        codebook_min_hamming_frac (float): Early-exit target for the minimum
+        codebook_min_hamming_frac (float | None): Early-exit target for the minimum
             pairwise Hamming distance expressed as a fraction of
-            ``n_estimators``. Clamped to ``[0, 1]`` and defaults to 0.25.
+            ``n_estimators``. Values are clamped to ``[0, 1]``; ``None`` disables
+            early stopping. Defaults to 0.25.
         codebook_selection (Literal["max_min_hamming"]): Selection criterion
             applied when comparing retry attempts. Currently only
             ``"max_min_hamming"`` is supported.
         codebook_hamming_max_classes (int): Maximum number of classes for which
             exact pairwise Hamming statistics are computed. Defaults to 200.
+        legacy_filter_rest_train (bool): If True, drop "rest" assignments from the
+            training data passed to each sub-estimator when using the legacy
+            codebook strategy. Defaults to False.
+        legacy_mask_rest_log_agg (bool): If True (default), suppress the "rest"
+            symbol's contribution during log-probability aggregation for legacy
+            codebooks.
+        row_weighting (str | None): Optional row-weighting heuristic applied
+            during aggregation. Supported values are ``"train_entropy"`` and
+            ``"train_acc"``. Defaults to ``None``.
+        row_weighting_gamma (float): Exponent applied to row weights. Defaults to
+            1.0.
 
     Attributes:
         classes_ (np.ndarray): Unique target labels.
@@ -222,16 +269,20 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         estimator: BaseEstimator,
         *,
         alphabet_size: int | None = None,
-        codebook_strategy: str = "balanced_cluster",
+        codebook_strategy: str = "legacy_rest",
         n_estimators: int | None = None,
         n_estimators_redundancy: int = 4,
         random_state: int | None = None,
         verbose: int = 0,
         log_proba_aggregation: bool = True,
         codebook_retries: int = 3,
-        codebook_min_hamming_frac: float = 0.25,
+        codebook_min_hamming_frac: float | None = 0.25,
         codebook_selection: Literal["max_min_hamming"] = "max_min_hamming",
         codebook_hamming_max_classes: int = 200,
+        legacy_filter_rest_train: bool = False,
+        legacy_mask_rest_log_agg: bool = True,
+        row_weighting: str | None = None,
+        row_weighting_gamma: float = 1.0,
     ):
         self.estimator = estimator
         self.random_state = random_state
@@ -241,6 +292,10 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         self.n_estimators_redundancy = n_estimators_redundancy
         self.verbose = verbose
         self.log_proba_aggregation = log_proba_aggregation
+        self.legacy_filter_rest_train = bool(legacy_filter_rest_train)
+        self.legacy_mask_rest_log_agg = bool(legacy_mask_rest_log_agg)
+        self.row_weighting = row_weighting
+        self.row_weighting_gamma = float(row_weighting_gamma)
         self.fit_params_: dict[str, Any] | None = None
         retries = codebook_retries
         min_frac = codebook_min_hamming_frac
@@ -248,14 +303,18 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         max_classes = codebook_hamming_max_classes
         if retries < 1:
             raise ValueError("codebook_retries must be at least 1.")
-        if not 0.0 <= min_frac <= 1.0:
+        if min_frac is not None and not 0.0 <= min_frac <= 1.0:
             raise ValueError("codebook_min_hamming_frac must be in [0, 1].")
         if max_classes < 0:
             raise ValueError("codebook_hamming_max_classes must be non-negative.")
         if selection != "max_min_hamming":
             raise ValueError("Unsupported codebook_selection criterion.")
+        if self.row_weighting not in {None, "train_entropy", "train_acc"}:
+            raise ValueError(
+                "row_weighting must be None, 'train_entropy', or 'train_acc'."
+            )
         self.codebook_retries = int(retries)
-        self.codebook_min_hamming_frac = float(min_frac)
+        self.codebook_min_hamming_frac = None if min_frac is None else float(min_frac)
         self.codebook_selection = selection
         self.codebook_hamming_max_classes = int(max_classes)
 
@@ -425,11 +484,9 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
 
         coverage_count = np.full(n_classes, n_estimators, dtype=int)
         max_attempts = max(1, self.codebook_retries)
-        target = (
-            math.ceil(self.codebook_min_hamming_frac * n_estimators)
-            if self.codebook_min_hamming_frac > 0
-            else None
-        )
+        target = None
+        if self.codebook_min_hamming_frac is not None and self.codebook_min_hamming_frac > 0:
+            target = math.ceil(self.codebook_min_hamming_frac * n_estimators)
         best_codebook: np.ndarray | None = None
         best_stats: dict[str, Any] | None = None
         best_min_dist: int | None = None
@@ -539,11 +596,9 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 "alphabet_size must be at least 2 for codebook generation."
             )
         max_attempts = max(1, self.codebook_retries)
-        target = (
-            math.ceil(self.codebook_min_hamming_frac * n_estimators)
-            if self.codebook_min_hamming_frac > 0
-            else None
-        )
+        target = None
+        if self.codebook_min_hamming_frac is not None and self.codebook_min_hamming_frac > 0:
+            target = math.ceil(self.codebook_min_hamming_frac * n_estimators)
         best_codebook: np.ndarray | None = None
         best_stats: dict[str, Any] | None = None
         best_min_dist: int | None = None
@@ -752,22 +807,83 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 "Fit method did not properly initialize for mapping. Call fit first."
             )
 
+        codebook_stats = getattr(self, "codebook_stats_", {}) or {}
+        has_rest_symbol = bool(codebook_stats.get("has_rest_symbol", False))
+        rest_class_code = codebook_stats.get("rest_class_code")
+        if has_rest_symbol and rest_class_code is None:
+            rest_class_code = self.alphabet_size_ - 1
+
         iterator = range(self.code_book_.shape[0])
         iterable = tqdm.tqdm(iterator, disable=(self.verbose <= 1))
-        Y_pred_probas_list = []
+        Y_pred_probas_list: list[np.ndarray] = []
+        weights: list[float] = []
         categorical_features = getattr(self, "categorical_features", None)
+        has_legacy_rest = (
+            self.codebook_strategy == "legacy_rest" and has_rest_symbol
+        )
+        n_train_samples = self.X_train.shape[0]
+
         for i in iterable:
+            y_subproblem = self.Y_train_per_estimator[i, :]
+            mask_train: np.ndarray | None = None
+            X_train_row = self.X_train
+            y_train_row = y_subproblem
+
+            if has_legacy_rest and self.legacy_filter_rest_train:
+                candidate_mask = y_subproblem != rest_class_code
+                if np.any(candidate_mask):
+                    mask_train = candidate_mask
+                    X_train_row = self.X_train[mask_train]
+                    y_train_row = y_subproblem[mask_train]
+
+            fit_kwargs_row = _filter_fit_params_for_mask(
+                self.fit_params_, mask_train, n_samples=n_train_samples
+            )
+
             Y_pred_probas_list.append(
                 _fit_and_predict_proba(
                     self.estimator,
-                    self.X_train,  # This is X_validated from fit
-                    self.Y_train_per_estimator[i, :],
-                    X,  # Pass validated X to predict on
+                    X_train_row,
+                    y_train_row,
+                    X,
                     categorical_features=categorical_features,
-                    fit_params=self.fit_params_,
+                    fit_params=fit_kwargs_row,
                     alphabet_size=self.alphabet_size_,
                 )
             )
+
+            weight = 1.0
+            if self.row_weighting in {"train_entropy", "train_acc"}:
+                weight_estimator = clone(self.estimator)
+                _apply_categorical_features_to_estimator(
+                    weight_estimator, categorical_features
+                )
+                weight_estimator.fit(X_train_row, y_train_row, **fit_kwargs_row)
+                if not hasattr(weight_estimator, "predict_proba"):
+                    raise AttributeError(
+                        "Base estimator must implement predict_proba for row weighting."
+                    )
+                train_proba = weight_estimator.predict_proba(X_train_row)
+                train_proba = np.clip(train_proba, 1e-12, 1.0)
+                q = train_proba.shape[1]
+                if self.row_weighting == "train_entropy":
+                    entropy = 0.0
+                    if train_proba.size > 0:
+                        entropy = -float(
+                            np.mean(np.sum(train_proba * np.log(train_proba), axis=1))
+                        )
+                    norm = math.log(q) if q > 1 else 1.0
+                    ratio = 0.0 if norm <= 0 else entropy / norm
+                    weight = max(1e-3, 1.0 - ratio)
+                else:  # train_acc
+                    predictions = np.argmax(train_proba, axis=1)
+                    acc = float(np.mean(predictions == y_train_row))
+                    baseline = 1.0 / max(q, 1)
+                    weight = max(1e-3, acc - baseline)
+                weight = float(weight) ** self.row_weighting_gamma
+
+            weights.append(weight)
+
         Y_pred_probas_arr = np.stack(Y_pred_probas_list, axis=0)
         self._log_shapes(
             X_train=self.X_train,
@@ -804,11 +920,20 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 )
             use_log_agg = True
 
+        weights_arr = np.asarray(weights, dtype=float)
+        weights_arr = np.where(np.isfinite(weights_arr), weights_arr, 1.0)
+        weights_arr = np.clip(weights_arr, 1e-6, None)
+        weights_arr /= max(np.mean(weights_arr), 1e-6)
+
         gather_idx = self.code_book_[:, None, :]
         gathered = np.take_along_axis(Y_pred_probas_arr, gather_idx, axis=2)
 
         if use_log_agg:
             gathered = np.log(np.clip(gathered, 1e-12, 1.0))
+            if has_rest_symbol and has_legacy_rest and self.legacy_mask_rest_log_agg:
+                rest_mask = (self.code_book_ != rest_class_code)[:, None, :]
+                gathered = gathered * rest_mask
+            gathered = gathered * weights_arr[:, None, None]
             aggregated = gathered.sum(axis=0)
             aggregated -= aggregated.max(axis=1, keepdims=True)
             exp_scores = np.exp(aggregated)
@@ -819,14 +944,16 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
                 probas[zero_mask] = 1.0 / n_orig_classes
             return probas
 
-        mask = (
-            self.code_book_ != rest_class_code
-            if has_rest_symbol
-            else np.ones_like(self.code_book_, dtype=bool)
-        )
-        weighted = gathered * mask[:, None, :]
+        if has_rest_symbol:
+            mask = (self.code_book_ != rest_class_code).astype(float)
+        else:
+            mask = np.ones_like(self.code_book_, dtype=float)
+        weighted = gathered
+        if has_rest_symbol:
+            weighted = weighted * mask[:, None, :]
+        weighted = weighted * weights_arr[:, None, None]
         aggregated = weighted.sum(axis=0)
-        counts = mask.sum(axis=0).astype(float)
+        counts = np.sum(mask * weights_arr[:, None], axis=0)
         with np.errstate(divide="ignore", invalid="ignore"):
             averages = aggregated / np.where(counts == 0, 1.0, counts)[None, :]
         averages[:, counts == 0] = 0.0
