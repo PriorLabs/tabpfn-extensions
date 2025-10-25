@@ -213,11 +213,11 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
             When False, falls back to the legacy averaging strategy that ignores
             the "rest" bucket.
         codebook_retries (int): Number of deterministic attempts to generate a
-            high-quality codebook. Defaults to 3.
+            high-quality codebook. Defaults to 50.
         codebook_min_hamming_frac (float | None): Early-exit target for the minimum
             pairwise Hamming distance expressed as a fraction of
             ``n_estimators``. Values are clamped to ``[0, 1]``; ``None`` disables
-            early stopping. Defaults to 0.25.
+            early stopping. Defaults to ``None``.
         codebook_selection (Literal["max_min_hamming"]): Selection criterion
             applied when comparing retry attempts. Currently only
             ``"max_min_hamming"`` is supported.
@@ -275,8 +275,8 @@ class ManyClassClassifier(ClassifierMixin, BaseEstimator):
         random_state: int | None = None,
         verbose: int = 0,
         log_proba_aggregation: bool = True,
-        codebook_retries: int = 3,
-        codebook_min_hamming_frac: float | None = 0.25,
+        codebook_retries: int = 50,
+        codebook_min_hamming_frac: float | None = None,
         codebook_selection: Literal["max_min_hamming"] = "max_min_hamming",
         codebook_hamming_max_classes: int = 200,
         legacy_filter_rest_train: bool = False,
