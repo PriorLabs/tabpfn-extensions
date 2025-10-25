@@ -159,11 +159,8 @@ class DefaultAggregator:
             aggregated = log_values.sum(axis=0)
             aggregated -= aggregated.max(axis=1, keepdims=True)
             exp_scores = np.exp(aggregated)
-            denom = np.clip(exp_scores.sum(axis=1, keepdims=True), 1.0, None)
+            denom = exp_scores.sum(axis=1, keepdims=True)
             probas = exp_scores / denom
-            zero_mask = denom.squeeze() == 0
-            if np.any(zero_mask):
-                probas[zero_mask] = 1.0 / codebook.shape[1]
             return probas
 
         mask = np.ones_like(codebook, dtype=float)
