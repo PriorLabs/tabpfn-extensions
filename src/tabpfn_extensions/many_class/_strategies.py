@@ -173,7 +173,7 @@ class DefaultAggregator:
             averages = aggregated / np.where(counts == 0, 1.0, counts)[None, :]
         averages[:, counts == 0] = 0.0
         row_sum = averages.sum(axis=1, keepdims=True)
-        denom = np.clip(row_sum, 1.0, None)
+        denom = np.where(row_sum == 0, 1.0, row_sum)
         averages /= denom
         zero_mask = row_sum.squeeze() == 0
         if np.any(zero_mask):
