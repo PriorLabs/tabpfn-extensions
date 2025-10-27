@@ -7,7 +7,6 @@ from scipy.stats import rankdata
 from sksurv.base import SurvivalAnalysisMixin
 from tabpfn_common_utils.telemetry import set_extension
 
-# Import TabPFN models from extensions (which handles backend compatibility)
 try:
     from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 except ImportError:
@@ -91,21 +90,26 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
     def __init__(
         self,
         *,
-        cls_model_path="auto",
-        reg_model_path="auto",
+        cls_model=None,
+        reg_model=None,
         ignore_pretraining_limits=False,
         random_state=None,
     ):
-        self.cls_model = TabPFNClassifier(
-            model_path=cls_model_path,
-            ignore_pretraining_limits=ignore_pretraining_limits,
-            random_state=random_state,
-        )
-        self.reg_model = TabPFNRegressor(
-            model_path=reg_model_path,
-            ignore_pretraining_limits=ignore_pretraining_limits,
-            random_state=random_state,
-        )
+        if cls_model is None:
+            self.cls_model = TabPFNClassifier(
+                ignore_pretraining_limits=ignore_pretraining_limits,
+                random_state=random_state,
+            )
+        else:
+            self.cls_model = cls_model
+
+        if reg_model is None:
+            self.reg_model = TabPFNRegressor(
+                ignore_pretraining_limits=ignore_pretraining_limits,
+                random_state=random_state,
+            )
+        else:
+            self.reg_model = reg_model
 
     def fit(self, X: np.ndarray, y: np.ndarray | list) -> SurvivalTabPFN:
         """Fits the survival analysis model.
@@ -120,6 +124,9 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
         """
         y_event = np.array([n[0] for n in y]).astype(bool)
         y_time = np.array([n[1] for n in y])
+
+        assert y_event.sum() >= 2, "You need atleast two events in your data."
+
         self.cls_model.fit(X, y_event)
 
         ## Rank longest time to shortest time from 0.0 to 1.0, only for event times where event==True

@@ -70,7 +70,7 @@ hpo = [
     "hyperopt>=0.2.7",
     "setuptools>=67.0.0",
 ]
-survival_pfn = [
+survival = [
     "scikit-survival>=0.25.0; python_version >= '3.10'",
 ]
 many_class = []
