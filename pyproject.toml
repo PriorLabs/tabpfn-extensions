@@ -71,7 +71,7 @@ hpo = [
     "setuptools>=67.0.0",
 ]
 survival_pfn = [
-    "scikit-survival>=0.25.0",
+    "scikit-survival>=0.25.0; python_version >= '3.10'",
 ]
 many_class = []
 classifier_as_regressor = []
