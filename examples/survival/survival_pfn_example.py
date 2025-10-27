@@ -8,7 +8,7 @@ For better performance, we recommend running with GPU acceleration.
 from sklearn.model_selection import train_test_split
 from sksurv.datasets import load_breast_cancer
 from sksurv.metrics import concordance_index_censored
-from src.tabpfn_extensions.survival import SurvivalTabPFN
+from tabpfn_extensions.survival import SurvivalTabPFN
 
 X, y = load_breast_cancer()
 test_size = 0.20
