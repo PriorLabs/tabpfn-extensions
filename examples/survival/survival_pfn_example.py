@@ -8,8 +8,7 @@ For better performance, we recommend running with GPU acceleration.
 from sklearn.model_selection import train_test_split
 from sksurv.datasets import load_breast_cancer
 from sksurv.metrics import concordance_index_censored
-
-from tabpfn_extensions.survival_pfn import SurvivalTabPFN
+from src.tabpfn_extensions.survival import SurvivalTabPFN
 
 X, y = load_breast_cancer()
 test_size = 0.20
@@ -23,7 +22,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # Create and fit classifier with appropriate settings
-model = TabPFNSurvivalAnalysis(random_state=42)
+model = SurvivalTabPFN(random_state=42)
 model.fit(X_train, y_train)
 risk_scores = model.predict(X_test)
 score = concordance_index_censored(

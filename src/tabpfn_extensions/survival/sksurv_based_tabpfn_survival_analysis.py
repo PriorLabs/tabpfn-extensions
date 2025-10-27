@@ -107,9 +107,7 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
             random_state=random_state,
         )
 
-    def fit(
-            self, X: np.ndarray, y: np.ndarray | list
-    ) -> SurvivalTabPFN:
+    def fit(self, X: np.ndarray, y: np.ndarray | list) -> SurvivalTabPFN:
         """Fits the survival analysis model.
 
         Parameters
@@ -132,6 +130,8 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
             reversed_y_time_with_event.shape[0] - 1
         )
         self.reg_model.fit(X_with_event, y_ranked_risk)
+
+        return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Predicts risk scores for X.
