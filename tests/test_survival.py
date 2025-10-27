@@ -6,12 +6,13 @@ from numpy.testing import assert_array_equal
 
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
-# --- Import dependencies ---
-from sksurv.base import SurvivalAnalysisMixin
 
-from tabpfn import TabPFNClassifier, TabPFNRegressor
-from tabpfn_extensions.survival import SurvivalTabPFN
-
+try:
+    from sksurv.base import SurvivalAnalysisMixin
+    from tabpfn import TabPFNClassifier, TabPFNRegressor
+    from tabpfn_extensions.survival import SurvivalTabPFN
+except ImportError:
+    pytest.skip("Required libraries (sksurv, tabpfn) not installed", allow_module_level=True)
 
 # A tiny, reusable synthetic dataset
 @pytest.fixture
