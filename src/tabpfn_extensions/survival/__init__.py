@@ -1,3 +1,3 @@
-from .sksurv_based_tabpfn_survival_analysis import TabPFNSurvivalAnalysis
+from .sksurv_based_tabpfn_survival_analysis import SurvivalTabPFN
 
-__all__ = ["TabPFNSurvivalAnalysis"]
+__all__ = ["SurvivalTabPFN"]

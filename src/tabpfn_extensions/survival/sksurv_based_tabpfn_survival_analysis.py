@@ -17,7 +17,7 @@ except ImportError:
 
 
 @set_extension("survival")
-class TabPFNSurvivalAnalysis(SurvivalAnalysisMixin):
+class SurvivalTabPFN(SurvivalAnalysisMixin):
     r"""TabPFN classifier and regressor blended together to predict risk scores
     to better optimize concordance index scores for survival analysis.
 
@@ -107,21 +107,45 @@ class TabPFNSurvivalAnalysis(SurvivalAnalysisMixin):
             random_state=random_state,
         )
 
-    def fit(self, X, y):
-        y_event = np.array([n[0] for n in y])
+    def fit(
+            self, X: np.ndarray, y: np.ndarray | list
+    ) -> SurvivalTabPFN:
+        """Fits the survival analysis model.
+
+        Parameters
+        ----------
+        X : np.ndarray of shape (n_samples, n_features)
+            The training input samples.
+        y : np.ndarray | list
+            Training target data. Assumed to be an iterable of
+            (event_indicator, time_to_event_or_censoring) elements.
+        """
+        y_event = np.array([n[0] for n in y]).astype(bool)
         y_time = np.array([n[1] for n in y])
         self.cls_model.fit(X, y_event)
 
         ## Rank longest time to shortest time from 0.0 to 1.0, only for event times where event==True
-        X_with_event = X[y_event is True]
-        y_time_with_event = y_time[y_event is True]
+        X_with_event = X[y_event]
+        y_time_with_event = y_time[y_event]
         reversed_y_time_with_event = -y_time_with_event
         y_ranked_risk = (rankdata(reversed_y_time_with_event) - 1) / (
             reversed_y_time_with_event.shape[0] - 1
         )
         self.reg_model.fit(X_with_event, y_ranked_risk)
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Predicts risk scores for X.
+
+        Parameters
+        ----------
+        X : np.ndarray of shape (n_samples, n_features)
+            The input samples to predict.
+
+        Returns:
+        -------
+        np.ndarray of shape (n_samples,)
+            The predicted risk scores.
+        """
         p_a = self.cls_model.predict_proba(X)[:, 1]
         p_b = self.reg_model.predict(X)
         preds = p_a * p_b
