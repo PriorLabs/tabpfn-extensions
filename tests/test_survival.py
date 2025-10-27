@@ -9,10 +9,14 @@ from numpy.testing import assert_array_equal
 
 try:
     from sksurv.base import SurvivalAnalysisMixin
+
     from tabpfn import TabPFNClassifier, TabPFNRegressor
     from tabpfn_extensions.survival import SurvivalTabPFN
 except ImportError:
-    pytest.skip("Required libraries (sksurv, tabpfn) not installed", allow_module_level=True)
+    pytest.skip(
+        "Required libraries (sksurv, tabpfn) not installed", allow_module_level=True
+    )
+
 
 # A tiny, reusable synthetic dataset
 @pytest.fixture
