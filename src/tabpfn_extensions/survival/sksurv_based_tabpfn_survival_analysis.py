@@ -149,6 +149,7 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
         p_a = self.cls_model.predict_proba(X)[:, 1]
         p_b = self.reg_model.predict(X)
         preds = p_a * p_b
+
         return preds
 
     @property
