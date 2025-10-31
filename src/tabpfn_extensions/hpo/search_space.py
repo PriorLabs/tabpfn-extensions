@@ -22,7 +22,10 @@ def enumerate_preprocess_transforms():
         # ["safepower"],
         ["quantile_uni_coarse"],
         ["quantile_norm_coarse"],
-        ["quantile_uni"],
+        # ["quantile_uni"],
+        ["kdi_uni"],
+        ["kdi_alpha_0.3"],
+        ["kdi_alpha_3.0"],
         ["none"],
         # ["robust"],  # Similar to squashing scaler.
         ["safepower", "quantile_uni"],
