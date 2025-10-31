@@ -133,9 +133,12 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
         X_with_event = X[y_event]
         y_time_with_event = y_time[y_event]
         reversed_y_time_with_event = -y_time_with_event
-        y_ranked_risk = (rankdata(reversed_y_time_with_event) - 1) / (
-            reversed_y_time_with_event.shape[0] - 1
-        )
+        if reversed_y_time_with_event.shape[0] == 1:
+            y_ranked_risk = np.zeros_like(reversed_y_time_with_event, dtype=float)
+        else:
+            y_ranked_risk = (rankdata(reversed_y_time_with_event) - 1) / (
+                reversed_y_time_with_event.shape[0] - 1
+            )
         self.reg_model.fit(X_with_event, y_ranked_risk)
 
         return self
