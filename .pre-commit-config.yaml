@@ -1,30 +1,26 @@
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-    -   id: check-yaml
-    -   id: check-added-large-files
-        args: ['--maxkb=1000']
-    -   id: end-of-file-fixer
-    -   id: trailing-whitespace
-    -   id: check-case-conflict
-    -   id: check-merge-conflict
-    -   id: debug-statements
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v5.0.0
+      hooks:
+          - id: check-yaml
+          - id: check-added-large-files
+            args: ["--maxkb=1000"]
+          - id: end-of-file-fixer
+          - id: trailing-whitespace
+          - id: check-case-conflict
+          - id: check-merge-conflict
+          - id: debug-statements
 
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
-    hooks:
-    -   id: ruff
-        args: [
-            '--fix',
-            '--select=E,W,F,I,COM,UP,NPY,BLE,ERA,Q',
-            '--ignore=E501,E741,NPY002'
-        ]
-    -   id: ruff-format
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.8.6
+      hooks:
+          - id: ruff
+            args: [--fix]
+          - id: ruff-format
 
--   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
-    hooks:
-    -   id: mypy
-        additional_dependencies: [types-requests==2.31.0.20240310]
-        exclude: '^(tests/|docs/|examples/)'
+    - repo: https://github.com/pre-commit/mirrors-mypy
+      rev: v1.15.0
+      hooks:
+          - id: mypy
+            additional_dependencies: [types-requests==2.31.0.20240310]
+            exclude: "^(tests/|docs/|examples/)"

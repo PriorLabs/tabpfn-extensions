@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Tutorial: Augment real-world data with TabEBM
+"""Tutorial: Augment real-world data with TabEBM
 
 This script replicates the functionality of the notebook but uses sklearn
 instead of TabCamel for data loading and preprocessing.
@@ -71,7 +70,6 @@ def preprocess_data(
     X_train, X_test, y_train, y_test, categorical_features, numerical_features
 ):
     """Preprocess the data using sklearn transformers."""
-
     # Create preprocessing pipeline
     preprocessor = ColumnTransformer(
         transformers=[
@@ -102,7 +100,6 @@ def preprocess_data(
 
 def main():
     """Main execution function."""
-
     # Set random seed
     seed_everything(42)
 
