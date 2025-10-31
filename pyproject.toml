@@ -92,10 +92,8 @@ all = [
 ]
 
 dev = [
-    # Lint/format
     "pre-commit>=3.0.0",
-    # This must be the same version as in .github/workflows/pull_request.yaml.
-    "ruff==0.8.6",
+    "ruff==0.8.6",  # This must be the same version as in .pre-commit-config.yaml
     "mypy>=1.0.0",
     # Test
     "pytest>=8.0.0",
@@ -126,12 +124,6 @@ output-format = "full"
 src = ["src", "tests", "examples"]
 
 [tool.ruff.lint]
-# Extend what ruff is allowed to fix, even it it may break
-# This is okay given we use it all the time and it ensures
-# better practices. Would be dangerous if using for first
-# time on established project.
-extend-safe-fixes = ["ALL"]
-
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 

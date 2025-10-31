@@ -7,6 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check_python_linting:
     name: Ruff Linting & Formatting
@@ -16,11 +20,11 @@ jobs:
       - uses: astral-sh/ruff-action@57714a7c8a2e59f32539362ba31877a1957dded1 # v3.5.1
         with:
           src: "./src ./tests"
-          version: 0.8.6
+          version-file: pyproject.toml
       - uses: astral-sh/ruff-action@57714a7c8a2e59f32539362ba31877a1957dded1 # v3.5.1
         with:
           src: "./src ./tests"
-          version: 0.8.6
+          version-file: pyproject.toml
           args: "format --check"
 
   test_compatibility:
