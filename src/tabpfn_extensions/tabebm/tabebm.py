@@ -13,9 +13,16 @@ from sklearn.model_selection import train_test_split
 from tabpfn_common_utils.telemetry import set_extension
 from torch.utils.data import DataLoader
 
-from tabpfn.config import ModelInterfaceConfig, PreprocessorConfig
+from tabpfn.config import PreprocessorConfig
 from tabpfn.utils import meta_dataset_collator
 from tabpfn_extensions.utils import TabPFNClassifier
+
+try:
+    from tabpfn.inference_config import InferenceConfig
+except ImportError:
+    # This is the old name and location of the InferenceConfig before TabPFN 2.5.
+    # Can be removed once these versions are no longer supported.
+    from tabpfn.config import ModelInterfaceConfig as InferenceConfig
 
 
 def to_numpy(X: np.ndarray | torch.Tensor | pd.DataFrame | None) -> np.ndarray | None:
@@ -85,7 +92,7 @@ class TabEBM:
         """
         # Configure TabPFN to disable preprocessing for gradient computation
         # This is crucial for SGLD sampling as we need gradients w.r.t. input features
-        no_preprocessing_inference_config = ModelInterfaceConfig(
+        no_preprocessing_inference_config = InferenceConfig(
             FINGERPRINT_FEATURE=False,
             FEATURE_SHIFT_METHOD=None,
             CLASS_SHIFT_METHOD=None,
@@ -229,7 +236,10 @@ class TabEBM:
         for target_class in unique_classes:
             # Create or retrieve cached EBM dataset and model
             ebm_dict = self._get_or_create_ebm_dataset(
-                X, y, target_class, distance_negative_class
+                X,
+                y,
+                target_class,
+                distance_negative_class,
             )
             X_ebm = ebm_dict["X_ebm"]
             y_ebm = ebm_dict["y_ebm"]
@@ -239,7 +249,11 @@ class TabEBM:
 
             # Initialize SGLD starting points
             start_dict = self._initialize_sgld_starting_points(
-                X_ebm, y_ebm, num_samples, starting_point_noise_std, seed
+                X_ebm,
+                y_ebm,
+                num_samples,
+                starting_point_noise_std,
+                seed,
             )
             X_sgld = start_dict["X_start"]
             y_sgld = start_dict["y_start"]
@@ -254,7 +268,9 @@ class TabEBM:
 
             # Pre-generate all noise for SGLD steps (memory/computation savings)
             noise_tensor = torch.randn(
-                noise_shape, device=self.device, dtype=X_sgld_tensor.dtype
+                noise_shape,
+                device=self.device,
+                dtype=X_sgld_tensor.dtype,
             )
 
             # SGLD sampling loop (optimized)
