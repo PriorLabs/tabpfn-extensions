@@ -111,8 +111,7 @@ def get_param_grid_hyperopt(task_type: str) -> dict:
             [None, 7.0, 12.0],
         ),
         "inference_config/MIN_UNIQUE_FOR_NUMERICAL_FEATURES": hp.choice(
-            "MIN_UNIQUE_FOR_NUMERICAL_FEATURES",
-            [1, 5, 10, 30]
+            "MIN_UNIQUE_FOR_NUMERICAL_FEATURES", [1, 5, 10, 30]
         ),
         # Enable this for datasets with many samples.
         # "inference_config/SUBSAMPLE_SAMPLES": hp.choice(
