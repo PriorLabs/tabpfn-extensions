@@ -142,7 +142,7 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
 
         # P(T<=t | event, X) from regressor distribution
         full = self._reg_model.predict(X, output_type="full")  # type: ignore
-        logits = full["logits"]  # torch.Tensor [n, nbins]
+        logits = torch.tensor(full["logits"])  # torch.Tensor [n, nbins]
         criterion = full["criterion"]  # FullSupportBarDistribution
 
         cdfs = []
