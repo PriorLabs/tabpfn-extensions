@@ -173,7 +173,7 @@ for c in range(4):
 plt.xlabel("time")
 plt.ylabel("Survival probability S(t|x)")
 plt.title("All survival curves colored by 4 clusters\n(thick lines = cluster means)")
-plt.ylim(0.5, 1)
+plt.ylim(0.1, 1)
 plt.grid(visible=True, alpha=0.25)
 plt.legend()
 plt.tight_layout()
