@@ -31,53 +31,32 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
 
     Parameters
     ----------
-    cls_model_path : default: auto
-        The path to the TabPFN model file for the TabPFNClassifier,
-        i.e., the pre-trained weights.
+    cls_model : TabPFNClassifier | None, default: None
+        A pre-initialised :class:`~tabpfn_extensions.utils.TabPFNClassifier`.
+        When ``None`` (the default) a new classifier instance will be created
+        internally using ``ignore_pretraining_limits`` and ``random_state``.
+        Supplying a classifier instance allows advanced users to customise
+        loading behaviour (e.g. from a specific checkpoint path) before
+        passing it to :class:`SurvivalTabPFN`.
 
-        - If `"auto"`, the model will be downloaded upon first use. This
-          defaults to your system cache directory, but can be overwritten
-          with the use of an environment variable `TABPFN_MODEL_CACHE_DIR`.
-        - If a path or a string of a path, the model will be loaded from
-          the user-specified location if available, otherwise it will be
-          downloaded to this location.
-
-    reg_model_path : default: auto
-        The path to the TabPFN model file for the TabPFNRegressor,
-        i.e., the pre-trained weights.
-
-        - If `"auto"`, the model will be downloaded upon first use. This
-          defaults to your system cache directory, but can be overwritten
-          with the use of an environment variable `TABPFN_MODEL_CACHE_DIR`.
-        - If a path or a string of a path, the model will be loaded from
-          the user-specified location if available, otherwise it will be
-          downloaded to this location.
+    reg_model : TabPFNRegressor | None, default: None
+        A pre-initialised :class:`~tabpfn_extensions.utils.TabPFNRegressor`.
+        When ``None`` (the default) a new regressor instance will be created
+        internally using ``ignore_pretraining_limits`` and ``random_state``.
+        Provide a custom regressor when you need to control how the
+        underlying TabPFN model is configured or loaded.
 
     ignore_pretraining_limits : bool, default: False
-        Whether to ignore the pre-training limits of the model. The TabPFN
-        models have been pre-trained on a specific range of input data. If the
-        input data is outside of this range, the model may not perform well.
-        You may ignore our limits to use the model on data outside the
-        pre-training range.
+        Whether to ignore the pre-training limits of the TabPFN models. These
+        limits cover the number of samples, features, and classes the models
+        were trained on. Setting this to ``True`` suppresses warnings or errors
+        when operating outside these limits (e.g. more than 1_000 samples on
+        CPU), but results may degrade.
 
-        - If `True`, the model will not raise an error if the input data is
-          outside the pre-training range. Also suppresses error when using
-          the model with more than 1000 samples on CPU.
-        - If `False`, you can use the model outside the pre-training range, but
-          the model could perform worse.
-
-        !!! note
-
-            The current pre-training limits are:
-
-            - 10_000 samples/rows
-            - 500 features/columns
-            - 10 classes, this is not ignorable and will raise an error
-              if the model is used with more classes.
-
-    random_state : int, RandomState instance, or None, optional, default: None
-        Controls the random seed given to each TabPFN model.
-        Pass an int for reproducible output across multiple function calls.
+    random_state : int | numpy.random.RandomState | None, default: None
+        Controls the random seed passed to both internal TabPFN models.
+        Provide an ``int`` for deterministic behaviour across runs. ``None``
+        uses the library defaults.
 
     References:
     ----------
@@ -111,34 +90,39 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
         else:
             self.reg_model = reg_model
 
-    def fit(self, X: np.ndarray, y: np.ndarray | list) -> SurvivalTabPFN:
+    def fit(self, X: np.ndarray, y: np.ndarray | list | dict) -> SurvivalTabPFN:
         """Fits the survival analysis model.
 
         Parameters
         ----------
         X : np.ndarray of shape (n_samples, n_features)
             The training input samples.
-        y : np.ndarray | list
-            Training target data. Assumed to be an iterable of
-            (event_indicator, time_to_event_or_censoring) elements.
+        y : np.ndarray | list | dict
+            Training target data. Accepts either a structured numpy array with
+            ``("event", "time")`` fields, a mapping with corresponding keys,
+            or an iterable of ``(event_indicator, time)`` tuples.
         """
-        y_event = np.array([n[0] for n in y]).astype(bool)
-        y_time = np.array([n[1] for n in y])
+        if isinstance(y, np.ndarray) and getattr(y.dtype, "names", None):
+            y_event = y["event"].astype(bool)
+            y_time = y["time"]
+        elif isinstance(y, dict):
+            y_event = np.asarray(y["event"], dtype=bool)
+            y_time = np.asarray(y["time"])
+        else:
+            y_event = np.array([n[0] for n in y], dtype=bool)
+            y_time = np.array([n[1] for n in y])
 
         assert y_event.sum() >= 2, "You need atleast two events in your data."
 
         self.cls_model.fit(X, y_event)
 
-        ## Rank longest time to shortest time from 0.0 to 1.0, only for event times where event==True
+        # Rank longest time to shortest time from 0.0 to 1.0, only for event times where event==True
         X_with_event = X[y_event]
         y_time_with_event = y_time[y_event]
         reversed_y_time_with_event = -y_time_with_event
-        if reversed_y_time_with_event.shape[0] == 1:
-            y_ranked_risk = np.zeros_like(reversed_y_time_with_event, dtype=float)
-        else:
-            y_ranked_risk = (rankdata(reversed_y_time_with_event) - 1) / (
-                reversed_y_time_with_event.shape[0] - 1
-            )
+        y_ranked_risk = (rankdata(reversed_y_time_with_event) - 1) / (
+            reversed_y_time_with_event.shape[0] - 1
+        )
         self.reg_model.fit(X_with_event, y_ranked_risk)
 
         return self

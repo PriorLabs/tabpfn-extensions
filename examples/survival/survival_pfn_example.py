@@ -26,8 +26,8 @@ model = SurvivalTabPFN(random_state=42)
 model.fit(X_train, y_train)
 risk_scores = model.predict(X_test)
 score = concordance_index_censored(
-    [n[0] for n in y_test],
-    [n[1] for n in y_test],
+    y_test["event"],
+    y_test["time"],
     risk_scores,
 )[0]
 print("Concordance index score:", score)
