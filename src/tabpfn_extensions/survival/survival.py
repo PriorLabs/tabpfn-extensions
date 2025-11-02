@@ -1,145 +1,274 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
+
 from __future__ import annotations
 
+from typing import Iterable, Literal, Optional
+
 import numpy as np
-from scipy.stats import rankdata
+import torch
 from sksurv.base import SurvivalAnalysisMixin
 from sksurv.util import check_y_survival
-from tabpfn_common_utils.telemetry import set_extension
 
+# If you use the Prior Labs telemetry extension, keep this import+decorator;
+# otherwise you can safely remove them.
 try:
-    from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
-except ImportError:
-    raise ImportError(
-        "TabPFN extensions utils module not found. Please make sure tabpfn_extensions is installed correctly.",
-    )
+    from tabpfn_common_utils.telemetry import set_extension
+except Exception:  # pragma: no cover
+    def set_extension(_name):
+        def deco(cls): return cls
+        return deco
+
+# TabPFN front-ends (assumed available in your environment)
+from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 
 
 @set_extension("survival")
 class SurvivalTabPFN(SurvivalAnalysisMixin):
-    r"""TabPFN classifier and regressor blended together to predict risk scores
-    to better optimize concordance index scores for survival analysis.
+    """
+    A lightweight survival “risk scorer” built from two TabPFN heads:
+    1) a classifier for P(event | X),
+    2) a distributional regressor for T | (event, X).
 
-    This ensemble model combines a TabPFNClassifier with a TabPFNRegressor to
-    improve performance on predicting risk scores to optimize concordance_index
-    scores. It leverages scikit-survival's API to add TabPFN as a new, powerful
-    model option for Survival Analysis.
+    At prediction time we can:
+      - produce horizon CDFs  F(t|X) = P(T <= t | X)  by mixing
+        P(event|X) with the regressor CDF learned on event times.
+      - return a single scalar risk:
+          * With horizons:  sum_k w_k * F(t_k | X).
+          * Without horizons:  P(event|X) / E[T | event, X].
 
-    For more details on TabPFN see [1]_.
-    For more details on Survival Analysis, see scikit-survival documentation:
-    https://scikit-survival.readthedocs.io/en/stable/index.html
+    This is intended for **ranking** (C-index) or simple horizon risk
+    scoring, not for full survival calibration.
 
     Parameters
     ----------
-    cls_model : TabPFNClassifier | None, default: None
-        A pre-initialised :class:`~tabpfn_extensions.utils.TabPFNClassifier`.
-        When ``None`` (the default) a new classifier instance will be created
-        internally using ``ignore_pretraining_limits`` and ``random_state``.
-        Supplying a classifier instance allows advanced users to customise
-        loading behaviour (e.g. from a specific checkpoint path) before
-        passing it to :class:`SurvivalTabPFN`.
+    cls_model : TabPFNClassifier | None, default=None
+        Optionally pass a pre-configured classifier instance.
 
-    reg_model : TabPFNRegressor | None, default: None
-        A pre-initialised :class:`~tabpfn_extensions.utils.TabPFNRegressor`.
-        When ``None`` (the default) a new regressor instance will be created
-        internally using ``ignore_pretraining_limits`` and ``random_state``.
-        Provide a custom regressor when you need to control how the
-        underlying TabPFN model is configured or loaded.
+    reg_model : TabPFNRegressor | None, default=None
+        Optionally pass a pre-configured regressor instance.
 
-    ignore_pretraining_limits : bool, default: False
-        Whether to ignore the pre-training limits of the TabPFN models. These
-        limits cover the number of samples, features, and classes the models
-        were trained on. Setting this to ``True`` suppresses warnings or errors
-        when operating outside these limits (e.g. more than 1_000 samples on
-        CPU), but results may degrade.
+    time_transform : {"none","log1p"}, default="log1p"
+        Optional monotone transform applied to target times *before*
+        training the regressor. If "log1p", we train on log1p(time).
+        Note: the regressor's returned distribution then lives in that
+        transformed (raw) space; we handle conversions when querying CDF.
 
-    random_state : int | numpy.random.RandomState | None, default: None
-        Controls the random seed passed to both internal TabPFN models.
-        Provide an ``int`` for deterministic behaviour across runs. ``None``
-        uses the library defaults.
+    default_horizons : iterable of float | None, default=None
+        If provided, `predict(X)` will return the weighted horizon risk.
+        If None, `predict(X)` falls back to P(event)/E[T|event].
 
-    References:
+    horizon_weights : iterable of float | None, default=None
+        Weights for `default_horizons`. If None, weights are uniform.
+
+    eps : float, default=1e-9
+        Small epsilon to stabilize divisions.
+
+    Attributes
     ----------
-    .. [1] Hollmann, N., Müller, S., Purucker, L., Krishnakumar, A., Körfer,
-           M., Hoo, S. B., Schirrmeister, R. T., & Hutter, F.,
-           "Accurate predictions on small data with a tabular foundation model."
-           Nature, 637(8045), 319-326, 2025
+    _predict_risk_score : bool
+        Flag for scikit-survival: higher score means higher risk.
     """
 
     def __init__(
         self,
         *,
-        cls_model=None,
-        reg_model=None,
-        ignore_pretraining_limits=False,
-        random_state=None,
+        cls_model: Optional[TabPFNClassifier] = None,
+        reg_model: Optional[TabPFNRegressor] = None,
+        time_transform: Literal["none", "log1p"] = "log1p",
+        default_horizons: Optional[Iterable[float]] = None,
+        horizon_weights: Optional[Iterable[float]] = None,
+        eps: float = 1e-9,
+        random_state: Optional[np.random.RandomState] = None,
     ):
-        if cls_model is None:
-            self.cls_model = TabPFNClassifier(
-                ignore_pretraining_limits=ignore_pretraining_limits,
-                random_state=random_state,
-            )
-        else:
-            self.cls_model = cls_model
+        self.cls_model = cls_model or TabPFNClassifier(random_state=random_state)
+        self.reg_model = reg_model or TabPFNRegressor(random_state=random_state)
+        self.time_transform = time_transform
+        self.default_horizons = None if default_horizons is None else list(default_horizons)
+        self.horizon_weights = None if horizon_weights is None else list(horizon_weights)
+        self.eps = float(eps)
 
-        if reg_model is None:
-            self.reg_model = TabPFNRegressor(
-                ignore_pretraining_limits=ignore_pretraining_limits,
-                random_state=random_state,
-            )
-        else:
-            self.reg_model = reg_model
+    # --- scikit-survival convention: larger = higher risk
+    @property
+    def _predict_risk_score(self) -> bool:  # noqa: D401
+        """Indicates that `predict(X)` returns a risk score (higher = riskier)."""
+        return True
 
-    def fit(self, X: np.ndarray, y: np.ndarray | list | dict) -> SurvivalTabPFN:
-        """Fits the survival analysis model.
+    # ------------------------------ helpers ------------------------------
+
+    def _to_reg_space(self, t: np.ndarray | float) -> np.ndarray:
+        """Map physical time(s) to the regressor 'raw' target space."""
+        if self.time_transform == "log1p":
+            return np.log1p(np.asarray(t, dtype=float))
+        return np.asarray(t, dtype=float)
+
+    def _from_reg_space(self, z: np.ndarray | float) -> np.ndarray:
+        """Inverse-map from regressor 'raw' space back to physical time(s)."""
+        if self.time_transform == "log1p":
+            return np.expm1(np.asarray(z, dtype=float))
+        return np.asarray(z, dtype=float)
+
+    # ------------------------------ fit ------------------------------
+
+    def fit(self, X: np.ndarray, y: np.ndarray | list | dict) -> "TabPFNSurvival":
+        """
+        Fit the classifier on event indicators, and the regressor on *event times only*.
 
         Parameters
         ----------
-        X : np.ndarray of shape (n_samples, n_features)
-            The training input samples.
-        y : np.ndarray | list | dict
-            Training target data. Accepts either a structured numpy array with
-            ``("event", "time")`` fields, a mapping with corresponding keys,
-            or an iterable of ``(event_indicator, time)`` tuples.
+        X : array-like of shape (n_samples, n_features)
+        y : structured array / mapping / iterable of (event, time)
+
+        Returns
+        -------
+        self
         """
         y_event, y_time = check_y_survival(y)
 
-        assert y_event.sum() >= 2, "You need atleast two events in your data."
-        assert np.all(np.asarray(y_time) >= 0), "Times should be non-negative."
+        # Basic sanity checks
+        if np.sum(y_event) < 2:
+            raise ValueError("Need at least two events to learn time distribution.")
+        if np.any(np.asarray(y_time) < 0):
+            raise ValueError("Times must be non-negative.")
 
+        # 1) Event classifier on ALL samples
         self.cls_model.fit(X, y_event)
 
-        # Rank longest time to shortest time from 0.0 to 1.0, only for event times where event==True
-        X_with_event = X[y_event]
-        y_time_with_event = y_time[y_event]
-        reversed_y_time_with_event = -y_time_with_event
-        y_ranked_risk = (rankdata(reversed_y_time_with_event) - 1) / (
-            reversed_y_time_with_event.shape[0] - 1
-        )
-        self.reg_model.fit(X_with_event, y_ranked_risk)
+        # 2) Time regressor on EVENT samples only
+        X_ev = X[y_event]
+        t_ev = np.asarray(y_time, dtype=float)[y_event]
+        t_ev_reg = self._to_reg_space(t_ev)
+        self.reg_model.fit(X_ev, t_ev_reg)
 
         return self
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
-        """Predicts risk scores for X.
+    # ------------------------------ distributions ------------------------------
+
+    def predict_cdf_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
+        """
+        Return F(t|X) = P(T <= t | X) for each t in `t_grid`.
+
+        We compute:
+            P(T <= t | X) = P(event | X) * P(T <= t | event, X)
 
         Parameters
         ----------
-        X : np.ndarray of shape (n_samples, n_features)
-            The input samples to predict.
+        X : array-like, shape (n_samples, n_features)
+        t_grid : iterable of float
+            Physical 'time' values.
 
-        Returns:
+        Returns
         -------
-        np.ndarray of shape (n_samples,)
-            The predicted risk scores.
+        F : ndarray, shape (n_samples, len(t_grid))
         """
-        p_a = self.cls_model.predict_proba(X)[:, 1]
-        p_b = self.reg_model.predict(X)
-        preds = p_a * p_b
+        t_grid = np.asarray(list(t_grid), dtype=float)
+        if t_grid.ndim != 1 or t_grid.size == 0:
+            raise ValueError("t_grid must be a 1-D, non-empty sequence of times.")
 
-        return preds
+        # 1) P(event|X)
+        p_event = self.cls_model.predict_proba(X)[:, 1]  # (n,)
 
-    @property
-    def _predict_risk_score(self):
-        return True
+        # 2) P(T<=t | event, X) using regressor distribution
+        #    We ask for full outputs to access logits + distribution object.
+        full = self.reg_model.predict(X, output_type="full")  # type: ignore
+        logits = full["logits"]            # torch.Tensor [n, n_bins] (post-processed)
+        criterion = full["criterion"]      # FullSupportBarDistribution
+
+        # Convert physical times to the regressor's target space
+        t_reg = self._to_reg_space(t_grid)
+
+        # Vectorized across grid (loop over m is fine; TabPFN inference is the hard part)
+        cdfs = []
+        with torch.no_grad():
+            for tau in t_reg:
+                # criterion.cdf(logits, tau) -> torch.Tensor [n,]
+                cdfs.append(criterion.cdf(logits, float(tau)).cpu().numpy())
+        F_event = np.column_stack(cdfs)  # (n, m)
+
+        # 3) Mix with event probability
+        F_mixed = p_event[:, None] * F_event  # (n, m)
+        return F_mixed
+
+    def predict_survival_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
+        """
+        Return S(t|X) = 1 - F(t|X) for each t in `t_grid`.
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+        t_grid : iterable of float
+
+        Returns
+        -------
+        S : ndarray, shape (n_samples, len(t_grid))
+        """
+        return 1.0 - self.predict_cdf_at(X, t_grid)
+
+    # ------------------------------ scalar risks ------------------------------
+
+    def predict_risk(
+        self,
+        X: np.ndarray,
+        *,
+        horizons: Optional[Iterable[float]] = None,
+        weights: Optional[Iterable[float]] = None,
+    ) -> np.ndarray:
+        """
+        Scalar risk for ranking.
+
+        If `horizons` provided:
+            risk = sum_k w_k * P(T <= t_k | X).
+        Else:
+            risk = P(event|X) / E[T | event, X].
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+        horizons : iterable of float | None
+            Physical horizon times. If None, uses the fallback risk.
+        weights : iterable of float | None
+            Optional weights for horizons (defaults to uniform).
+
+        Returns
+        -------
+        risk : ndarray of shape (n_samples,)
+        """
+        if horizons is not None:
+            horizons = list(horizons)
+            if len(horizons) == 0:
+                raise ValueError("If provided, 'horizons' cannot be empty.")
+            F = self.predict_cdf_at(X, horizons)  # (n, m)
+            if weights is None:
+                w = np.full(F.shape[1], 1.0 / F.shape[1], dtype=float)
+            else:
+                w = np.asarray(list(weights), dtype=float)
+                if w.shape[0] != F.shape[1]:
+                    raise ValueError("weights must match number of horizons.")
+                s = w.sum()
+                w = w / (s + self.eps)
+            return (F @ w).astype(float)
+
+        # Fallback: P(event)/E[T | event,X]
+        p_event = self.cls_model.predict_proba(X)[:, 1]
+        full = self.reg_model.predict(X, output_type="full")  # type: ignore
+        logits = full["logits"]
+        criterion = full["criterion"]
+        with torch.no_grad():
+            mu_reg = criterion.mean(logits).cpu().numpy()  # mean in reg space
+        mu_time = self._from_reg_space(mu_reg)
+        inv_mean_time = 1.0 / (mu_time + self.eps)
+        return (p_event * inv_mean_time).astype(float)
+
+    # ------------------------------ scikit API ------------------------------
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Return a single **risk score** per row (higher = riskier).
+
+        If this instance was created with `default_horizons`, this returns
+        the weighted horizon risk; otherwise it returns the fallback risk
+        (P(event)/E[T|event]).
+        """
+        if self.default_horizons is not None:
+            return self.predict_risk(X, horizons=self.default_horizons, weights=self.horizon_weights)
+        return self.predict_risk(X, horizons=None)
