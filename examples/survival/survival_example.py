@@ -1,13 +1,15 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
 
-"""WARNING: This example may run slowly on CPU-only systems.
+"""This example may run slowly on CPU-only systems.
 For better performance, we recommend running with GPU acceleration.
 """
 
 from sklearn.model_selection import train_test_split
 from sksurv.datasets import load_breast_cancer
 from sksurv.metrics import concordance_index_censored
+from sksurv.util import check_y_survival
+
 from tabpfn_extensions.survival import SurvivalTabPFN
 
 X, y = load_breast_cancer()
@@ -25,15 +27,14 @@ X_train, X_test, y_train, y_test = train_test_split(
 model = SurvivalTabPFN(random_state=42)
 model.fit(X_train, y_train)
 risk_scores = model.predict(X_test)
+
+event_test, time_test = check_y_survival(y_test)
 score = concordance_index_censored(
-    y_test["event"],
-    y_test["time"],
+    event_test,
+    time_test,
     risk_scores,
 )[0]
 print("Concordance index score:", score)
 
-# Alternatively, it is possible to predict and score in single function call
-print("Concordance index score (via score method):", model.score(X_test, y_test))
-
 # Expected output, approximately:
-# Concordance index score: 0.71907
+# Concordance index score: 0.7211

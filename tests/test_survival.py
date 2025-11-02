@@ -137,7 +137,6 @@ def test_reproducibility(tiny_data):
 
 def test_fit_with_two_events():
     """Model should train when exactly two events are present."""
-
     X = np.array(
         [
             [0.1, 0.2],
@@ -158,10 +157,7 @@ def test_fit_with_two_events():
 
     model = SurvivalTabPFN(random_state=42)
 
-    try:
-        model.fit(X, y)
-        preds = model.predict(X)
-    except Exception as exc:  # pragma: no cover - failure path should be unreachable
-        pytest.fail(f"Model failed to fit/predict with exactly two events: {exc}")
+    model.fit(X, y)
+    preds = model.predict(X)
 
     assert preds.shape == (X.shape[0],)
