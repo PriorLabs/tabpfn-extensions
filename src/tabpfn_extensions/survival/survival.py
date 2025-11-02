@@ -3,28 +3,22 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Literal, Optional
+from collections.abc import Iterable
+from typing import Literal
 
 import numpy as np
 import torch
 from sklearn.base import BaseEstimator
 from sksurv.base import SurvivalAnalysisMixin
 from sksurv.util import check_y_survival
-
-try:
-    from tabpfn_common_utils.telemetry import set_extension
-except Exception:  # pragma: no cover
-    def set_extension(_name):
-        def deco(cls): return cls
-        return deco
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 
 
 @set_extension("survival")
 class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
-    """
-    Two-head TabPFN survival scorer:
+    """Two-head TabPFN survival scorer:
       1) classifier -> P(event | X)
       2) distributional regressor -> T | (event, X)
 
@@ -55,10 +49,12 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
     def __init__(
         self,
         *,
-        cls_model: Optional[TabPFNClassifier] = None,
-        reg_model: Optional[TabPFNRegressor] = None,
-        risk_strategy: Literal["weighted_cdf", "avg_cdf", "p_over_mean"] = "weighted_cdf",
-        default_horizons: Optional[Iterable[float]] = None,
+        cls_model: TabPFNClassifier | None = None,
+        reg_model: TabPFNRegressor | None = None,
+        risk_strategy: Literal[
+            "weighted_cdf", "avg_cdf", "p_over_mean"
+        ] = "weighted_cdf",
+        default_horizons: Iterable[float] | None = None,
         n_auto_horizons: int = 6,
         auto_horizon_quantile_range: tuple[float, float] = (0.10, 0.90),
         exp_weight_gamma: float = 0.85,
@@ -69,7 +65,9 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
         self.cls_model = cls_model
         self.reg_model = reg_model
         self.risk_strategy = risk_strategy
-        self.default_horizons = None if default_horizons is None else list(default_horizons)
+        self.default_horizons = (
+            None if default_horizons is None else list(default_horizons)
+        )
         self.n_auto_horizons = int(n_auto_horizons)
         self.auto_horizon_quantile_range = tuple(auto_horizon_quantile_range)
         self.exp_weight_gamma = float(exp_weight_gamma)
@@ -77,10 +75,10 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
         self.random_state = random_state
 
         # fitted attributes (set in fit)
-        self._auto_horizons_: Optional[np.ndarray] = None
-        self._cls_model: Optional[TabPFNClassifier] = None
-        self._reg_model: Optional[TabPFNRegressor] = None
-        self.n_features_in_: Optional[int] = None
+        self._auto_horizons_: np.ndarray | None = None
+        self._cls_model: TabPFNClassifier | None = None
+        self._reg_model: TabPFNRegressor | None = None
+        self.n_features_in_: int | None = None
 
     @property
     def _predict_risk_score(self) -> bool:
@@ -89,7 +87,7 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
 
     # ------------------------------ fit ------------------------------
 
-    def fit(self, X: np.ndarray, y: np.ndarray | list | dict) -> "SurvivalTabPFN":
+    def fit(self, X: np.ndarray, y: np.ndarray | list | dict) -> SurvivalTabPFN:
         y_event, y_time = check_y_survival(y)
 
         if np.sum(y_event) < 2:
@@ -101,8 +99,12 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
         self.n_features_in_ = X.shape[1]
 
         # instantiate sub-models if not provided
-        self._cls_model = self.cls_model or TabPFNClassifier(random_state=self.random_state)
-        self._reg_model = self.reg_model or TabPFNRegressor(random_state=self.random_state)
+        self._cls_model = self.cls_model or TabPFNClassifier(
+            random_state=self.random_state
+        )
+        self._reg_model = self.reg_model or TabPFNRegressor(
+            random_state=self.random_state
+        )
 
         # 1) P(event|X)
         self._cls_model.fit(X, y_event)
@@ -136,18 +138,19 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
 
         X = np.asarray(X)
 
-        # P(event|X)
-        p_event = self._cls_model.predict_proba(X)[:, 1]  # (n,)
+        p_event = self._cls_model.predict_proba(X)[:, 1]  #  P(event|X), (n,)
 
         # P(T<=t | event, X) from regressor distribution
         full = self._reg_model.predict(X, output_type="full")  # type: ignore
-        logits = full["logits"]            # torch.Tensor [n, nbins]
-        criterion = full["criterion"]      # FullSupportBarDistribution
+        logits = full["logits"]  # torch.Tensor [n, nbins]
+        criterion = full["criterion"]  # FullSupportBarDistribution
 
         cdfs = []
         with torch.no_grad():
             for tau in t_grid:
-                ys = torch.as_tensor([float(tau)], device=logits.device, dtype=logits.dtype)
+                ys = torch.as_tensor(
+                    [float(tau)], device=logits.device, dtype=logits.dtype
+                )
                 cdf_tau = criterion.cdf(logits, ys).squeeze(-1).cpu().numpy()  # (n,)
                 cdfs.append(cdf_tau)
         F_event = np.column_stack(cdfs)  # (n, m)
@@ -187,8 +190,8 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
         self,
         X: np.ndarray,
         *,
-        horizons: Optional[Iterable[float]] = None,
-        weights: Optional[Iterable[float]] = None,
+        horizons: Iterable[float] | None = None,
+        weights: Iterable[float] | None = None,
     ) -> np.ndarray:
         if self._cls_model is None or self._reg_model is None:
             raise RuntimeError("Estimator not fitted yet.")

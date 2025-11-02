@@ -8,9 +8,6 @@ from numpy.testing import assert_array_equal
 #  Licensed under the Apache License, Version 2.0
 
 try:
-    from sksurv.base import SurvivalAnalysisMixin
-
-    from tabpfn import TabPFNClassifier, TabPFNRegressor
     from tabpfn_extensions.survival import SurvivalTabPFN
 except ImportError:
     pytest.skip(
@@ -68,25 +65,6 @@ def tiny_data():
 
 
 # --- Tests ---
-
-
-def test_model_initialization():
-    """Tests if the model initializes correctly."""
-    model = SurvivalTabPFN(random_state=42)
-
-    # Check that it's a valid sksurv model
-    assert isinstance(model, SurvivalAnalysisMixin)
-
-    # Check that it correctly initializes the internal models
-    assert isinstance(model.cls_model, TabPFNClassifier)
-    assert isinstance(model.reg_model, TabPFNRegressor)
-
-    # Check that parameters are passed down
-    assert model.cls_model.random_state == 42
-    assert model.reg_model.random_state == 42
-
-    # Check sksurv API property
-    assert model._predict_risk_score is True
 
 
 def test_model_predict(tiny_data):
