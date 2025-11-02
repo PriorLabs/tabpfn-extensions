@@ -75,7 +75,6 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
         *,
         cls_model: Optional[TabPFNClassifier] = None,
         reg_model: Optional[TabPFNRegressor] = None,
-        time_transform: Literal["none", "log1p"] = "log1p",
         default_horizons: Optional[Iterable[float]] = None,
         horizon_weights: Optional[Iterable[float]] = None,
         eps: float = 1e-9,
@@ -83,7 +82,6 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
     ):
         self.cls_model = cls_model or TabPFNClassifier(random_state=random_state)
         self.reg_model = reg_model or TabPFNRegressor(random_state=random_state)
-        self.time_transform = time_transform
         self.default_horizons = None if default_horizons is None else list(default_horizons)
         self.horizon_weights = None if horizon_weights is None else list(horizon_weights)
         self.eps = float(eps)
@@ -93,20 +91,6 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
     def _predict_risk_score(self) -> bool:  # noqa: D401
         """Indicates that `predict(X)` returns a risk score (higher = riskier)."""
         return True
-
-    # ------------------------------ helpers ------------------------------
-
-    def _to_reg_space(self, t: np.ndarray | float) -> np.ndarray:
-        """Map physical time(s) to the regressor 'raw' target space."""
-        if self.time_transform == "log1p":
-            return np.log1p(np.asarray(t, dtype=float))
-        return np.asarray(t, dtype=float)
-
-    def _from_reg_space(self, z: np.ndarray | float) -> np.ndarray:
-        """Inverse-map from regressor 'raw' space back to physical time(s)."""
-        if self.time_transform == "log1p":
-            return np.expm1(np.asarray(z, dtype=float))
-        return np.asarray(z, dtype=float)
 
     # ------------------------------ fit ------------------------------
 
@@ -137,8 +121,7 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
         # 2) Time regressor on EVENT samples only
         X_ev = X[y_event]
         t_ev = np.asarray(y_time, dtype=float)[y_event]
-        t_ev_reg = self._to_reg_space(t_ev)
-        self.reg_model.fit(X_ev, t_ev_reg)
+        self.reg_model.fit(X_ev, t_ev)
 
         return self
 
@@ -146,62 +129,39 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
 
     def predict_cdf_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
         """
-        Return F(t|X) = P(T <= t | X) for each t in `t_grid`.
-
-        We compute:
-            P(T <= t | X) = P(event | X) * P(T <= t | event, X)
-
-        Parameters
-        ----------
-        X : array-like, shape (n_samples, n_features)
-        t_grid : iterable of float
-            Physical 'time' values.
+        Compute mixed CDF F(t|X) = P(T <= t | X) over a time grid.
 
         Returns
         -------
-        F : ndarray, shape (n_samples, len(t_grid))
+        F : ndarray of shape (n_samples, len(t_grid))
         """
         t_grid = np.asarray(list(t_grid), dtype=float)
         if t_grid.ndim != 1 or t_grid.size == 0:
             raise ValueError("t_grid must be a 1-D, non-empty sequence of times.")
 
-        # 1) P(event|X)
+        # P(event|X)
         p_event = self.cls_model.predict_proba(X)[:, 1]  # (n,)
 
-        # 2) P(T<=t | event, X) using regressor distribution
-        #    We ask for full outputs to access logits + distribution object.
+        # P(T<=t | event, X) from regressor distribution
         full = self.reg_model.predict(X, output_type="full")  # type: ignore
-        logits = full["logits"]            # torch.Tensor [n, n_bins] (post-processed)
-        criterion = full["criterion"]      # FullSupportBarDistribution
+        logits = full["logits"]  # torch.Tensor [n, nbins]
+        criterion = full["criterion"]  # FullSupportBarDistribution
 
-        # Convert physical times to the regressor's target space
-        t_reg = self._to_reg_space(t_grid)
-
-        # Vectorized across grid (loop over m is fine; TabPFN inference is the hard part)
         cdfs = []
         with torch.no_grad():
-            for tau in t_reg:
-                # criterion.cdf(logits, tau) -> torch.Tensor [n,]
-                cdfs.append(criterion.cdf(logits, float(tau)).cpu().numpy())
-        F_event = np.column_stack(cdfs)  # (n, m)
+            for tau in t_grid:
+                # Make ys a 1-D tensor on the same device/dtype as logits
+                ys = torch.as_tensor([float(tau)], device=logits.device, dtype=logits.dtype)
+                # criterion.cdf(logits, ys) -> [n, 1]; squeeze to [n]
+                cdf_tau = criterion.cdf(logits, ys).squeeze(-1).cpu().numpy()
+                cdfs.append(cdf_tau)
 
-        # 3) Mix with event probability
-        F_mixed = p_event[:, None] * F_event  # (n, m)
+        F_event = np.column_stack(cdfs)  # (n, m)
+        F_mixed = p_event[:, None] * F_event
         return F_mixed
 
     def predict_survival_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
-        """
-        Return S(t|X) = 1 - F(t|X) for each t in `t_grid`.
-
-        Parameters
-        ----------
-        X : array-like, shape (n_samples, n_features)
-        t_grid : iterable of float
-
-        Returns
-        -------
-        S : ndarray, shape (n_samples, len(t_grid))
-        """
+        """Survival S(t|X) = 1 - F(t|X)."""
         return 1.0 - self.predict_cdf_at(X, t_grid)
 
     # ------------------------------ scalar risks ------------------------------
@@ -254,8 +214,7 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
         logits = full["logits"]
         criterion = full["criterion"]
         with torch.no_grad():
-            mu_reg = criterion.mean(logits).cpu().numpy()  # mean in reg space
-        mu_time = self._from_reg_space(mu_reg)
+            mu_time = criterion.mean(logits).cpu().numpy()  # mean in reg space
         inv_mean_time = 1.0 / (mu_time + self.eps)
         return (p_event * inv_mean_time).astype(float)
 
