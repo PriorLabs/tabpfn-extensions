@@ -2,6 +2,8 @@
 #  Licensed under the Apache License, Version 2.0
 from __future__ import annotations
 
+from typing import Mapping
+
 import numpy as np
 from scipy.stats import rankdata
 from sksurv.base import SurvivalAnalysisMixin
@@ -102,17 +104,11 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
             ``("event", "time")`` fields, a mapping with corresponding keys,
             or an iterable of ``(event_indicator, time)`` tuples.
         """
-        if isinstance(y, np.ndarray) and getattr(y.dtype, "names", None):
-            y_event = y["event"].astype(bool)
-            y_time = y["time"]
-        elif isinstance(y, dict):
-            y_event = np.asarray(y["event"], dtype=bool)
-            y_time = np.asarray(y["time"])
-        else:
-            y_event = np.array([n[0] for n in y], dtype=bool)
-            y_time = np.array([n[1] for n in y])
+        y_event, y_time = _split_y(y)
 
         assert y_event.sum() >= 2, "You need atleast two events in your data."
+        assert np.all(np.asarray(y_time) >= 0), \
+            "Times should be non-negative."
 
         self.cls_model.fit(X, y_event)
 
@@ -149,3 +145,25 @@ class SurvivalTabPFN(SurvivalAnalysisMixin):
     @property
     def _predict_risk_score(self):
         return True
+
+def _split_y(y):
+    # dict: expect "event" and "time"
+    if isinstance(y, Mapping):
+        return np.asarray(y["event"], dtype=bool), np.asarray(y["time"])
+
+    # structured ndarray: use named fields if present, else first two fields
+    if isinstance(y, np.ndarray) and getattr(y.dtype, "names", None):
+        names = y.dtype.names
+        e_key = "event" if "event" in names else names[0]
+        t_key = "time" if "time" in names else names[1]
+        return y[e_key].astype(bool), y[t_key]
+
+    # plain 2D array-like: first col = event, second = time
+    arr = np.asarray(y, dtype=object)
+    if arr.ndim == 2 and arr.shape[1] >= 2:
+        return np.asarray(arr[:, 0], dtype=bool), np.asarray(arr[:, 1])
+
+    # generic iterable of (event, time)
+    y_event = np.array([row[0] for row in y], dtype=bool)
+    y_time = np.array([row[1] for row in y])
+    return y_event, y_time
