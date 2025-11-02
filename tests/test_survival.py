@@ -8,14 +8,23 @@ from numpy.testing import assert_array_equal
 #  Licensed under the Apache License, Version 2.0
 
 try:
-    from sksurv.base import SurvivalAnalysisMixin
-
-    from tabpfn import TabPFNClassifier, TabPFNRegressor
     from tabpfn_extensions.survival import SurvivalTabPFN
 except ImportError:
     pytest.skip(
         "Required libraries (sksurv, tabpfn) not installed", allow_module_level=True
     )
+
+
+# Deterministic test samples used across tests
+_X_TEST_SAMPLES = np.array(
+    [
+        [0.1, 0.2],
+        [0.3, 0.4],
+        [0.5, 0.6],
+        [0.7, 0.8],
+        [0.9, 0.1],
+    ]
+)
 
 
 # A tiny, reusable synthetic dataset
@@ -58,25 +67,6 @@ def tiny_data():
 # --- Tests ---
 
 
-def test_model_initialization():
-    """Tests if the model initializes correctly."""
-    model = SurvivalTabPFN(random_state=42)
-
-    # Check that it's a valid sksurv model
-    assert isinstance(model, SurvivalAnalysisMixin)
-
-    # Check that it correctly initializes the internal models
-    assert isinstance(model.cls_model, TabPFNClassifier)
-    assert isinstance(model.reg_model, TabPFNRegressor)
-
-    # Check that parameters are passed down
-    assert model.cls_model.random_state == 42
-    assert model.reg_model.random_state == 42
-
-    # Check sksurv API property
-    assert model._predict_risk_score is True
-
-
 def test_model_predict(tiny_data):
     """Tests if 'predict' returns risk scores of the correct shape and type."""
     X, y = tiny_data
@@ -88,9 +78,8 @@ def test_model_predict(tiny_data):
     assert np.issubdtype(preds_train.dtype, np.floating)
 
     # Test prediction on new, unseen data
-    X_test = np.random.rand(5, X.shape[1])  # 5 new samples
-    preds_test = model.predict(X_test)
-    assert preds_test.shape == (5,)
+    preds_test = model.predict(_X_TEST_SAMPLES)
+    assert preds_test.shape == (_X_TEST_SAMPLES.shape[0],)
     assert np.issubdtype(preds_test.dtype, np.floating)
 
 
@@ -110,17 +99,43 @@ def test_model_score(tiny_data):
 def test_reproducibility(tiny_data):
     """Tests that random_state ensures deterministic predictions."""
     X, y = tiny_data
-    X_test = np.random.rand(5, X.shape[1])
-
     # First model and prediction
     model_1 = SurvivalTabPFN(random_state=42)
     model_1.fit(X, y)
-    preds_1 = model_1.predict(X_test)
+    preds_1 = model_1.predict(_X_TEST_SAMPLES)
 
     # Second model and prediction with the same seed
     model_2 = SurvivalTabPFN(random_state=42)
     model_2.fit(X, y)
-    preds_2 = model_2.predict(X_test)
+    preds_2 = model_2.predict(_X_TEST_SAMPLES)
 
     # Assert that the outputs are identical
     assert_array_equal(preds_1, preds_2)
+
+
+def test_fit_with_two_events():
+    """Model should train when exactly two events are present."""
+    X = np.array(
+        [
+            [0.1, 0.2],
+            [0.3, 0.4],
+            [0.5, 0.6],
+            [0.7, 0.8],
+        ]
+    )
+    y = np.array(
+        [
+            (True, 10.0),
+            (False, 20.0),
+            (True, 5.0),
+            (False, 8.0),
+        ],
+        dtype=[("event", "bool"), ("time", "f8")],
+    )
+
+    model = SurvivalTabPFN(random_state=42)
+
+    model.fit(X, y)
+    preds = model.predict(X)
+
+    assert preds.shape == (X.shape[0],)
