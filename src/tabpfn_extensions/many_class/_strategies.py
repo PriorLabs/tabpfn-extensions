@@ -48,7 +48,9 @@ class WeightMode(str, Enum):
 
 @dataclass(**DATACLASS_KWARGS)
 class CodebookConfig:
-    strategy: Literal["legacy_rest", "balanced_cluster"] = "legacy_rest" # legacy_rest is recommended
+    strategy: Literal["legacy_rest", "balanced_cluster"] = (
+        "legacy_rest"  # legacy_rest is recommended
+    )
     retries: int = 50
     min_hamming_frac: float | None = None
     hamming_max_classes: int = 200
