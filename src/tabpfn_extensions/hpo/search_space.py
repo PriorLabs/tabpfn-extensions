@@ -1,3 +1,4 @@
+# ruff: noqa: ERA001  ; Ignore commented out code.
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
 
@@ -10,7 +11,6 @@ hyperparameter optimization. It also includes utilities for customizing search s
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from hyperopt import hp
 from tabpfn_common_utils.telemetry import set_extension
@@ -20,126 +20,46 @@ def enumerate_preprocess_transforms():
     transforms = []
 
     names_list = [
-        ["safepower"],
+        # ["safepower"],
         ["quantile_uni_coarse"],
         ["quantile_norm_coarse"],
-        ["quantile_uni"],
+        # ["quantile_uni"],
+        ["kdi_uni"],
+        ["kdi_alpha_0.3"],
+        ["kdi_alpha_3.0"],
         ["none"],
-        ["robust"],
+        # ["robust"],  # Similar to squashing scaler.
         ["safepower", "quantile_uni"],
-        ["none", "safepower"],
+        # ["none", "safepower"],
+        ["none", "quantile_uni_coarse"],
+        ["squashing_scaler_default", "quantile_uni_coarse"],
+        ["squashing_scaler_default"],
+        # ["squashing_scaler_max10"],
     ]
 
     for names in names_list:
         for categorical_name in [
             "numeric",
             "ordinal_very_common_categories_shuffled",
-            "onehot",
+            # "onehot",
             "none",
         ]:
             for append_original in [True, False]:
-                for subsample_features in [-1, 0.99, 0.95, 0.9]:
-                    for global_transformer_name in [None, "svd"]:
-                        transforms += [
-                            [
-                                {
-                                    # Use "name" parameter as expected by TabPFN PreprocessorConfig
-                                    "name": name,
-                                    "global_transformer_name": global_transformer_name,
-                                    "subsample_features": subsample_features,
-                                    "categorical_name": categorical_name,
-                                    "append_original": append_original,
-                                }
-                                for name in names
-                            ],
-                        ]
+                for global_transformer_name in [None, "svd", "svd_quarter_components"]:
+                    transforms += [
+                        [
+                            {
+                                # Use "name" parameter as expected by TabPFN PreprocessorConfig
+                                "name": name,
+                                "global_transformer_name": global_transformer_name,
+                                "subsample_features": -1,
+                                "categorical_name": categorical_name,
+                                "append_original": append_original,
+                            }
+                            for name in names
+                        ],
+                    ]
     return transforms
-
-
-@set_extension("hpo")
-class TabPFNSearchSpace:
-    """Utility class for creating and customizing TabPFN hyperparameter search spaces.
-
-    This class provides methods to generate default search spaces for both classification
-    and regression tasks, as well as customizing parameter ranges.
-
-    Examples:
-        ```python
-        # Get default classifier search space
-        clf_space = TabPFNSearchSpace.get_classifier_space()
-
-        # Get customized classifier search space
-        custom_space = TabPFNSearchSpace.get_classifier_space(
-            n_ensemble_range=(5, 15),
-            temp_range=(0.1, 0.5)
-        )
-
-        # Use with TunedTabPFNClassifier
-        from tabpfn_extensions.hpo import TunedTabPFNClassifier
-
-        clf = TunedTabPFNClassifier(
-            n_trials=50,
-            search_space=custom_space
-        )
-        ```
-    """
-
-    @staticmethod
-    def get_classifier_space(
-        n_ensemble_range: tuple[int, int] = (1, 8),
-        temp_range: tuple[float, float] = (0.75, 1.0),
-    ) -> dict[str, Any]:
-        """Get a search space for classification tasks.
-
-        Args:
-            n_ensemble_range: Range for n_estimators parameter as (min, max)
-            temp_range: Range for softmax_temperature as (min, max)
-
-        Returns:
-            Dictionary with search space parameters
-        """
-        # Generate values within the ranges
-        n_ensemble_values = list(range(n_ensemble_range[0], n_ensemble_range[1] + 1))
-        temp_values = [
-            round(temp_range[0] + i * 0.05, 2)
-            for i in range(int((temp_range[1] - temp_range[0]) / 0.05) + 1)
-        ]
-
-        # Create simplified search space suitable for HPO
-        return {
-            "n_estimators": n_ensemble_values,
-            "softmax_temperature": temp_values,
-            "average_before_softmax": [True, False],
-        }
-
-    @staticmethod
-    def get_regressor_space(
-        n_ensemble_range: tuple[int, int] = (1, 8),
-        temp_range: tuple[float, float] = (0.75, 1.0),
-    ) -> dict[str, Any]:
-        """Get a search space for regression tasks.
-
-        Args:
-            n_ensemble_range: Range for n_estimators parameter as (min, max)
-            temp_range: Range for softmax_temperature as (min, max)
-
-        Returns:
-            Dictionary with search space parameters
-        """
-        # Basic space is the same as classifier space
-        space = TabPFNSearchSpace.get_classifier_space(
-            n_ensemble_range=n_ensemble_range,
-            temp_range=temp_range,
-        )
-
-        # Add regression-specific parameters
-        space.update(
-            {
-                # Add any regression-specific parameters here
-            },
-        )
-
-        return space
 
 
 @set_extension("hpo")
@@ -170,6 +90,7 @@ def get_param_grid_hyperopt(task_type: str) -> dict:
                 0.9,
                 0.95,
                 1.0,
+                1.05,
             ],
         ),
         # Inference config
@@ -187,12 +108,16 @@ def get_param_grid_hyperopt(task_type: str) -> dict:
         ),
         "inference_config/OUTLIER_REMOVAL_STD": hp.choice(
             "OUTLIER_REMOVAL_STD",
-            [None, 7.0, 9.0, 12.0],
+            [None, 7.0, 12.0],
         ),
-        "inference_config/SUBSAMPLE_SAMPLES": hp.choice(
-            "SUBSAMPLE_SAMPLES",
-            [0.99, None],
+        "inference_config/MIN_UNIQUE_FOR_NUMERICAL_FEATURES": hp.choice(
+            "MIN_UNIQUE_FOR_NUMERICAL_FEATURES", [1, 5, 10, 30]
         ),
+        # Enable this for datasets with many samples.
+        # "inference_config/SUBSAMPLE_SAMPLES": hp.choice(
+        #     "SUBSAMPLE_SAMPLES",
+        #     [0.7, None],
+        # ),
     }
 
     local_dir = (Path(__file__).parent / "hpo_models").resolve()
@@ -219,7 +144,7 @@ def get_param_grid_hyperopt(task_type: str) -> dict:
                 (None,),
                 (None, "safepower"),
                 ("safepower",),
-                ("quantile_uni",),
+                # ("quantile_uni",),
             ],
         )
     else:
