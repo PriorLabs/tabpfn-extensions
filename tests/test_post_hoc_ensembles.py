@@ -96,7 +96,6 @@ class TestAutoTabPFNClassifier(BaseClassifierTests):
         pass
 
 
-
 @pytest.mark.local_compatible
 @pytest.mark.client_compatible
 class TestAutoTabPFNRegressor(BaseRegressorTests):
