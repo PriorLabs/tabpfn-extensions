@@ -29,9 +29,9 @@ from test_base_tabpfn import BaseClassifierTests
 
 # Helper function (as provided in the initial problem description)
 def get_classification_data(num_classes: int, num_features: int, num_samples: int):
-    assert num_samples >= num_classes, (
-        "Number of samples must be at least the number of classes."
-    )
+    assert (
+        num_samples >= num_classes
+    ), "Number of samples must be at least the number of classes."
     X = np.random.randn(num_samples, num_features)
     y = np.concatenate(
         [
@@ -78,9 +78,9 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         predictions = estimator.predict(X_test)
         probabilities = estimator.predict_proba(X_test)
 
-        assert not estimator.no_mapping_needed_, (
-            "Mapping should have been used for 15 classes."
-        )
+        assert (
+            not estimator.no_mapping_needed_
+        ), "Mapping should have been used for 15 classes."
         assert estimator.code_book_ is not None
         assert estimator.code_book_.shape[1] == n_classes
         assert (
@@ -119,9 +119,9 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
                 assert estimator.code_book_ is not None
                 assert estimator.code_book_.shape[1] == num_classes
                 stats = estimator.codebook_statistics_
-                assert stats.get("coverage_min", 0) > 0, (
-                    f"Coverage min is 0 for {num_classes} classes!"
-                )
+                assert (
+                    stats.get("coverage_min", 0) > 0
+                ), f"Coverage min is 0 for {num_classes} classes!"
                 assert stats.get("regeneration_attempts", 0) >= 1
             else:
                 assert estimator._get_alphabet_size() >= num_classes
