@@ -91,11 +91,14 @@ jobs:
         if: runner.os != 'Windows'
         env:
           TABPFN_EXCLUDE_DEVICES: "mps"
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           FAST_TEST_MODE=1 pytest tests/
 
       - name: Run Tests (Windows)
         if: runner.os == 'Windows'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           $env:FAST_TEST_MODE = 1
           pytest tests/
