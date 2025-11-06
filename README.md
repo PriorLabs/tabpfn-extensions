@@ -1,4 +1,4 @@
-# TabPFN Extensions ⚡
+# TabPFN Extensions
 
 [![PyPI version](https://badge.fury.io/py/tabpfn-extensions.svg)](https://badge.fury.io/py/tabpfn-extensions)
 [![Downloads](https://pepy.tech/badge/tabpfn)](https://pepy.tech/project/tabpfn)
@@ -11,7 +11,7 @@
 
 > [!WARNING]
 >
-> #### 🧪 Experimental Code Notice
+> #### Experimental Code Notice
 > Please note that the extensions in this repository are experimental.
 > -   They are less rigorously tested than the core `tabpfn` library.
 > -   APIs are subject to change without notice in future releases.
@@ -24,14 +24,14 @@
 >
 > [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PriorLabs/TabPFN/blob/main/examples/notebooks/TabPFN_Demo_Local.ipynb)
 
-## ⚙️ Installation
+## Installation
 
 ```bash
 # Clone and install the repository
 pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-extensions.git"
 ```
 
-## 🛠️ Available Extensions
+## Available Extensions
 
 - **post_hoc_ensembles**: Improve performance with model combination
 - **interpretability**: Explain TabPFN predictions with SHAP values and feature selection
@@ -45,28 +45,28 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 
 Detailed documentation for each extension is available in the respective module directories.
 
-### 🔄 Backend Options
+### Backend Options
 
 TabPFN Extensions works with two TabPFN implementations:
 
-1. **🖥️ TabPFN Package** - Full PyTorch implementation for local inference:
+1. ** TabPFN Package** - Full PyTorch implementation for local inference:
    ```bash
    pip install tabpfn
    ```
 
-2. **☁️ TabPFN Client** - Lightweight API client for cloud-based inference:
+2. ** TabPFN Client** - Lightweight API client for cloud-based inference:
    ```bash
    pip install tabpfn-client
    ```
 
 Choose the backend that fits your needs - most extensions work with either option!
 
-## 📝 License
+## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 
-## 🔀 TabPFN Workflow at a Glance
+## TabPFN Workflow at a Glance
 Follow this decision tree to build your model and choose the right extensions from our ecosystem. It walks you through critical questions about your data, hardware, and performance needs, guiding you to the best solution for your specific use case.
 
 ```mermaid
@@ -208,7 +208,7 @@ graph LR
 
 ```
 
-## 📊 Anonymized Telemetry
+## Anonymized Telemetry
 
 This project collects fully anonymous usage telemetry with an option to opt-out of any telemetry or opt-in to extended telemetry.
 
@@ -226,7 +226,7 @@ For details on telemetry, please see our [Telemetry Reference](https://github.co
 export TABPFN_DISABLE_TELEMETRY=1
 ```
 
-## 🧑‍💻 For Contributors
+## For Contributors
 
 Interested in adding your own extension? We welcome contributions!
 
