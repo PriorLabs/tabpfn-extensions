@@ -11,14 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-## [0.2.9] - 2025-11-07
+## [0.2.1] - 2025-11-07
 
 ### Added
 
 ### Changed
-- Updated tabpfn package to 6.0.5. This means **for most extensions, the new v2.5 model will be
+- Updated tabpfn dependency to 6.0.5. This means **for most extensions, the new v2.5 model will be
   used** (excluding AutoTabPFN and tuned for now).
-- The search space for tuniung and AutoTabPFN has been updated to work again with tabpfn 6.0.
+- The search space for tuning and AutoTabPFN has been updated to work again with tabpfn 6.0 in #196.
+
+## [0.2.0] - 2025-11-06
+
+### Added
+
+### Change
+- Made new tabpfn release (6.0.0 and up) optional
 - Fixed type mistmatch in imputation #195
 - Fixed SurvivalTabPFN documentation and clean ranking logic #194
 
