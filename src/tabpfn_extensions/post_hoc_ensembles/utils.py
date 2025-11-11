@@ -128,8 +128,9 @@ def search_space_func(
     if task_type == "regression":
         balance_probabilities = None
 
-    search_space = get_param_grid_hyperopt(task_type=task_type,
-                                           model_version=model_version)
+    search_space = get_param_grid_hyperopt(
+        task_type=task_type, model_version=model_version
+    )
     rng = np.random.default_rng(seed)
     tabpfn_configs = [
         prepare_tabpfnv2_config(
