@@ -141,10 +141,21 @@ def get_param_grid_hyperopt(
         model_source = ModelSource.get_classifier_v2()
     elif task_type == "multiclass" and model_version == ModelVersion.V2_5:
         model_source = ModelSource.get_classifier_v2_5()
-    elif task_type == "regression" and model_version == ModelVersion.V2:
-        model_source = ModelSource.get_regressor_v2()
-    elif task_type == "regression" and model_version == ModelVersion.V2_5:
-        model_source = ModelSource.get_regressor_v2_5()
+    elif task_type == "regression":
+        if model_version == ModelVersion.V2:
+            model_source = ModelSource.get_regressor_v2()
+        elif model_version == ModelVersion.V2_5:
+            model_source = ModelSource.get_regressor_v2_5()
+        search_space["inference_config/REGRESSION_Y_PREPROCESS_TRANSFORMS"] = hp.choice(
+            "REGRESSION_Y_PREPROCESS_TRANSFORMS",
+            [
+                (None,),
+                (None, "safepower"),
+                ("safepower",),
+                # ("quantile_uni",),
+            ],
+        )
+
     else:
         raise ValueError(
             f"Unknown combination of task type {task_type} and "
@@ -163,14 +174,4 @@ def get_param_grid_hyperopt(
 
     model_paths = [str(model_dir / ckpt_name) for ckpt_name in model_source.filenames]
     search_space["model_path"] = hp.choice("model_path", model_paths)
-
-    search_space["inference_config/REGRESSION_Y_PREPROCESS_TRANSFORMS"] = hp.choice(
-        "REGRESSION_Y_PREPROCESS_TRANSFORMS",
-        [
-            (None,),
-            (None, "safepower"),
-            ("safepower",),
-            # ("quantile_uni",),
-        ],
-    )
     return search_space

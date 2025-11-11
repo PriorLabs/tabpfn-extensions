@@ -353,6 +353,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         n_estimators: int = 8,
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
+        model_version: ModelVersion = ModelVersion.V2_5,
     ):
         super().__init__(
             max_time=max_time,
@@ -365,6 +366,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             n_ensemble_models=n_ensemble_models,
             n_estimators=n_estimators,
             ignore_pretraining_limits=ignore_pretraining_limits,
+            model_version=model_version,
         )
 
         self.balance_probabilities = balance_probabilities
@@ -501,6 +503,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         n_ensemble_models: int = 20,
         n_estimators: int = 8,
         ignore_pretraining_limits: bool = False,
+        model_version: ModelVersion = ModelVersion.V2_5,
     ):
         super().__init__(
             max_time=max_time,
@@ -513,6 +516,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
             n_ensemble_models=n_ensemble_models,
             n_estimators=n_estimators,
             ignore_pretraining_limits=ignore_pretraining_limits,
+            model_version=model_version,
         )
 
         self._is_classifier = False
