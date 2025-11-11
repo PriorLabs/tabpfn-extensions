@@ -68,6 +68,7 @@ def get_param_grid_hyperopt(
     task_type: str,
     model_version: ModelVersion = ModelVersion.V2_5,
     model_dir: Path | None = None,
+    download_models_if_missing: bool = True,
 ) -> dict:
     """Generate the full hyperopt search space for TabPFN optimization.
 
@@ -76,6 +77,11 @@ def get_param_grid_hyperopt(
 
     Args:
         task_type: Either "multiclass" or "regression"
+        model_version: Version of the TabPFN model to use.
+        model_dir: Directory to store or look for TabPFN model checkpoints.
+            If None, defaults to "hpo_models" directory next to this file.
+        download_models_if_missing: Whether to download model checkpoints if they
+            are not found in the specified model directory.
 
     Returns:
         Hyperopt search space dictionary
@@ -146,10 +152,11 @@ def get_param_grid_hyperopt(
         )
 
     # Make sure models are downloaded.
-    for ckpt_name in model_source.filenames:
-        download_model(
-            to=model_dir / ckpt_name,
-            version=model_version,
+    if download_models_if_missing:
+        for ckpt_name in model_source.filenames:
+            download_model(
+                to=model_dir / ckpt_name,
+                version=model_version,
             which="classifier" if task_type == "multiclass" else "regressor",
             model_name=ckpt_name,
         )

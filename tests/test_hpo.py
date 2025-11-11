@@ -135,7 +135,9 @@ class TestSearchSpaceCompatibility:
         This verifies compatibility between the HPO search space and the
         TabPFN core library's expected configuration.
         """
-        full_search_space = get_param_grid_hyperopt(task_type)
+        full_search_space = get_param_grid_hyperopt(
+            task_type, download_models_if_missing=False
+        )
         rng = np.random.default_rng(42)
 
         for i in range(NUM_CONFIGS_TO_TEST):
@@ -209,9 +211,9 @@ class TestSearchSpaceCompatibility:
                 else:
                     pytest.fail(f"Unknown task type: {task_type}")
 
-                assert (
-                    model_instance is not None
-                ), "Model instance should not be None after instantiation attempt."
+                assert model_instance is not None, (
+                    "Model instance should not be None after instantiation attempt."
+                )
 
             except (TypeError, ValueError, RuntimeError, AssertionError) as e:
                 pytest.fail(
