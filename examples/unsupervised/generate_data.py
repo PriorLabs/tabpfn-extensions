@@ -11,9 +11,10 @@ from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor
 from tabpfn_extensions.unsupervised import TabPFNUnsupervisedModel
 
 
-def plotting_helper_create_combined_dataframe(real_samples, synthetic_samples, feature_names):
+def plotting_helper_create_combined_dataframe(
+    real_samples, synthetic_samples, feature_names
+):
     """Return a tidy DataFrame with real and generated samples."""
-
     real_df = pd.DataFrame(real_samples.numpy(), columns=feature_names)
     real_df["real_or_synthetic"] = "Actual samples"
 
@@ -28,7 +29,6 @@ def plotting_helper_create_combined_dataframe(real_samples, synthetic_samples, f
 
 def plotting_helper_plot_pairgrid(combined_df):
     """Mirror the experiment helper's PairGrid visualisation."""
-
     plot_sample_count = combined_df["real_or_synthetic"].value_counts().min()
     plot_df = (
         combined_df.groupby("real_or_synthetic", group_keys=False)
@@ -47,7 +47,7 @@ def main():
     feature_indices = [0, 1]  # Select features to analyse (first two columns)
 
     breast_cancer = load_breast_cancer(return_X_y=False)
-    X, y = breast_cancer["data"], breast_cancer["target"]
+    X = breast_cancer["data"]
     attribute_names = breast_cancer["feature_names"]
 
     feature_names = [attribute_names[i] for i in feature_indices]
@@ -58,7 +58,7 @@ def main():
     model_unsupervised = TabPFNUnsupervisedModel(tabpfn_clf=clf, tabpfn_reg=reg)
     model_unsupervised.fit(X_tensor)
 
-    multiplier = 3.0 # fraction of samples to be generated
+    multiplier = 3.0  # fraction of samples to be generated
     n_samples = int(X_tensor.shape[0] * multiplier)
     synthetic_samples = model_unsupervised.generate_synthetic_data(
         n_samples=n_samples,
@@ -66,7 +66,9 @@ def main():
         n_permutations=3,  # Number of permutations to average, more yields better results but slower runtime
     )
 
-    combined_df = plotting_helper_create_combined_dataframe(X_tensor, synthetic_samples, feature_names)
+    combined_df = plotting_helper_create_combined_dataframe(
+        X_tensor, synthetic_samples, feature_names
+    )
 
     print("Combined dataset with real and synthetic samples:")
     print(combined_df.head())
