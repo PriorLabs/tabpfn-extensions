@@ -14,6 +14,7 @@ from pathlib import Path
 
 from hyperopt import hp
 from tabpfn_common_utils.telemetry import set_extension
+
 from tabpfn.model_loading import ModelSource, ModelVersion, download_model
 
 
@@ -64,7 +65,8 @@ def enumerate_preprocess_transforms():
 
 @set_extension("hpo")
 def get_param_grid_hyperopt(
-    task_type: str, model_version: ModelVersion = ModelVersion.V2_5,
+    task_type: str,
+    model_version: ModelVersion = ModelVersion.V2_5,
     model_dir: Path | None = None,
 ) -> dict:
     """Generate the full hyperopt search space for TabPFN optimization.
@@ -138,8 +140,10 @@ def get_param_grid_hyperopt(
     elif task_type == "regression" and model_version == ModelVersion.V2_5:
         model_source = ModelSource.get_regressor_v2_5()
     else:
-        raise ValueError(f"Unknown combination of task type {task_type} and "
-                         "model version {model_version}!")
+        raise ValueError(
+            f"Unknown combination of task type {task_type} and "
+            "model version {model_version}!"
+        )
 
     # Make sure models are downloaded.
     for ckpt_name in model_source.filenames:
@@ -150,9 +154,7 @@ def get_param_grid_hyperopt(
             model_name=ckpt_name,
         )
 
-    model_paths = [
-        str(model_dir / ckpt_name) for ckpt_name in model_source.filenames
-    ]
+    model_paths = [str(model_dir / ckpt_name) for ckpt_name in model_source.filenames]
     search_space["model_path"] = hp.choice("model_path", model_paths)
 
     search_space["inference_config/REGRESSION_Y_PREPROCESS_TRANSFORMS"] = hp.choice(
