@@ -14,6 +14,7 @@ from pathlib import Path
 
 from hyperopt import hp
 from tabpfn_common_utils.telemetry import set_extension
+from tabpfn.model_loading import ModelSource, ModelVersion, download_model
 
 
 def enumerate_preprocess_transforms():
@@ -62,8 +63,14 @@ def enumerate_preprocess_transforms():
 
 
 @set_extension("hpo")
-def get_param_grid_hyperopt(task_type: str) -> dict:
+def get_param_grid_hyperopt(
+    task_type: str, model_version: ModelVersion = ModelVersion.V2_5,
+    model_dir: Path | None = None,
+) -> dict:
     """Generate the full hyperopt search space for TabPFN optimization.
+
+    Note: This will also download the required TabPFN model checkpoints if not already
+    present in the specified model directory.
 
     Args:
         task_type: Either "multiclass" or "regression"
@@ -119,36 +126,42 @@ def get_param_grid_hyperopt(task_type: str) -> dict:
         # ),
     }
 
-    local_dir = (Path(__file__).parent / "hpo_models").resolve()
+    if model_dir is None:
+        model_dir = (Path(__file__).parent / "hpo_models").resolve()
 
-    if task_type == "multiclass":
-        model_paths = [
-            str(local_dir / "tabpfn-v2-classifier.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-od3j1g5m.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-gn2p4bpt.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-znskzxi4.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-llderlii.ckpt"),
-            str(local_dir / "tabpfn-v2-classifier-vutqq28w.ckpt"),
-        ]
-    elif task_type == "regression":
-        model_paths = [
-            str(local_dir / "tabpfn-v2-regressor-09gpqh39.ckpt"),
-            str(local_dir / "tabpfn-v2-regressor.ckpt"),
-            str(local_dir / "tabpfn-v2-regressor-2noar4o2.ckpt"),
-            str(local_dir / "tabpfn-v2-regressor-wyl4o83o.ckpt"),
-        ]
-        search_space["inference_config/REGRESSION_Y_PREPROCESS_TRANSFORMS"] = hp.choice(
-            "REGRESSION_Y_PREPROCESS_TRANSFORMS",
-            [
-                (None,),
-                (None, "safepower"),
-                ("safepower",),
-                # ("quantile_uni",),
-            ],
-        )
+    if task_type == "multiclass" and model_version == ModelVersion.V2:
+        model_source = ModelSource.get_classifier_v2()
+    elif task_type == "multiclass" and model_version == ModelVersion.V2_5:
+        model_source = ModelSource.get_classifier_v2_5()
+    elif task_type == "regression" and model_version == ModelVersion.V2:
+        model_source = ModelSource.get_regressor_v2()
+    elif task_type == "regression" and model_version == ModelVersion.V2_5:
+        model_source = ModelSource.get_regressor_v2_5()
     else:
-        raise ValueError(f"Unknown task type {task_type} for the search space!")
+        raise ValueError(f"Unknown combination of task type {task_type} and "
+                         "model version {model_version}!")
 
+    # Make sure models are downloaded.
+    for ckpt_name in model_source.filenames:
+        download_model(
+            to=model_dir / ckpt_name,
+            version=model_version,
+            which="classifier" if task_type == "multiclass" else "regressor",
+            model_name=ckpt_name,
+        )
+
+    model_paths = [
+        str(model_dir / ckpt_name) for ckpt_name in model_source.filenames
+    ]
     search_space["model_path"] = hp.choice("model_path", model_paths)
 
+    search_space["inference_config/REGRESSION_Y_PREPROCESS_TRANSFORMS"] = hp.choice(
+        "REGRESSION_Y_PREPROCESS_TRANSFORMS",
+        [
+            (None,),
+            (None, "safepower"),
+            ("safepower",),
+            # ("quantile_uni",),
+        ],
+    )
     return search_space

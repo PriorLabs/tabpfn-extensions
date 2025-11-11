@@ -21,6 +21,7 @@ from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
 from tabpfn_common_utils.telemetry import set_extension
 
+from tabpfn.model_loading import ModelVersion
 from tabpfn_extensions.utils import (
     DeviceSpecification,
     infer_categorical_features,
@@ -110,6 +111,7 @@ class AutoTabPFNBase(BaseEstimator):
         n_ensemble_models: int = 20,
         n_estimators: int = 8,
         ignore_pretraining_limits: bool = False,
+        model_version: ModelVersion = ModelVersion.V2_5,
     ):
         self.max_time = max_time
         self.eval_metric = eval_metric
@@ -123,7 +125,7 @@ class AutoTabPFNBase(BaseEstimator):
         self.n_ensemble_models = n_ensemble_models
         self.n_estimators = n_estimators
         self.ignore_pretraining_limits = ignore_pretraining_limits
-
+        self.model_version = model_version
         self._is_classifier = False
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
@@ -219,7 +221,6 @@ class AutoTabPFNBase(BaseEstimator):
         # Generate hyperparameter configurations for TabPFN Ensemble
 
         task_type = "multiclass" if self._is_classifier else "regression"
-
         if self.n_ensemble_models > 1:
             rng = check_random_state(self.random_state)
             seed = rng.randint(np.iinfo(np.int32).max)
@@ -230,6 +231,7 @@ class AutoTabPFNBase(BaseEstimator):
                 n_estimators=self.n_estimators,
                 ignore_pretraining_limits=self.ignore_pretraining_limits,
                 seed=seed,
+                model_version=self.model_version,
                 **self.get_task_args_(),
             )
         else:
@@ -251,6 +253,11 @@ class AutoTabPFNBase(BaseEstimator):
             _add_ignore_constraints_inplace(tabpfn_configs)
 
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
+        if isinstance(self.presets, str) and self.presets == "extreme_quality":
+            raise ValueError(
+                "Extreme quality preset is not supported at the moment, as it does not "
+                "accept hyperparameters."
+            )
 
         # Set GPU count
         num_gpus = 0
