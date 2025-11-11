@@ -15,7 +15,10 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import log_loss, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
+from torch.amp import GradScaler, autocast
+from torch.nn.utils import clip_grad_norm_
 from torch.optim import Adam
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
@@ -116,6 +119,10 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
     min_delta : float, default=1e-4
         Minimum change in ROC AUC to be considered as an improvement.
 
+    grad_clip_value : float, default=1.0
+        Maximum norm for gradient clipping. If None, gradient clipping is disabled.
+        Gradient clipping helps stabilize training by preventing exploding gradients.
+
     **kwargs : dict
         Additional keyword arguments to pass to the underlying TabPFNClassifier,
         such as `n_estimators`.
@@ -133,6 +140,7 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         early_stopping: bool = True,
         patience: int = 3,
         min_delta: float = 1e-4,
+        grad_clip_value: float | None = 1.0,
         **kwargs: Any,
     ):
         super().__init__()
@@ -146,6 +154,7 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         self.early_stopping = early_stopping
         self.patience = patience
         self.min_delta = min_delta
+        self.grad_clip_value = grad_clip_value
         self.kwargs = kwargs
 
         assert self.meta_batch_size == 1, "meta_batch_size must be 1 for finetuning"
@@ -180,13 +189,14 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
 
         # Calculate the context size used during finetuning
         context_size = min(self.n_inference_context_samples, len(y_train))
+        print(f"Context size: {context_size}")
 
         classifier_config = {
             "ignore_pretraining_limits": True,
             "device": self.device,
             "n_estimators": self.kwargs.get("n_estimators", 8),
             "random_state": self.random_state,
-            "inference_precision": torch.float32,
+            # inference_precision": torch.float32,
         }
 
         # Initialize the base TabPFNClassifier
@@ -236,6 +246,13 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         )
         loss_function = torch.nn.CrossEntropyLoss()
 
+        # Initialize learning rate scheduler with cosine annealing
+        scheduler = CosineAnnealingLR(optimizer, T_max=self.epochs)
+
+        # Setup mixed precision training for CUDA
+        use_amp = self.device == "cuda" and torch.cuda.is_available()
+        scaler: GradScaler | None = GradScaler("cuda") if use_amp else None
+
         # Fine-tuning loop
         logging.info("--- 🚀 Starting Fine-tuning ---")
 
@@ -261,12 +278,19 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                 ctx = set(np.unique(y_context_batch))
                 qry = set(np.unique(y_query_batch))
                 if not qry.issubset(ctx):
+                    logging.warning(
+                        f"Skipping batch: query labels {qry} are not a subset of context labels {ctx}"
+                    )
                     continue
 
                 if (
                     X_context_batch[0].shape[1] + X_query_batch[0].shape[1]
                     != context_size
                 ):
+                    actual_size = X_context_batch[0].shape[1] + X_query_batch[0].shape[1]
+                    logging.warning(
+                        f"Skipping batch: total batch size {actual_size} does not match context size {context_size}"
+                    )
                     continue
 
                 optimizer.zero_grad()
@@ -279,18 +303,54 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                     confs,
                 )
 
-                # Get predictions (logits) on the fine-tuning set
-                predictions = self.finetuned_classifier_.forward(
-                    X_query_batch,
-                    return_logits=True,
-                )
+                # Forward pass, loss calculation, and backward pass with mixed precision on CUDA
+                if use_amp and scaler is not None:
+                    with autocast("cuda"):
+                        # Get predictions (logits) on the fine-tuning set
+                        predictions = self.finetuned_classifier_.forward(
+                            X_query_batch,
+                            return_logits=True,
+                        )
 
-                # Calculate loss
-                loss = loss_function(predictions, y_query_batch.to(self.device))
+                        # Calculate loss
+                        loss = loss_function(predictions, y_query_batch.to(self.device))
 
-                # Backpropagation
-                loss.backward()
-                optimizer.step()
+                    # Backpropagation with gradient scaling
+                    scaler.scale(loss).backward()
+
+                    # Gradient clipping
+                    if self.grad_clip_value is not None:
+                        scaler.unscale_(optimizer)
+                        clip_grad_norm_(
+                            self.finetuned_classifier_.model_.parameters(),  # type: ignore
+                            self.grad_clip_value,
+                        )
+
+                    # Optimizer step with gradient scaling
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    # Get predictions (logits) on the fine-tuning set
+                    predictions = self.finetuned_classifier_.forward(
+                        X_query_batch,
+                        return_logits=True,
+                    )
+
+                    # Calculate loss
+                    loss = loss_function(predictions, y_query_batch.to(self.device))
+
+                    # Backpropagation
+                    loss.backward()
+
+                    # Gradient clipping
+                    if self.grad_clip_value is not None:
+                        clip_grad_norm_(
+                            self.finetuned_classifier_.model_.parameters(),  # type: ignore
+                            self.grad_clip_value,
+                        )
+
+                    # Optimizer step
+                    optimizer.step()
 
                 progress_bar.set_postfix(loss=f"{loss.item():.4f}")
 
@@ -306,6 +366,9 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
             logging.info(
                 f"📊 Epoch {epoch + 1} Evaluation | Val ROC: {roc_auc:.4f}, Val Log Loss: {log_loss_score:.4f}\n",
             )
+
+            # Update learning rate scheduler after each epoch
+            scheduler.step()
 
             # Early stopping logic
             if self.early_stopping and not np.isnan(roc_auc):
