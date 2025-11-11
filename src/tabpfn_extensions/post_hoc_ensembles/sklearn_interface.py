@@ -130,7 +130,7 @@ class AutoTabPFNBase(BaseEstimator):
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         default_args = {"verbosity": 1, "path": f"TabPFNModels/m-{timestamp}"}
         user_args = self.phe_init_args or {}
         return {**default_args, **user_args}

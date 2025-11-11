@@ -211,9 +211,9 @@ class TestSearchSpaceCompatibility:
                 else:
                     pytest.fail(f"Unknown task type: {task_type}")
 
-                assert model_instance is not None, (
-                    "Model instance should not be None after instantiation attempt."
-                )
+                assert (
+                    model_instance is not None
+                ), "Model instance should not be None after instantiation attempt."
 
             except (TypeError, ValueError, RuntimeError, AssertionError) as e:
                 pytest.fail(

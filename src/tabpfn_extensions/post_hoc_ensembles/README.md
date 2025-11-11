@@ -31,10 +31,14 @@ These parameters manage the AutoGluon ensembling process:
 
 These parameters are applied to the underlying TabPFN models within the ensemble.
 
-* `n_estimators` (int, default=16): The number of internal transformers to ensemble within *each* individual TabPFN model. Higher values can significantly improve performance but also increase computational resource usage.
+* `n_estimators` (int, default=8): The number of internal transformers to ensemble within *each* individual TabPFN model. Higher values can significantly improve performance but also increase computational resource usage.
 * `balance_probabilities` (bool, default=False): If `True`, balances the output probabilities from TabPFN. This can be highly beneficial for classification tasks with imbalanced classes. This parameter is applied uniformly to all models in the ensemble and is not part of the random hyperparameter search.
 * `ignore_pretraining_limits` (bool, default=False): If `True`, this bypasses TabPFN's built-in limits on dataset size (10000 samples) and feature count (500). **Warning:** Use this with caution, as model performance is not guaranteed and may be poor when exceeding these recommended limits.
 
+
+## Gotcha's
+
+**AutoTabPFN fails with "Learner already fit"**: This can indicate an out-of-memory error and fails within the AutoGluon framework. One potential quick fix for now can be to reduce the number of estimators.
 
 ---
 
