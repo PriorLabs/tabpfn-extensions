@@ -157,9 +157,9 @@ def get_param_grid_hyperopt(
             download_model(
                 to=model_dir / ckpt_name,
                 version=model_version,
-            which="classifier" if task_type == "multiclass" else "regressor",
-            model_name=ckpt_name,
-        )
+                which="classifier" if task_type == "multiclass" else "regressor",
+                model_name=ckpt_name,
+            )
 
     model_paths = [str(model_dir / ckpt_name) for ckpt_name in model_source.filenames]
     search_space["model_path"] = hp.choice("model_path", model_paths)
