@@ -5,6 +5,7 @@ from typing import Any, Literal
 import numpy as np
 from hyperopt.pyll import stochastic
 
+from tabpfn.model_loading import ModelVersion
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 
 
@@ -88,6 +89,7 @@ def search_space_func(
     ignore_pretraining_limits: bool,
     balance_probabilities: bool | None = None,
     seed: int = 42,
+    model_version: ModelVersion = ModelVersion.V2_5,
 ) -> list[dict[str, Any]]:
     """Sample and prepare multiple TabPFNv2 hyperparameter sets.
 
@@ -126,7 +128,9 @@ def search_space_func(
     if task_type == "regression":
         balance_probabilities = None
 
-    search_space = get_param_grid_hyperopt(task_type=task_type)
+    search_space = get_param_grid_hyperopt(
+        task_type=task_type, model_version=model_version
+    )
     rng = np.random.default_rng(seed)
     tabpfn_configs = [
         prepare_tabpfnv2_config(
