@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 from sklearn.datasets import make_multilabel_classification, make_regression
-from sklearn.metrics import f1_score, r2_score
+from sklearn.metrics import r2_score, roc_auc_score
+from sklearn.model_selection import train_test_split
 
 from tabpfn_extensions.multioutput import (
     TabPFNMultiOutputClassifier,
@@ -24,31 +25,26 @@ X_reg, y_reg = make_regression(
     random_state=0,
 )
 
-rng = np.random.default_rng(0)
-X_reg_missing = X_reg.copy()
-missing_mask = rng.random(X_reg_missing.shape) < 0.1
-X_reg_missing[missing_mask] = np.nan
-
-print(f"Regression missing values: {missing_mask.sum()} / {X_reg_missing.size}")
+X_reg_train, X_reg_test, y_reg_train, y_reg_test = train_test_split(
+    X_reg, y_reg, test_size=0.3, random_state=42
+)
 
 regressor = TabPFNMultiOutputRegressor(
-    n_estimators=4,
-    model_path="tabpfn-v2-regressor.ckpt",
+    n_estimators=4
 )
-regressor.fit(X_reg_missing, y_reg)
+regressor.fit(X_reg_train, y_reg_train)
 
-reg_predictions = regressor.predict(X_reg_missing)
+reg_predictions = regressor.predict(X_reg_test)
 print("Regression predictions shape:", reg_predictions.shape)
-print("Regression predictions contain NaNs:", np.isnan(reg_predictions).any())
 
 r2_per_target = [
-    r2_score(y_reg[:, i], reg_predictions[:, i])
+    r2_score(y_reg_test[:, i], reg_predictions[:, i])
     for i in range(reg_predictions.shape[1])
 ]
 print("Regression R2 per target:", r2_per_target)
 print(
     "Regression average R2:",
-    r2_score(y_reg, reg_predictions, multioutput="uniform_average"),
+    r2_score(y_reg_test, reg_predictions, multioutput="uniform_average"),
 )
 
 # ---------------------------------------------------------------------------
@@ -65,15 +61,16 @@ X_clf, y_clf = make_multilabel_classification(
 )
 
 X_clf = X_clf.astype(np.float32)
-clf_missing = X_clf.copy()
-clf_missing[rng.random(clf_missing.shape) < 0.1] = np.nan
+
+X_clf_train, X_clf_test, y_clf_train, y_clf_test = train_test_split(
+    X_clf, y_clf, test_size=0.3, random_state=42
+)
 
 classifier = TabPFNMultiOutputClassifier(n_estimators=4)
-classifier.fit(clf_missing, y_clf)
+classifier.fit(X_clf_train, y_clf_train)
 
-clf_predictions = classifier.predict(clf_missing)
+clf_predictions = classifier.predict_proba(X_clf_test)
 print("Classification predictions shape:", clf_predictions.shape)
-print("Classification predictions contain NaNs:", np.isnan(clf_predictions).any())
 
-micro_f1 = f1_score(y_clf, clf_predictions, average="micro")
-print("Classification micro-F1:", micro_f1)
+micro_roc_auc = roc_auc_score(y_clf_test, clf_predictions, average="micro")
+print("Classification micro-ROC-AUC:", micro_roc_auc)

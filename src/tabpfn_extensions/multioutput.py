@@ -8,7 +8,6 @@ from sklearn.multioutput import MultiOutputClassifier, MultiOutputRegressor
 
 from .utils import TabPFNClassifier, TabPFNRegressor
 
-
 _EstimatorT = TypeVar("_EstimatorT")
 
 
@@ -36,18 +35,20 @@ class _TabPFNMultiOutputMixin:
 
         super().__init__(estimator=estimator, n_jobs=n_jobs)
 
-    def get_params(self, deep: bool = True) -> dict[str, Any]:  # pragma: no cover - delegating to sklearn
+    def get_params(
+        self, deep: bool = True
+    ) -> dict[str, Any]:  # pragma: no cover - delegating to sklearn
         """Return parameters for this estimator with TabPFN kwargs included."""
-
         params = super().get_params(deep=deep)
         if getattr(self, "_estimator_is_default", False):
             params.pop("estimator", None)
             params.update(self.tabpfn_params)
         return params
 
-    def set_params(self, **params: Any) -> "_TabPFNMultiOutputMixin":  # pragma: no cover - delegating to sklearn
+    def set_params(
+        self, **params: Any
+    ) -> _TabPFNMultiOutputMixin:  # pragma: no cover - delegating to sklearn
         """Update parameters while keeping TabPFN kwargs in sync."""
-
         if getattr(self, "_estimator_is_default", False):
             tabpfn_updates: dict[str, Any] = {}
             for key in list(params):
