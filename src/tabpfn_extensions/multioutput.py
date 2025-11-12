@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from typing import Any, TypeVar
 
-from sklearn.base import ClassifierMixin, RegressorMixin
 from sklearn.multioutput import MultiOutputClassifier, MultiOutputRegressor
 
 from .utils import TabPFNClassifier, TabPFNRegressor
 
 
-_EstimatorT = TypeVar("_EstimatorT", bound=RegressorMixin | ClassifierMixin)
+_EstimatorT = TypeVar("_EstimatorT")
 
 
 class _TabPFNMultiOutputMixin:
@@ -29,18 +28,38 @@ class _TabPFNMultiOutputMixin:
             msg = "Provide either a custom estimator or tabpfn_params, not both."
             raise ValueError(msg)
 
-        if estimator is None:
+        self._estimator_is_default = estimator is None
+        self.tabpfn_params = dict(tabpfn_params) if self._estimator_is_default else {}
+
+        if self._estimator_is_default:
             estimator = self._tabpfn_estimator_cls(**tabpfn_params)
 
-        self.tabpfn_params = tabpfn_params
         super().__init__(estimator=estimator, n_jobs=n_jobs)
 
     def get_params(self, deep: bool = True) -> dict[str, Any]:  # pragma: no cover - delegating to sklearn
         """Return parameters for this estimator with TabPFN kwargs included."""
 
         params = super().get_params(deep=deep)
-        params["tabpfn_params"] = dict(self.tabpfn_params)
+        if getattr(self, "_estimator_is_default", False):
+            params.pop("estimator", None)
+            params.update(self.tabpfn_params)
         return params
+
+    def set_params(self, **params: Any) -> "_TabPFNMultiOutputMixin":  # pragma: no cover - delegating to sklearn
+        """Update parameters while keeping TabPFN kwargs in sync."""
+
+        if getattr(self, "_estimator_is_default", False):
+            tabpfn_updates: dict[str, Any] = {}
+            for key in list(params):
+                if key in {"estimator", "n_jobs"}:
+                    continue
+                tabpfn_updates[key] = params.pop(key)
+
+            if tabpfn_updates:
+                self.tabpfn_params.update(tabpfn_updates)
+                self.estimator = self._tabpfn_estimator_cls(**self.tabpfn_params)
+
+        return super().set_params(**params)
 
 
 class TabPFNMultiOutputRegressor(_TabPFNMultiOutputMixin, MultiOutputRegressor):
