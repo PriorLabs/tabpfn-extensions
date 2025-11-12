@@ -1,0 +1,55 @@
+"""Utilities for multi-output learning with TabPFN."""
+
+from __future__ import annotations
+
+from typing import Any, TypeVar
+
+from sklearn.base import ClassifierMixin, RegressorMixin
+from sklearn.multioutput import MultiOutputClassifier, MultiOutputRegressor
+
+from .utils import TabPFNClassifier, TabPFNRegressor
+
+
+_EstimatorT = TypeVar("_EstimatorT", bound=RegressorMixin | ClassifierMixin)
+
+
+class _TabPFNMultiOutputMixin:
+    """Shared initialisation logic for TabPFN multi-output wrappers."""
+
+    _tabpfn_estimator_cls: type[_EstimatorT]
+
+    def __init__(
+        self,
+        estimator: _EstimatorT | None = None,
+        *,
+        n_jobs: int | None = None,
+        **tabpfn_params: Any,
+    ) -> None:
+        if estimator is not None and tabpfn_params:
+            msg = "Provide either a custom estimator or tabpfn_params, not both."
+            raise ValueError(msg)
+
+        if estimator is None:
+            estimator = self._tabpfn_estimator_cls(**tabpfn_params)
+
+        self.tabpfn_params = tabpfn_params
+        super().__init__(estimator=estimator, n_jobs=n_jobs)
+
+    def get_params(self, deep: bool = True) -> dict[str, Any]:  # pragma: no cover - delegating to sklearn
+        """Return parameters for this estimator with TabPFN kwargs included."""
+
+        params = super().get_params(deep=deep)
+        params["tabpfn_params"] = dict(self.tabpfn_params)
+        return params
+
+
+class TabPFNMultiOutputRegressor(_TabPFNMultiOutputMixin, MultiOutputRegressor):
+    """A lightweight multi-output wrapper around :class:`TabPFNRegressor`."""
+
+    _tabpfn_estimator_cls = TabPFNRegressor
+
+
+class TabPFNMultiOutputClassifier(_TabPFNMultiOutputMixin, MultiOutputClassifier):
+    """A lightweight multi-output wrapper around :class:`TabPFNClassifier`."""
+
+    _tabpfn_estimator_cls = TabPFNClassifier
