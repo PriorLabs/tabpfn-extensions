@@ -3,10 +3,9 @@
 
 from __future__ import annotations
 
+import copy
 import logging
-import tempfile
 from functools import partial
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -24,7 +23,6 @@ from tqdm.auto import tqdm
 
 from tabpfn import TabPFNClassifier
 from tabpfn.finetune_utils import clone_model_for_evaluation
-from tabpfn.model_loading import load_fitted_tabpfn_model, save_fitted_tabpfn_model
 from tabpfn.utils import meta_dataset_collator
 
 # Configure logging to show INFO level messages (including validation metrics)
@@ -188,15 +186,15 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         X_train, X_val, y_train, y_val = validation_splitter(X, y)
 
         # Calculate the context size used during finetuning
-        context_size = min(self.n_inference_context_samples, len(y_train))
-        print(f"Context size: {context_size}")
+        n_finetuning_fit_predict_context_samples = min(self.n_inference_context_samples, len(y_train))
 
+        # Unpack kwargs to allow any TabPFNClassifier hyperparameter to be specified,
+        # then override with required config values
         classifier_config = {
+            **self.kwargs,
             "ignore_pretraining_limits": True,
             "device": self.device,
-            "n_estimators": self.kwargs.get("n_estimators", 8),
             "random_state": self.random_state,
-            # inference_precision": torch.float32,
         }
 
         # Initialize the base TabPFNClassifier
@@ -207,37 +205,14 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         )
         # Required to access model parameters for the optimizer
         self.finetuned_classifier_._initialize_model_variables()
+        self.finetuned_classifier_.softmax_temperature_ = self.finetuned_classifier_.softmax_temperature
 
         eval_config = {
             **classifier_config,
             "inference_config": {
-                "SUBSAMPLE_SAMPLES": context_size,  # Passing this to the dataloader causes an error, so we set eval config separately from the classifier config.
+                "SUBSAMPLE_SAMPLES": n_finetuning_fit_predict_context_samples,  # Passing this to the dataloader causes an error, so we set eval config separately from the classifier config.
             },
         }
-
-        # Prepare data for the fine-tuning loop
-        # This splitter function will be applied to the training data to create
-        # (context, query) pairs for each step of the loop.
-
-        training_splitter = partial(
-            train_test_split,
-            test_size=self.finetune_split_ratio,
-            random_state=self.random_state,
-        )
-
-        training_datasets = self.finetuned_classifier_.get_preprocessed_datasets(
-            X_train,
-            y_train,
-            training_splitter,
-            context_size,
-            equal_split_size=False,
-        )
-
-        finetuning_dataloader = DataLoader(
-            training_datasets,
-            batch_size=self.meta_batch_size,
-            collate_fn=meta_dataset_collator,
-        )
 
         # Setup optimizer and loss function
         optimizer = Adam(
@@ -259,9 +234,34 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
         # Early stopping variables
         best_roc_auc = -np.inf
         patience_counter = 0
-        best_model_path = None
+        best_model = None
 
         for epoch in range(self.epochs):
+            # Regenerate datasets each epoch with a different random_state to ensure
+            # diversity in context/query pairs across epochs. This prevents the model
+            # from seeing the exact same splits in every epoch, which could reduce
+            # training signal diversity.
+            training_splitter = partial(
+                train_test_split,
+                test_size=self.finetune_split_ratio,
+                random_state=self.random_state + epoch,
+            )
+
+            training_datasets = self.finetuned_classifier_.get_preprocessed_datasets(
+                X_train,
+                y_train,
+                training_splitter,
+                n_finetuning_fit_predict_context_samples,
+                equal_split_size=False,
+            )
+
+            finetuning_dataloader = DataLoader(
+                training_datasets,
+                batch_size=self.meta_batch_size,
+                collate_fn=meta_dataset_collator,
+                shuffle=True,
+            )
+
             progress_bar = tqdm(
                 finetuning_dataloader,
                 desc=f"Finetuning Epoch {epoch + 1}/{self.epochs}",
@@ -274,7 +274,7 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                 cat_ixs,
                 confs,
             ) in progress_bar:
-                
+
                 ctx = set(np.unique(y_context_batch))
                 qry = set(np.unique(y_query_batch))
                 if not qry.issubset(ctx):
@@ -285,11 +285,11 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
 
                 if (
                     X_context_batch[0].shape[1] + X_query_batch[0].shape[1]
-                    != context_size
+                    != n_finetuning_fit_predict_context_samples
                 ):
                     actual_size = X_context_batch[0].shape[1] + X_query_batch[0].shape[1]
                     logging.warning(
-                        f"Skipping batch: total batch size {actual_size} does not match context size {context_size}"
+                        f"Skipping batch: total batch size {actual_size} does not match n_finetuning_fit_predict_context_samples {n_finetuning_fit_predict_context_samples}"
                     )
                     continue
 
@@ -361,7 +361,7 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                 y_train,  # pyright: ignore[reportArgumentType]
                 X_val,    # pyright: ignore[reportArgumentType]
                 y_val,    # pyright: ignore[reportArgumentType]
-            )  
+            )
 
             logging.info(
                 f"📊 Epoch {epoch + 1} Evaluation | Val ROC: {roc_auc:.4f}, Val Log Loss: {log_loss_score:.4f}\n",
@@ -375,16 +375,8 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                 if roc_auc > best_roc_auc + self.min_delta:
                     best_roc_auc = roc_auc
                     patience_counter = 0
-                    # Save the best model using TabPFN's official save function
-                    with tempfile.NamedTemporaryFile(
-                        suffix=".tabpfn_fit",
-                        delete=False,
-                    ) as tmp_file:
-                        best_model_path = Path(tmp_file.name)
-                        save_fitted_tabpfn_model(
-                            self.finetuned_classifier_,
-                            best_model_path,
-                        )
+                    # Save the best model
+                    best_model = copy.deepcopy(self.finetuned_classifier_)
                 else:
                     patience_counter += 1
                     logging.info(
@@ -394,28 +386,19 @@ class FinetunedTabPFNClassifier(BaseEstimator, ClassifierMixin):
                 if patience_counter >= self.patience:
                     logging.info(
                         f"🛑 Early stopping triggered. Best ROC AUC: {best_roc_auc:.4f}",
-                    )
-                    # Restore the best model using TabPFN's official load function
-                    if best_model_path is not None:
-                        self.finetuned_classifier_ = load_fitted_tabpfn_model(
-                            best_model_path,
-                            device=self.device,
                         )
-                        # Clean up the temporary file
-                        best_model_path.unlink(missing_ok=True)
+                    # Restore the best model
+                    if best_model is not None:
+                        self.finetuned_classifier_ = best_model
                     break
 
         logging.info("--- ✅ Fine-tuning Finished ---")
-
-        # Clean up temporary file if early stopping didn't trigger
-        if best_model_path is not None and best_model_path.exists():
-            best_model_path.unlink(missing_ok=True)
 
         finetuned_inference_classifier = clone_model_for_evaluation(
             self.finetuned_classifier_, # type: ignore
             eval_config,
             TabPFNClassifier,
-        )  
+        )
         self.finetuned_inference_classifier_ = finetuned_inference_classifier
         self.finetuned_inference_classifier_.fit_mode = "fit_preprocessors"  # type: ignore
         self.finetuned_inference_classifier_.fit(self.X_, self.y_)  # type: ignore
