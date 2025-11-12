@@ -29,9 +29,7 @@ X_reg_train, X_reg_test, y_reg_train, y_reg_test = train_test_split(
     X_reg, y_reg, test_size=0.3, random_state=42
 )
 
-regressor = TabPFNMultiOutputRegressor(
-    n_estimators=4
-)
+regressor = TabPFNMultiOutputRegressor(n_estimators=4)
 regressor.fit(X_reg_train, y_reg_train)
 
 reg_predictions = regressor.predict(X_reg_test)
