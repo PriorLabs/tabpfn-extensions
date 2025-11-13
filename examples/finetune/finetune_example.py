@@ -11,7 +11,7 @@ from tabpfn_extensions.finetune.finetune_classifier import FinetunedTabPFNClassi
 # We use a small subset for a quick demonstration.
 print("--- 1. Loading Data ---")
 X_all, y_all = fetch_covtype(return_X_y=True, shuffle=True)
-X, y = X_all[:11000], y_all[:11000]
+X, y = X_all[:50_000], y_all[:50_000]
 
 # Create a final hold-out test set. This is NOT used during fine-tuning.
 X_train, X_test, y_train, y_test = train_test_split(
