@@ -146,3 +146,6 @@ sftp_freiburg.json
 *.py.new
 commit_messages.txt
 CLAUDE.md
+
+# VSCode debugging
+vscode_remote_debugging/
