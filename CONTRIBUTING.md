@@ -2,6 +2,9 @@
 
 Welcome to TabPFN Extensions! This repository is a collection of community-contributed packages that extend and enhance TabPFN, a foundation model for tabular data. We welcome all contributions and aim to make the process as simple as possible.
 
+Before developing a feature / opening a PR, please open a GitHub issue and describe the bug or feature request.
+This allows us to discuss the proposal and helps avoid unnecessary work.
+
 ## 📋 Quick Start
 
 1. **Setup your development environment**:

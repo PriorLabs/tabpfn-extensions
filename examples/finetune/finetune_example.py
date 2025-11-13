@@ -52,13 +52,13 @@ print("--- 2. Initializing and Fitting Model ---\n")
 # Instantiate the wrapper with your desired hyperparameters
 finetuned_clf = FinetunedTabPFNClassifier(
     device="cuda" if torch.cuda.is_available() else "cpu",
-    epochs=20,
-    learning_rate=3e-7,
-    n_inference_context_samples=3000,
+    epochs=10,
+    learning_rate=1e-6,
+    n_inference_context_samples=10_000,
     finetune_split_ratio=0.3,
     random_state=42,
-    n_estimators=8,
-    patience=5,
+    n_estimators=2,
+    patience=3,
     ignore_pretraining_limits=True,
     grad_clip_value=1.0,
 )

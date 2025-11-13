@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tabpfn-extensions"
-version = "0.1.4"
+version = "0.2.1"
 dependencies = [
     "torch>=2.1,<3",
     "pandas>=1.4.0,<3",
-    "scikit-learn>=1.2.0,<1.7",
+    "scikit-learn>=1.6.0,<1.7",
     "scipy>=1.11.1,<2",
-    "tabpfn>=2.1.1,<3",
+    "tabpfn>=6.0.5,<7",
+    "tabpfn-common-utils[telemetry-interactive]>=0.2.0",
 ]
 
 requires-python = ">=3.9"
@@ -26,6 +27,8 @@ authors = [
     { name = "Frank Hutter", email = "fh@cs.uni-freiburg.de" },
     { name = "Eddie Bergman" },
     { name = "Klemens Flöge" },
+    { name = "Oscar Key" },
+    { name = "Dominik Safaric" }
 ]
 readme = "README.md"
 description = "TabPFN: Foundation model for tabular data"
@@ -86,13 +89,19 @@ all = [
 ]
 
 dev = [
-    # Lint/format
     "pre-commit>=3.0.0",
-    "ruff>=0.3.0",
+    "ruff==0.8.6",  # This must be the same version as in .pre-commit-config.yaml
     "mypy>=1.0.0",
     # Test
     "pytest>=8.0.0",
     "pytest-xdist>=3.6.0",
+    "pytest-mock>=3.15.1",
+]
+
+[group.build]
+dependencies = [
+    "build",
+    "twine",
 ]
 
 [tool.pytest.ini_options]
@@ -112,12 +121,6 @@ output-format = "full"
 src = ["src", "tests", "examples"]
 
 [tool.ruff.lint]
-# Extend what ruff is allowed to fix, even it it may break
-# This is okay given we use it all the time and it ensures
-# better practices. Would be dangerous if using for first
-# time on established project.
-extend-safe-fixes = ["ALL"]
-
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
@@ -233,9 +236,12 @@ exclude = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*.py" = [
     "S101",
-    "D101",
-    "D102",
-    "D103",
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "D105",  # Missing docstring in magic method
+    "D106",  # Missing docstring in public nested class
+    "D107",   # Missing docstring in `__init__`
     "ANN001",
     "ANN201",
     "FBT001",
@@ -388,3 +394,9 @@ reportPrivateImportUsage = false
 reportUnnecessaryComparison = false
 reportConstantRedefinition = false
 reportUntypedFunctionDecorator = false
+
+[dependency-groups]
+dev = [
+    "build>=1.3.0",
+    "twine>=6.2.0",
+]

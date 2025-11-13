@@ -19,18 +19,34 @@ except ImportError:
 # Only import if hyperopt is available
 if HYPEROPT_AVAILABLE:
     from .search_space import (
-        TabPFNSearchSpace,
         get_param_grid_hyperopt,
     )
     from .tuned_tabpfn import TunedTabPFNClassifier, TunedTabPFNRegressor
 
     __all__ = [
-        "TabPFNSearchSpace",
         "get_param_grid_hyperopt",
         "TunedTabPFNClassifier",
         "TunedTabPFNRegressor",
         "HYPEROPT_AVAILABLE",
     ]
 else:
-    # Define empty __all__ when hyperopt is not available
-    __all__ = ["HYPEROPT_AVAILABLE"]
+    # Define placeholder classes when hyperopt is not available
+    class TunedTabPFNClassifier:
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "TunedTabPFNClassifier requires hyperopt. "
+                "Install with 'pip install \"tabpfn-extensions[hpo]\"'"
+            )
+
+    class TunedTabPFNRegressor:
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "TunedTabPFNRegressor requires hyperopt. "
+                "Install with 'pip install \"tabpfn-extensions[hpo]\"'"
+            )
+
+    __all__ = [
+        "TunedTabPFNClassifier",
+        "TunedTabPFNRegressor",
+        "HYPEROPT_AVAILABLE",
+    ]

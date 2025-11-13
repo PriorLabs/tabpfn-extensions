@@ -413,9 +413,9 @@ class TestTabPFNClassifier(BaseClassifierTests):
         """Test classifier with different ensemble configurations."""
         X, y = classification_data
 
-        for N_ensemble_configurations in [1, 5]:
+        for n_estimators in [1, 5]:
             # Set the ensemble configurations
-            estimator.N_ensemble_configurations = N_ensemble_configurations
+            estimator.n_estimators = n_estimators
 
             # Fit the model
             estimator.fit(X, y)

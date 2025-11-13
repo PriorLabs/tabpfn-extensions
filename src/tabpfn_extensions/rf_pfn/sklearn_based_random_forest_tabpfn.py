@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.utils.multiclass import unique_labels
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 
@@ -46,6 +47,7 @@ def softmax_numpy(logits: np.ndarray) -> np.ndarray:
     return exp_logits / sum_exp_logits  # Normalize to get probabilities
 
 
+@set_extension("rf_pfn")
 class RandomForestTabPFNBase:
     """Base Class for common functionalities."""
 
@@ -90,6 +92,7 @@ class RandomForestTabPFNBase:
                     "Please use TabPFNRegressor with RandomForestTabPFNRegressor.",
                 )
 
+    @set_extension("rf_pfn")
     def fit(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None):
         """Fits RandomForestTabPFN.
 
@@ -209,6 +212,7 @@ class RandomForestTabPFNBase:
         return self
 
 
+@set_extension("rf_pfn")
 class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifier):
     """RandomForestTabPFNClassifier implements Random Forest using TabPFN at leaf nodes.
 
@@ -504,6 +508,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
         return all_proba
 
 
+@set_extension("rf_pfn")
 class RandomForestTabPFNRegressor(RandomForestTabPFNBase, RandomForestRegressor):
     """RandomForestTabPFNRegressor implements a Random Forest using TabPFN at leaf nodes.
 

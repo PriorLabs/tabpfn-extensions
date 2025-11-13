@@ -49,13 +49,16 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
+from tabpfn_common_utils.telemetry import set_extension
 
+from tabpfn.model_loading import ModelVersion
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 from tabpfn_extensions.misc.sklearn_compat import validate_data
 from tabpfn_extensions.scoring.scoring_utils import (
     score_classification,
     score_regression,
 )
+from tabpfn_extensions.utils import DeviceSpecification
 
 # Import TabPFN models from extensions (which handles backend compatibility)
 try:
@@ -102,7 +105,7 @@ class TunedTabPFNBase(BaseEstimator):
         n_validation_size: float = 0.2,
         shuffle_data: bool = True,
         metric: MetricType = MetricType.ACCURACY,
-        device: str = "auto",
+        device: DeviceSpecification = "auto",
         random_state: int | None = None,
         categorical_feature_indices: list[int] | None = None,
         verbose: bool = True,
@@ -110,6 +113,7 @@ class TunedTabPFNBase(BaseEstimator):
         objective_fn: Callable[[Any, np.ndarray, np.ndarray], float] | None = None,
         search_algorithm_type: str = "tpe",
         existing_trials: Trials | None = None,
+        model_version: ModelVersion = ModelVersion.V2_5,
     ):
         self.n_trials = n_trials
         self.n_validation_size = n_validation_size
@@ -123,6 +127,7 @@ class TunedTabPFNBase(BaseEstimator):
         self.objective_fn = objective_fn
         self.search_algorithm_type = search_algorithm_type
         self.existing_trials = existing_trials
+        self.model_version = model_version
 
     def _optimize(self, X: np.ndarray, y: np.ndarray, task_type: str):
         """Optimize hyperparameters using hyperopt with proper data handling."""
@@ -186,6 +191,7 @@ class TunedTabPFNBase(BaseEstimator):
         else:
             current_search_space = get_param_grid_hyperopt(
                 "multiclass" if task_type in ["binary", "multiclass"] else "regression",
+                model_version=self.model_version,
             )
 
         def objective(params):
@@ -211,9 +217,9 @@ class TunedTabPFNBase(BaseEstimator):
             }
             model_params["inference_config"] = inference_config
             # Use device utility for automatic selection
-            from tabpfn_extensions.utils import infer_device_and_type
+            from tabpfn_extensions.utils import infer_device
 
-            model_params["device"] = infer_device_and_type(self.device)
+            model_params["device"] = infer_device(self.device)
             model_params["random_state"] = rng.randint(0, 2**31 - 1)
 
             # Handle model type selection
@@ -398,6 +404,7 @@ class TunedTabPFNBase(BaseEstimator):
         return tags
 
 
+@set_extension("hpo")
 class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
     """TabPFN Classifier with hyperparameter tuning and proper categorical handling."""
 
@@ -491,6 +498,7 @@ class TunedTabPFNClassifier(TunedTabPFNBase, ClassifierMixin):
         return self.best_model_.predict_proba(X)
 
 
+@set_extension("hpo")
 class TunedTabPFNRegressor(TunedTabPFNBase, RegressorMixin):
     """TabPFN Regressor with hyperparameter tuning and proper categorical handling."""
 
