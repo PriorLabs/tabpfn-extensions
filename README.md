@@ -230,13 +230,18 @@ export TABPFN_DISABLE_TELEMETRY=1
 
 Interested in adding your own extension? We welcome contributions!
 
+We use [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage the project's environment, so install that first.
+
 ```bash
 # Clone and set up for development
 git clone https://github.com/PriorLabs/tabpfn-extensions.git
 cd tabpfn-extensions
+uv sync
+source .venv/bin/activate
 
-# Lightweight dev setup (fast)
-pip install -e ".[dev]"
+# If you add optional dependencies for your extension in pyproject.toml, install them
+# like this
+uv sync --extra [your extension name]
 
 # Test your extension with fast mode
 FAST_TEST_MODE=1 pytest tests/test_your_extension.py -v

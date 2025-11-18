@@ -84,9 +84,6 @@ jobs:
           fi
         shell: bash
 
-      - name: Initialize submodules
-        run: git submodule update --init --recursive
-
       - name: Run Tests (Unix)
         if: runner.os != 'Windows'
         env:
