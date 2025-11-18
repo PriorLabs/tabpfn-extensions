@@ -10,6 +10,7 @@ examples/
 ├── hpo/                      # Hyperparameter optimization
 ├── interpretability/         # SHAP and feature selection
 ├── many_class/               # Handling many classes
+├── multioutput/              # Multi-output regression and classification
 ├── post_hoc_ensembles/       # Post-hoc ensembles
 ├── rf_pfn/                   # Random Forest + TabPFN combinations
 └── unsupervised/             # Unsupervised learning
