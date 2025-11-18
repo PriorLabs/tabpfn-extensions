@@ -17,12 +17,12 @@ git clone https://github.com/PriorLabs/tabpfn-extensions.git
 cd tabpfn-extensions
 
 # Install a lightweight environment for extension development
-uv sync # Only installs base requirements
+uv sync  # Only installs base requirements
 # OR full install with all dependencies (may take longer)
 uv sync --all-extras
 
 # Activate the environment
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source .venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 2. **Create your extension package**:
