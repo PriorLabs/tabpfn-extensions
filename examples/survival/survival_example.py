@@ -19,14 +19,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, cross_val_score, train_test_split
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (
     OneHotEncoder,
     StandardScaler,
 )
-from sklearn.model_selection import KFold, cross_val_score
-from sklearn.pipeline import Pipeline
-
 from sksurv.datasets import (  # change dataset here if desired
     load_whas500,
 )
@@ -90,8 +88,8 @@ pre = ColumnTransformer(
 )
 
 tabpfn_cv = SurvivalTabPFN(
-    cls_model=TabPFNClassifier(n_estimators=16, random_state=42),
-    reg_model=TabPFNRegressor(n_estimators=16, random_state=42),
+    cls_model=TabPFNClassifier(n_estimators=8, random_state=42),
+    reg_model=TabPFNRegressor(n_estimators=8, random_state=42),
     n_auto_horizons=20,
     auto_horizon_quantile_range=(0.05, 0.95),
 )
@@ -137,7 +135,9 @@ print(f"CV C-index RSF   : {scores_rsf.mean():.3f} ± {scores_rsf.std():.3f}")
 # ============================ Survival curves S(t|x) ==========================
 # Use a compact time grid up to the 95th percentile of observed test times
 t_grid = np.linspace(0.0, float(np.percentile(time_test, 95)), 200)
-S = tabpfn.predict_survival_at(X_test, t_grid)  # shape: (n_samples, len(t_grid))
+S = tabpfn.predict_survival_from_cif_at(
+    X_test, t_grid
+)  # shape: (n_samples, len(t_grid))
 
 # ============================ 4-cluster visualization =========================
 # Cluster on failure curves (1 - S); color all curves by cluster; show cluster means

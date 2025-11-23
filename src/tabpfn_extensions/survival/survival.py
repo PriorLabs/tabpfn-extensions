@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Iterable
 from typing import Literal
 
@@ -26,13 +27,22 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
       2) distributional regressor -> T | (event, X)
 
     Scalar risk options (higher = riskier):
-      - 'weighted_cdf' (default): sum_j w_j * P(T <= tau_j | X)
-      - 'avg_cdf': uniform average across horizons.
-      - 'p_over_mean': P(event|X) / E[T | event, X]  (legacy fallback).
+      - "weighted_cdf" (default): sum_j w_j * CIF_1(tau_j | X),
+        where CIF_1(t | X) = P(T <= t, event=1 | X).
+      - "avg_cdf": uniform average of CIF_1(tau_j | X) across horizons.
+      - "p_over_mean": P(event|X) / E[T | event, X]  (legacy fallback).
 
-    Also exposes CDF/Survival curves:
-      - predict_cdf_at(X, t_grid) -> F(t|X)
-      - predict_survival_at(X, t_grid) -> S(t|X) = 1 - F(t|X)
+    Also exposes CIF-based curves for event=1:
+      - predict_cif_at(X, t_grid)
+          -> CIF_1(t|X) = P(T <= t, event=1 | X)
+      - predict_survival_from_cif_at(X, t_grid)
+          -> 1 - CIF_1(t|X)
+
+    Backwards-compatible aliases (deprecated):
+      - predict_cdf_at(X, t_grid)
+          -> same as predict_cif_at, returns CIF_1(t|X)
+      - predict_survival_at(X, t_grid)
+          -> same as predict_survival_from_cif_at
 
     Parameters
     ----------
@@ -94,7 +104,7 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
         y_event, y_time = check_y_survival(y)
 
         if np.sum(y_event) < 2:
-            raise ValueError("Need at least two events to learn a time distribution.")
+            raise ValueError(f"Need at least 2 events to learn a time distribution, but found {np.sum(y_event)}.")
         if np.any(np.asarray(y_time) < 0):
             raise ValueError("Times must be non-negative.")
 
@@ -131,7 +141,17 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
 
     # ------------------------------ distributions ------------------------------
 
-    def predict_cdf_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
+    def predict_cif_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
+        """Event-1 cumulative incidence CIF_1(t|X).
+
+        Computes
+
+            CIF_1(t|X) = P(T <= t, event=1 | X)
+
+        via the factorization
+
+            P(event=1 | X) * P(T <= t | event=1, X).
+        """
         if self._cls_model is None or self._reg_model is None:
             raise RuntimeError("Estimator not fitted yet.")
 
@@ -148,22 +168,69 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
         logits = torch.tensor(full["logits"])  # torch.Tensor [n, nbins]
         criterion = full["criterion"]  # FullSupportBarDistribution
 
-        cdfs = []
+        cifs = []
         with torch.no_grad():
             for tau in t_grid:
                 ys = torch.as_tensor(
                     [float(tau)], device=logits.device, dtype=logits.dtype
                 )
                 cdf_tau = criterion.cdf(logits, ys).squeeze(-1).cpu().numpy()  # (n,)
-                cdfs.append(cdf_tau)
-        F_event = np.column_stack(cdfs)  # (n, m)
+                cifs.append(cdf_tau)
+        F_event = np.column_stack(cifs)  # (n, m)
 
         # Mix with event probability
         F_mixed = p_event[:, None] * F_event
         return F_mixed
 
+    def predict_survival_from_cif_at(
+        self, X: np.ndarray, t_grid: Iterable[float]
+    ) -> np.ndarray:
+        """Complement 1 - CIF_1(t|X) based on :meth:`predict_cif_at`.
+
+        Returns:
+            1 - CIF_1(t|X) = 1 - P(T <= t, event=1 | X),
+
+        i.e. the probability that event 1 has not yet occurred by time ``t``.
+        """
+        return 1.0 - self.predict_cif_at(X, t_grid)
+
+    def predict_cdf_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
+        """Deprecated alias for :meth:`predict_cif_at`.
+
+        This returns the same event-1 cumulative incidence
+
+            CIF_1(t|X) = P(T <= t, event=1 | X).
+
+        Use :meth:`predict_cif_at` instead for clearer semantics.
+        """
+        warnings.warn(
+            "SurvivalTabPFN.predict_cdf_at is deprecated and returns the event-1 "
+            "cumulative incidence CIF_1(t|X) = P(T <= t, event=1 | X). "
+            "Use predict_cif_at instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        return self.predict_cif_at(X, t_grid)
+
     def predict_survival_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
-        return 1.0 - self.predict_cdf_at(X, t_grid)
+        """Deprecated alias for :meth:`predict_survival_from_cif_at`.
+
+        This returns
+
+            1 - CIF_1(t|X) = 1 - P(T <= t, event=1 | X),
+
+        i.e. the probability that event 1 has not yet occurred by time ``t``.
+
+        Use :meth:`predict_survival_from_cif_at` instead for clearer semantics.
+        """
+        warnings.warn(
+            "SurvivalTabPFN.predict_survival_at is deprecated and returns "
+            "1 - CIF_1(t|X) based on the event-1 cumulative incidence. "
+            "Use predict_survival_from_cif_at instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        return 1.0 - self.predict_cif_at(X, t_grid)
 
     # ------------------------------ scalar risk ------------------------------
 
@@ -201,12 +268,12 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
 
         strategy = self.risk_strategy
 
-        # If user passes horizons explicitly, we override strategy to CDF-based
+        # If user passes horizons explicitly, we override strategy to CIF-based
         if horizons is not None:
             taus = np.asarray(list(horizons), dtype=float)
             if taus.size == 0:
                 raise ValueError("If provided, 'horizons' cannot be empty.")
-            F = self.predict_cdf_at(X, taus)  # (n, m)
+            F = self.predict_cif_at(X, taus)  # (n, m)
             if weights is None:
                 w = np.full(F.shape[1], 1.0 / F.shape[1], dtype=float)
             else:
@@ -216,10 +283,10 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
                 w = w / (w.sum() + self.eps)
             return (F @ w).astype(float)
 
-        # No horizons provided: use configured strategy
+        # No horizons provided: use configured strategy (CIF-based when applicable)
         if strategy in ("weighted_cdf", "avg_cdf"):
             taus, w = self._horizons_and_weights()
-            F = self.predict_cdf_at(X, taus)  # (n, m)
+            F = self.predict_cif_at(X, taus)  # (n, m)
             return (F @ w).astype(float)
 
         # Legacy fallback: P(event)/E[T | event, X]

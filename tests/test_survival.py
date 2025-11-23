@@ -4,9 +4,6 @@ import numpy as np
 import pytest
 from numpy.testing import assert_array_equal
 
-#  Copyright (c) Prior Labs GmbH 2025.
-#  Licensed under the Apache License, Version 2.0
-
 try:
     from tabpfn_extensions.survival import SurvivalTabPFN
 except ImportError:
