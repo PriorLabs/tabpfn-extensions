@@ -23,7 +23,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import (
     OneHotEncoder,
     StandardScaler,
-    StandardScaler as Std,
 )
 from sksurv.datasets import (  # change dataset here if desired
     load_whas500,
@@ -145,7 +144,7 @@ S = tabpfn.predict_survival_at(X_test, t_grid)  # shape: (n_samples, len(t_grid)
 # ============================ 4-cluster visualization =========================
 # Cluster on failure curves (1 - S); color all curves by cluster; show cluster means
 F = 1.0 - S
-Z = Std(with_mean=True, with_std=True).fit_transform(F)
+Z = StandardScaler(with_mean=True, with_std=True).fit_transform(F)
 
 kmeans = KMeans(n_clusters=4, n_init=50, random_state=42)
 labels = kmeans.fit_predict(Z)
