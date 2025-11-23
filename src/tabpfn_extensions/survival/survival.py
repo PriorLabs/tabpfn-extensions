@@ -104,7 +104,9 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
         y_event, y_time = check_y_survival(y)
 
         if np.sum(y_event) < 2:
-            raise ValueError(f"Need at least 2 events to learn a time distribution, but found {np.sum(y_event)}.")
+            raise ValueError(
+                f"Need at least 2 events to learn a time distribution, but found {np.sum(y_event)}."
+            )
         if np.any(np.asarray(y_time) < 0):
             raise ValueError("Times must be non-negative.")
 
