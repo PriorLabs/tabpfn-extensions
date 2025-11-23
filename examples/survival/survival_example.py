@@ -24,6 +24,9 @@ from sklearn.preprocessing import (
     OneHotEncoder,
     StandardScaler,
 )
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.pipeline import Pipeline
+
 from sksurv.datasets import (  # change dataset here if desired
     load_whas500,
 )
@@ -65,11 +68,6 @@ cindex_tabpfn = concordance_index_censored(event_test, time_test, risk_tabpfn)[0
 print(f"TabPFN C-index: {cindex_tabpfn:.3f}")
 
 # ============================ Cross-validation C-index =========================
-from sklearn.model_selection import KFold, cross_val_score
-from sklearn.pipeline import Pipeline
-from sksurv.metrics import concordance_index_censored
-from sksurv.util import check_y_survival
-
 # --- CV config ---
 cv = KFold(n_splits=5, shuffle=True, random_state=42)
 
