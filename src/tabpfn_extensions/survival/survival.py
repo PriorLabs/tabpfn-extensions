@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Iterable
 from typing import Literal
 
@@ -194,44 +193,6 @@ class SurvivalTabPFN(SurvivalAnalysisMixin, BaseEstimator):
 
         i.e. the probability that event 1 has not yet occurred by time ``t``.
         """
-        return 1.0 - self.predict_cif_at(X, t_grid)
-
-    def predict_cdf_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
-        """Deprecated alias for :meth:`predict_cif_at`.
-
-        This returns the same event-1 cumulative incidence
-
-            CIF_1(t|X) = P(T <= t, event=1 | X).
-
-        Use :meth:`predict_cif_at` instead for clearer semantics.
-        """
-        warnings.warn(
-            "SurvivalTabPFN.predict_cdf_at is deprecated and returns the event-1 "
-            "cumulative incidence CIF_1(t|X) = P(T <= t, event=1 | X). "
-            "Use predict_cif_at instead.",
-            FutureWarning,
-            stacklevel=2,
-        )
-        return self.predict_cif_at(X, t_grid)
-
-    def predict_survival_at(self, X: np.ndarray, t_grid: Iterable[float]) -> np.ndarray:
-        """Deprecated alias for :meth:`predict_survival_from_cif_at`.
-
-        This returns
-
-            1 - CIF_1(t|X) = 1 - P(T <= t, event=1 | X),
-
-        i.e. the probability that event 1 has not yet occurred by time ``t``.
-
-        Use :meth:`predict_survival_from_cif_at` instead for clearer semantics.
-        """
-        warnings.warn(
-            "SurvivalTabPFN.predict_survival_at is deprecated and returns "
-            "1 - CIF_1(t|X) based on the event-1 cumulative incidence. "
-            "Use predict_survival_from_cif_at instead.",
-            FutureWarning,
-            stacklevel=2,
-        )
         return 1.0 - self.predict_cif_at(X, t_grid)
 
     # ------------------------------ scalar risk ------------------------------
