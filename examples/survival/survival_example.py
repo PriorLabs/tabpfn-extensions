@@ -1,14 +1,13 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
 
-# INFO: The survival prediction work is work-in-progress and still unoptimized,
-#  TabPFN survival may provide inconsistent improvements.
-
 """SurvivalTabPFN demo with baselines and a 4-cluster visualization:
 - Train SurvivalTabPFN on a survival dataset
 - Print C-index for TabPFN, Cox, and RSF
 - Plot ALL survival curves colored by 4 clusters (no PCA)
 
+Note: The survival prediction work is work-in-progress and still unoptimized,
+  TabPFN survival may provide inconsistent improvements.
 Note: This may run slowly on CPU-only systems—GPU is recommended.
 """
 
@@ -83,7 +82,6 @@ def cindex_scorer(estimator, X, y):
     return concordance_index_censored(event, time, risk)[0]
 
 
-# --- Preprocessing for baselines (TabPFN does not need this) ---
 cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
 num_cols = [c for c in X.columns if c not in cat_cols]
 pre = ColumnTransformer(
@@ -93,10 +91,6 @@ pre = ColumnTransformer(
     ],
     remainder="drop",
 )
-
-# --- Define models (use your existing ones if already created) ---
-from tabpfn_extensions.survival import SurvivalTabPFN
-from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 
 tabpfn_cv = SurvivalTabPFN(
     cls_model=TabPFNClassifier(n_estimators=16, random_state=42),
