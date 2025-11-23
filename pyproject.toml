@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tabpfn-extensions"
-version = "0.1.6"
+version = "0.2.1"
 dependencies = [
     "torch>=2.1,<3",
     "pandas>=1.4.0,<3",
-    "scikit-learn>=1.2.0,<1.7",
+    "scikit-learn>=1.6.0,<1.7",
     "scipy>=1.11.1,<2",
-    "tabpfn>=2.1.1,<3",
+    "tabpfn>=6.0.5,<7",
     "tabpfn-common-utils[telemetry-interactive]>=0.2.0",
 ]
 
@@ -93,20 +93,16 @@ all = [
     "scikit-survival>=0.25.0; python_version >= '3.10'",
 ]
 
+[dependency-groups]
 dev = [
     "pre-commit>=3.0.0",
     "ruff==0.8.6",  # This must be the same version as in .pre-commit-config.yaml
     "mypy>=1.0.0",
-    # Test
     "pytest>=8.0.0",
     "pytest-xdist>=3.6.0",
     "pytest-mock>=3.15.1",
-]
-
-[group.build]
-dependencies = [
-    "build",
-    "twine",
+    "build>=1.3.0",
+    "twine>=6.2.0",
 ]
 
 [tool.pytest.ini_options]
@@ -118,7 +114,7 @@ log_level = "DEBUG"
 xfail_strict = true
 addopts = "--durations=10 -vv"
 
-# https://github.com/charliermarsh/ruff
+# https://github.com/astral-sh/ruff
 [tool.ruff]
 target-version = "py39"
 line-length = 88
@@ -399,9 +395,3 @@ reportPrivateImportUsage = false
 reportUnnecessaryComparison = false
 reportConstantRedefinition = false
 reportUntypedFunctionDecorator = false
-
-[dependency-groups]
-dev = [
-    "build>=1.3.0",
-    "twine>=6.2.0",
-]

@@ -1,4 +1,4 @@
-# TabPFN Extensions ⚡
+# TabPFN Extensions
 
 [![PyPI version](https://badge.fury.io/py/tabpfn-extensions.svg)](https://badge.fury.io/py/tabpfn-extensions)
 [![Downloads](https://pepy.tech/badge/tabpfn)](https://pepy.tech/project/tabpfn)
@@ -11,7 +11,7 @@
 
 > [!WARNING]
 >
-> #### 🧪 Experimental Code Notice
+> #### Experimental Code Notice
 > Please note that the extensions in this repository are experimental.
 > -   They are less rigorously tested than the core `tabpfn` library.
 > -   APIs are subject to change without notice in future releases.
@@ -24,14 +24,14 @@
 >
 > [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PriorLabs/TabPFN/blob/main/examples/notebooks/TabPFN_Demo_Local.ipynb)
 
-## ⚙️ Installation
+## Installation
 
 ```bash
 # Clone and install the repository
 pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-extensions.git"
 ```
 
-## 🛠️ Available Extensions
+## Available Extensions
 
 - **post_hoc_ensembles**: Improve performance with model combination
 - **interpretability**: Explain TabPFN predictions with SHAP values and feature selection
@@ -45,28 +45,28 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 
 Detailed documentation for each extension is available in the respective module directories.
 
-### 🔄 Backend Options
+### Backend Options
 
 TabPFN Extensions works with two TabPFN implementations:
 
-1. **🖥️ TabPFN Package** - Full PyTorch implementation for local inference:
+1. ** TabPFN Package** - Full PyTorch implementation for local inference:
    ```bash
    pip install tabpfn
    ```
 
-2. **☁️ TabPFN Client** - Lightweight API client for cloud-based inference:
+2. ** TabPFN Client** - Lightweight API client for cloud-based inference:
    ```bash
    pip install tabpfn-client
    ```
 
 Choose the backend that fits your needs - most extensions work with either option!
 
-## 📝 License
+## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 
-## 🔀 TabPFN Workflow at a Glance
+## TabPFN Workflow at a Glance
 Follow this decision tree to build your model and choose the right extensions from our ecosystem. It walks you through critical questions about your data, hardware, and performance needs, guiding you to the best solution for your specific use case.
 
 ```mermaid
@@ -208,18 +208,40 @@ graph LR
 
 ```
 
+## Anonymized Telemetry
 
-## 🧑‍💻 For Contributors
+This project collects fully anonymous usage telemetry with an option to opt-out of any telemetry or opt-in to extended telemetry.
+
+The data is used exclusively to help us provide stability to the relevant products and compute environments and guide future improvements.
+
+- **No personal data is collected**
+- **No code, model inputs, or outputs are ever sent**
+- **Data is strictly anonymous and cannot be linked to individuals**
+
+For details on telemetry, please see our [Telemetry Reference](https://github.com/PriorLabs/TabPFN/blob/main/TELEMETRY.md) and our [Privacy Policy](https://priorlabs.ai/privacy_policy/).
+
+**To opt out**, set the following environment variable:
+
+```bash
+export TABPFN_DISABLE_TELEMETRY=1
+```
+
+## For Contributors
 
 Interested in adding your own extension? We welcome contributions!
+
+We use [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage the project's environment, so install that first.
 
 ```bash
 # Clone and set up for development
 git clone https://github.com/PriorLabs/tabpfn-extensions.git
 cd tabpfn-extensions
+uv sync
+source .venv/bin/activate
 
-# Lightweight dev setup (fast)
-pip install -e ".[dev]"
+# If you add optional dependencies for your extension in pyproject.toml, install them
+# like this
+uv sync --extra [your extension name]
 
 # Test your extension with fast mode
 FAST_TEST_MODE=1 pytest tests/test_your_extension.py -v
@@ -229,48 +251,5 @@ See our [Contribution Guide](CONTRIBUTING.md) for more details.
 
 [![Contributors](https://contrib.rocks/image?repo=priorlabs/tabpfn-extensions)](https://github.com/priorlabs/tabpfn-extensions/graphs/contributors)
 
-## 📊 Anonymous Telemetry
-
-This project collects **anonymous usage telemetry** by default.
-
-The data is used exclusively to help us understand how the library is being used and to guide future improvements.
-
-- **No personal data is collected**
-- **No code, model inputs, or outputs are ever sent**
-- **Data is strictly anonymous and cannot be linked to individuals**
-
-### What we collect
-We only collect high-level, non-identifying information such as:
-- Package version
-- Python version
-- How often fit and inference are called, including simple metadata like the dimensionality of the input and the type of task (e.g., classification vs. regression) (:warning: never the data itself)
-
-See the [Telemetry documentation](https://github.com/priorlabs/tabpfn/blob/main/TELEMETRY.md) for the full details of events and metadata.
-
-This data is processed in compliance with the **General Data Protection Regulation (GDPR)** principles of data minimization and purpose limitation.
-
-For more details, please see our [Privacy Policy](https://priorlabs.ai/privacy_policy/).
-
-### Additional opt-in features
-
-In addition to the default anonymous telemetry, you can **optionally** enable:
-
-#### 📈 Extended Anonymous Analytics
-Helps us understand common usage patterns across multiple calls.  
-  - Still strictly anonymous  
-  - Never includes data, inputs, or outputs  
-  - Cannot be linked to an individual user  
-
-#### 📰 Newsletter  
-Stay informed about product updates, scientific advances, and community news.  
-  - Requires explicit opt-in  
-  - Your email is only used for the newsletter and never shared  
-
-### How to opt out
-If you prefer not to send telemetry, you can disable it by setting the following environment variable:
-
-```bash
-export TABPFN_DISABLE_TELEMETRY=1
-```
 ---
 Built with ❤️ by the TabPFN community

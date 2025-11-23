@@ -51,7 +51,6 @@ def get_small_test_search_space():
                         # Use "name" parameter as expected by TabPFN PreprocessorConfig
                         "name": "none",
                         "global_transformer_name": None,
-                        "subsample_features": -1,
                         "categorical_name": "none",
                         "append_original": False,
                     },
