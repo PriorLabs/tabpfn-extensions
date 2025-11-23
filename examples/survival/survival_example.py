@@ -33,7 +33,7 @@ from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.metrics import concordance_index_censored
 from sksurv.util import check_y_survival
 
-from tabpfn_extensions.survival import SurvivalTabPFN  # must expose predict_survival_at
+from tabpfn_extensions.survival import SurvivalTabPFN
 from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 
 # Silence only the specific TabPFN power-transform overflow warnings
@@ -125,8 +125,8 @@ rsf_cv = Pipeline(
 
 # --- Run CV (returns array of C-index values for each fold) ---
 scores_tabpfn = cross_val_score(tabpfn_cv, X, y, scoring=cindex_scorer, cv=cv, n_jobs=1)
-scores_cox = cross_val_score(cox_cv, X, y, scoring=cindex_scorer, cv=cv, n_jobs=1)
-scores_rsf = cross_val_score(rsf_cv, X, y, scoring=cindex_scorer, cv=cv, n_jobs=1)
+scores_cox = cross_val_score(cox_cv, X, y, scoring=cindex_scorer, cv=cv, n_jobs=-1)
+scores_rsf = cross_val_score(rsf_cv, X, y, scoring=cindex_scorer, cv=cv, n_jobs=-1)
 
 print(f"CV C-index TabPFN: {scores_tabpfn.mean():.3f} ± {scores_tabpfn.std():.3f}")
 print(f"CV C-index CoxPH : {scores_cox.mean():.3f} ± {scores_cox.std():.3f}")
@@ -144,7 +144,7 @@ S = tabpfn.predict_survival_from_cif_at(
 F = 1.0 - S
 Z = StandardScaler(with_mean=True, with_std=True).fit_transform(F)
 
-kmeans = KMeans(n_clusters=4, n_init=50, random_state=42)
+kmeans = KMeans(n_clusters=4, n_init="auto", random_state=42)
 labels = kmeans.fit_predict(Z)
 
 # Plot all curves colored by cluster
