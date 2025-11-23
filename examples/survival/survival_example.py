@@ -1,6 +1,9 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
 
+# INFO: The survival prediction work is work-in-progress and still unoptimized,
+#  TabPFN survival may provide inconsistent improvements.
+
 """SurvivalTabPFN demo with baselines and a 4-cluster visualization:
 - Train SurvivalTabPFN on a survival dataset
 - Print C-index for TabPFN, Cox, and RSF

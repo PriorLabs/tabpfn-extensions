@@ -1,6 +1,9 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
 
+# INFO: The survival prediction work is work-in-progress and still unoptimized,
+#  TabPFN survival may provide inconsistent improvements.
+
 from __future__ import annotations
 
 from collections.abc import Iterable
