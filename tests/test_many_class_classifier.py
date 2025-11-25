@@ -27,11 +27,19 @@ from tabpfn_extensions.many_class import (
 from test_base_tabpfn import BaseClassifierTests
 
 
-# Helper function (as provided in the initial problem description)
+# Helper functions for generating test data
 def get_classification_data(num_classes: int, num_features: int, num_samples: int):
-    assert (
-        num_samples >= num_classes
-    ), "Number of samples must be at least the number of classes."
+    """Generate simple numpy classification data for testing.
+    
+    Args:
+        num_classes: Number of target classes
+        num_features: Number of features
+        num_samples: Number of samples
+        
+    Returns:
+        X, y: Numpy arrays with features and target labels
+    """
+    assert num_samples >= num_classes, "Number of samples must be at least the number of classes."
     X = np.random.randn(num_samples, num_features)
     y = np.concatenate(
         [
@@ -42,6 +50,70 @@ def get_classification_data(num_classes: int, num_features: int, num_samples: in
     y = np.random.permutation(y)
     assert np.unique(y).size == num_classes
     return X, y
+
+
+def get_pandas_classification_data(
+    num_classes: int,
+    num_samples: int = 100,
+    use_category: bool = False,
+    use_bool: bool = False,
+):
+    """Generate pandas DataFrame with mixed data types for testing.
+    
+    Args:
+        num_classes: Number of target classes
+        num_samples: Number of samples
+        use_category: If True, include a pandas categorical dtype column
+        use_bool: If True, include a boolean dtype column
+        
+    Returns:
+        X, y: Pandas DataFrame with mixed types and Series with target labels
+    """
+    import pandas as pd
+    import random
+
+    assert num_samples >= num_classes, "Number of samples must be at least the number of classes."
+
+    def _random_from_cats(cats, num_rows):
+        """Sample random values from categories, guaranteeing all are present."""
+        return cats + random.choices(cats, k=num_rows - len(cats))
+
+    data = {}
+
+    # Create pandas series with low cardinality categorical values as strings
+    _categories = ["cat1", "cat2", "cat3"]
+    data["cat_low_cardinality_str"] = pd.Series(
+        _random_from_cats(_categories, num_samples), name="cat_low_cardinality_str"
+    )
+
+    # Optionally add pandas categorical dtype
+    if use_category:
+        data["cat_low_cardinality_cat"] = pd.Series(
+            _random_from_cats(_categories, num_samples),
+            dtype="category",
+            name="cat_low_cardinality_cat",
+        )
+
+    # Add numerical float values
+    data["numerical_float"] = pd.Series(
+        np.random.normal(1.0, 3.0, num_samples), name="numerical_float"
+    )
+
+    # Optionally add boolean values
+    if use_bool:
+        data["bool"] = pd.Series(
+            [bool(i % 2) for i in range(num_samples)], name="bool", dtype="boolean"
+        )
+
+    # Create target with string class labels
+    _target_categories = [f"target_class_{i + 1}" for i in range(num_classes)]
+    data["target"] = pd.Series(
+        _random_from_cats(_target_categories, num_samples), name="target"
+    )
+
+    df = pd.DataFrame(data)
+    return df.drop(columns=["target"]), df["target"]
+
 
 
 class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifierTests
@@ -336,3 +408,68 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
     )
     def test_with_missing_values(self, estimator, dataset_generator):
         pass
+
+
+    def test_with_pandas_datatypes(self):
+        """Test ManyClassClassifier handles different pandas data types (str, category, bool, float).
+        
+        Tests ManyClassClassifier with various pandas data type combinations to ensure
+        proper handling of string categories, pandas categorical dtype, booleans, and floats.
+        Uses a fast dummy classifier to speed up the test.
+        """
+
+        class DummyClassifier(BaseEstimator, ClassifierMixin):
+            """A fast dummy classifier that returns dummy predictions."""
+            def __init__(self, random_state=None):
+                super().__init__()
+                self.random_state = random_state
+            
+            def fit(self, X, y, sample_weight=None):
+                """Store the classes seen during fit."""
+                self.classes_ = np.unique(y)
+                self.n_features_in_ = X.shape[1] if hasattr(X, 'shape') else len(X[0])
+                return self
+            
+            def predict(self, X):
+                """Return the first class for all samples."""
+                n_samples = X.shape[0] if hasattr(X, 'shape') else len(X)
+                return np.full(n_samples, self.classes_[0], dtype=self.classes_.dtype)
+            
+            def predict_proba(self, X):
+                """Return uniform probabilities across all classes."""
+                n_samples = X.shape[0] if hasattr(X, 'shape') else len(X)
+                n_classes = len(self.classes_)
+                return np.full((n_samples, n_classes), 1.0 / n_classes)
+
+        MAX_CLASSES = 10
+
+        # Test different combinations of pandas data types
+        for use_category in [False, True]:
+            for use_bool in [False, True]:
+                X, y = get_pandas_classification_data(
+                    num_classes=MAX_CLASSES + 1,
+                    num_samples=100,
+                    use_category=use_category,
+                    use_bool=use_bool,
+                )
+
+                # Use a fast dummy classifier instead of TabPFN for speed
+                estimator = ManyClassClassifier(
+                    estimator=DummyClassifier(random_state=42),
+                    alphabet_size=MAX_CLASSES,
+                    n_estimators=None,
+                    random_state=42,
+                )
+
+                estimator.fit(X, y)
+                predictions = estimator.predict(X)
+                proba = estimator.predict_proba(X)
+                
+                # Verify mapping was used for ManyClassClassifier
+                assert not estimator.no_mapping_needed_
+                assert estimator.code_book_ is not None
+
+                # Validate outputs for both cases
+                assert predictions.shape[0] == X.shape[0]
+                assert proba.shape == (X.shape[0], MAX_CLASSES + 1)
+                assert np.allclose(proba.sum(axis=1), 1.0)
