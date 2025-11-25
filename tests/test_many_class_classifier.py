@@ -8,8 +8,10 @@ from a common base test suite.
 from __future__ import annotations
 
 import logging
+import random
 
 import numpy as np
+import pandas as pd
 import pytest
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import make_blobs
@@ -71,10 +73,6 @@ def get_pandas_classification_data(
     Returns:
         X, y: Pandas DataFrame with mixed types and Series with target labels
     """
-    import random
-
-    import pandas as pd
-
     assert (
         num_samples >= num_classes
     ), "Number of samples must be at least the number of classes."
