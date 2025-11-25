@@ -329,7 +329,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         pass
 
     def test_with_pandas_and_mixed_datatypes(
-        self, estimator, pandas_classification_dataset_many_classes_mixed_types
+        self, pandas_classification_dataset_many_classes_mixed_types
     ):
         # Use a fast dummy classifier instead of TabPFN for speed; cannot use standard estimator due to mixed types
         MAX_CLASSES = 10
