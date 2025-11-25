@@ -28,18 +28,8 @@ from tabpfn_extensions.many_class import (
 from test_base_tabpfn import BaseClassifierTests
 
 
-# Helper functions for generating test data
+# Helper function (as provided in the initial problem description)
 def get_classification_data(num_classes: int, num_features: int, num_samples: int):
-    """Generate simple numpy classification data for testing.
-
-    Args:
-        num_classes: Number of target classes
-        num_features: Number of features
-        num_samples: Number of samples
-
-    Returns:
-        X, y: Numpy arrays with features and target labels
-    """
     assert (
         num_samples >= num_classes
     ), "Number of samples must be at least the number of classes."
