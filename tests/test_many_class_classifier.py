@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.datasets import make_blobs
+from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -327,9 +328,32 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
     def test_passes_estimator_checks(self, estimator):
         pass
 
-    @pytest.mark.skip(reason="Disabled due to backend=tabpfn_client failures.")
-    def test_with_pandas(self, estimator, pandas_classification_data):
-        pass
+    def test_with_pandas_and_mixed_datatypes(
+        self, pandas_classification_dataset_many_classes_mixed_types
+    ):
+        # Use a fast dummy classifier instead of TabPFN for speed; cannot use standard estimator due to mixed types
+        MAX_CLASSES = 10
+
+        X, y = pandas_classification_dataset_many_classes_mixed_types
+
+        estimator = ManyClassClassifier(
+            estimator=DummyClassifier(random_state=42),
+            alphabet_size=MAX_CLASSES,
+            n_estimators=None,
+            random_state=42,
+        )
+
+        estimator.fit(X, y)
+        predictions = estimator.predict(X)
+        proba = estimator.predict_proba(X)
+
+        # Verify mapping was used for ManyClassClassifier
+        assert not estimator.no_mapping_needed_
+        assert estimator.code_book_ is not None
+
+        # Simple output validation
+        assert predictions.shape[0] == X.shape[0]
+        assert np.allclose(proba.sum(axis=1), 1.0)
 
     @pytest.mark.skip(
         reason="Disabled due to DecisionTreeTabPFN not supporting missing values."
