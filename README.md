@@ -47,7 +47,7 @@ Detailed documentation for each extension is available in the respective module 
 
 ### Backend Options
 
-TabPFN Extensions works with two TabPFN implementations:
+Many TabPFN Extensions works with two TabPFN implementations:
 
 1. ** TabPFN Package** - Full PyTorch implementation for local inference:
    ```bash
@@ -60,6 +60,8 @@ TabPFN Extensions works with two TabPFN implementations:
    ```
 
 Choose the backend that fits your needs - most extensions work with either option!
+
+Exceptions to this include Post Hoc Ensembling and Embeddings.
 
 ## License
 
