@@ -35,23 +35,23 @@ jobs:
         include:
           - os: ubuntu-latest
             python-version: "3.9"
-            dependency-set: minimum
+            dependency-set: lowest-direct
           - os: macos-15-intel # We need x86 as ARM is  python>= 3.11 only.
             # https://github.com/actions/setup-python/issues/855
             python-version: "3.9"
-            dependency-set: minimum
+            dependency-set: lowest-direct
           - os: windows-latest
             python-version: "3.9"
-            dependency-set: minimum
+            dependency-set: lowest-direct
           - os: ubuntu-latest
             python-version: "3.13"
-            dependency-set: maximum
+            dependency-set: highest
           - os: macos-latest
             python-version: "3.13"
-            dependency-set: maximum
+            dependency-set: highest
           - os: windows-latest
             python-version: "3.13"
-            dependency-set: maximum
+            dependency-set: highest
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -68,34 +68,26 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Generate requirements file
-        run: python scripts/generate_dependencies.py ${{ matrix.dependency-set }}
+      - name: Check tabpfn availability
+        id: check_tabpfn_availability
+        run: |
+          output=$(python scripts/is_tabpfn_min_version_on_pypi.py)
+          echo "$output"
+          use_github=$(echo "$output" | grep "USE_GITHUB=" | cut -d'=' -f2)
+          echo "use_github=$use_github" >> $GITHUB_OUTPUT
+
+      - name: Install tabpfn from GitHub (if not on PyPI)
+        if: steps.check_tabpfn_availability.outputs.use_github == 'true'
+        run: |
+          uv venv -p ${{ matrix.python-version }}
+          uv pip install git+https://github.com/PriorLabs/tabpfn.git@main
 
       - name: Install dependencies
-        run: |
-          uv pip install --system ".[all]"
-          # onnx is required for onnx export tests
-          # we don't install all dev dependencies here for speed
-          uv pip install --system -r requirements.txt
-          uv pip install --system pytest psutil
-          # onnx is not supported on python 3.13 yet https://github.com/onnx/onnx/issues/6339
-          if [[ "${{ matrix.python-version }}" != "3.13" ]]; then
-            uv pip install --system onnx
-          fi
-        shell: bash
+        run: uv sync --group ci --all-extras --resolution ${{ matrix.dependency-set }}
 
-      - name: Run Tests (Unix)
-        if: runner.os != 'Windows'
+      - name: Run Tests
         env:
           TABPFN_EXCLUDE_DEVICES: "mps"
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          FAST_TEST_MODE=1 pytest tests/
-
-      - name: Run Tests (Windows)
-        if: runner.os == 'Windows'
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          $env:FAST_TEST_MODE = 1
-          pytest tests/
+          FAST_TEST_MODE: 1
+        run: uv run --no-sync pytest tests/
