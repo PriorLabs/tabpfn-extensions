@@ -24,11 +24,11 @@ from tabpfn_extensions.CP_missing_data import CP_MDA_TabPFNRegressor, CP_MDA_Tab
 
 # generate some data
 np.random.seed(42)  # For reproducibility
-X = np.random.rand(100, 5)
+X = np.random.rand(100, 2)
 Y = np.random.rand(100)
 
 # add missing values in X under MCAR
-X[np.random.randint(0, 100, 10), np.random.randint(0, 5, 10)] = np.nan
+X[np.random.randint(0, 100, 40), np.random.randint(0, 2, 40)] = np.nan
 
 # Check how many unique patterns there are 
 unique_patterns = pd.DataFrame(X).isnull().astype(int).drop_duplicates()
