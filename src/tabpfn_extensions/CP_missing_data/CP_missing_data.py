@@ -10,7 +10,13 @@ import warnings
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from tabpfn import TabPFNRegressor
+
+try:
+    # Try standard TabPFN package first
+    from tabpfn import TabPFNRegressor
+except ImportError:
+    # Fall back to TabPFN client
+    from tabpfn_client import  TabPFNRegressor
 
 
 class CP_MDA_TabPFNRegressor:
