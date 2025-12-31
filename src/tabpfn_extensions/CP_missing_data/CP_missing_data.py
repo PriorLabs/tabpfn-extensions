@@ -59,9 +59,9 @@ class CP_MDA_TabPFNRegressor:
         error_lb = (lb - y_val)
         error_ub = (y_val - ub)
         s = np.maximum(error_lb, error_ub)
-        # obtain the right quantile
 
-        Q_use = (1 - alpha) / (1 + 1/len(s))
+        # obtain the emperical quantile
+        Q_use = (1 - alpha) * (1 + 1/len(s))
         correction_term = np.quantile(s, Q_use)
         return correction_term
 
@@ -132,6 +132,7 @@ class CP_MDA_TabPFNRegressor:
         for i in self.mask_unique["mask_id"]:
             # select the nested masks
             nested_masks = self.mask_nested[self.mask_nested["mask_id"] == i]["nested_masks"].values[0]
+            
             # add the mask itself
             nested_masks_with_self = nested_masks + [i]  # Create new list instead of append
 
