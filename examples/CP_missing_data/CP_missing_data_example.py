@@ -19,7 +19,6 @@ except ImportError:
     # Fall back to TabPFN client
     from tabpfn_client import  TabPFNRegressor
 
-from sklearn.model_selection import train_test_split
 from tabpfn_extensions.CP_missing_data import CP_MDA_TabPFNRegressor, CP_MDA_TabPFNRegressor_newdata
 
 # generate some data

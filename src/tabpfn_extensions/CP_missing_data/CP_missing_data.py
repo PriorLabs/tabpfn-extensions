@@ -207,35 +207,35 @@ class CP_MDA_TabPFNRegressor_newdata:
         self.preds_test = preds_test
 
     def match_mask(self):
-      """Add correction terms to the new masks from the test set."""
-      mask_test = self.X.isnull().astype(int)
-      mask_cols = list(mask_test.columns.values)
+        """Add correction terms to the new masks from the test set."""
+        mask_test = self.X.isnull().astype(int)
+        mask_cols = list(mask_test.columns.values)
 
-      mask_test_cor = mask_test.merge(
-            self.calibration_results,
-            on=mask_cols,
-            how='left'
-        )
+        mask_test_cor = mask_test.merge(
+                self.calibration_results,
+                on=mask_cols,
+                how='left'
+            )
 
-      # check if there are masks in the test set that are not in the calibration set
-      new_masks = mask_test_cor[mask_test_cor["correction_term"].isnull()][mask_cols]
+        # check if there are masks in the test set that are not in the calibration set
+        new_masks = mask_test_cor[mask_test_cor["correction_term"].isnull()][mask_cols]
 
-      if new_masks.shape[0] > 0:
-          warnings.warn(
-              "The following masks are not in the calibration set:\n"
-              f"{new_masks.to_string()}\n"
-              "The baseline quantile estimates will be returned for those cases."
-          )
+        if new_masks.shape[0] > 0:
+            warnings.warn(
+                "The following masks are not in the calibration set:\n"
+                f"{new_masks.to_string()}\n"
+                "The baseline quantile estimates will be returned for those cases."
+            )
 
-      self.mask_test_cor = mask_test_cor
+        self.mask_test_cor = mask_test_cor
 
     def perform_correction(self):
-      """Apply correction terms to the prediction intervals."""
-      preds_test = self.preds_test.copy()
-      lb_corr = preds_test[0] - self.mask_test_cor["correction_term"].values
-      ub_corr = preds_test[2] + self.mask_test_cor["correction_term"].values
+        """Apply correction terms to the prediction intervals."""
+        preds_test = self.preds_test.copy()
+        lb_corr = preds_test[0] - self.mask_test_cor["correction_term"].values
+        ub_corr = preds_test[2] + self.mask_test_cor["correction_term"].values
 
-      return lb_corr, preds_test[1], ub_corr, preds_test[0], preds_test[2]
+        return lb_corr, preds_test[1], ub_corr, preds_test[0], preds_test[2]
 
     def fit(self):
         """Convenience method to run the entire pipeline"""
