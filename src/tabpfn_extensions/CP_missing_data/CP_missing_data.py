@@ -177,9 +177,9 @@ class CP_MDA_TabPFNRegressor_newdata:
 
     TabPFN: Fitted TabPFNRegressor model.
 
-    X_train : matrix-like of shape (n_samples, n_predictors)
+    X_new : matrix-like of shape (n_samples, n_predictors)
 
-    quantiles : array with three arumgnent denoting the qualitens of intrest used
+    quantiles : array with three arguments denoting the quantiles of interest used
                 in fitting the model. The default is [0.05, 0.5, 0.95].
 
     calibration_results : matrix with the correction terms for each mask.
