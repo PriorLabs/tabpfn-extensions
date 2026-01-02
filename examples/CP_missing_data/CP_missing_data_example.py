@@ -5,7 +5,7 @@ for the TabPFNRegressor when these are missing values in the dataset. The proces
 in two steps. Using the training data to train the model and obtain correction terms for
 each mask, and appying the corrcetion terms with the trained model to a new dataset.
 
-Note: This algorithms works well then the missing pattern is small.
+Note: This algorithm works well when the missing pattern is small.
 """
 
 import numpy as np
