@@ -26,11 +26,11 @@ class CP_MDA_TabPFNRegressor:
     Parameters:
         X_train : matrix-like of shape (n_samples, n_predictors)
 
-        Y_train : array-like of continious outcome with shape (n_samples,)
+        Y_train : array-like of continuous outcome with shape (n_samples,)
 
-        quantiles : array with three arumgnent denoting the qualitens of intrest.
-            The default is [0.05, 0.5, 0.95], where the first indicates the lowerbound,
-            the second the median, and the third the upperbound.
+        quantiles : array with three arguments denoting the quantiles of interest.
+            The default is [0.05, 0.5, 0.95], where the first indicates the lower bound,
+            the second the median, and the third the upper bound.
 
         val_size : float between 0 and 1, indicating the size of the validation set
             as a fraction of the training data.
