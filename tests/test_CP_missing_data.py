@@ -59,8 +59,10 @@ def test_model_CP(X_train, Y_train, seed):
     model = CP_MDA_TabPFNRegressor(X_train, Y_train,  quantiles = [0.05, 0.5, 0.95], val_size = 0.5, seed = seed)
     calibration_results, model_fit = model.fit()
 
-    # not the best check since we do not control which cases are in the valset
-    missing_df = pd.DataFrame(X_train).isnull().astype(int).drop_duplicates()
+    # Replicate the split to get the validation set and find its unique masks.
+    from sklearn.model_selection import train_test_split
+    _, X_val, _, _ = train_test_split(X_train, Y_train, test_size=0.5, random_state=seed)
+    missing_df = pd.DataFrame(X_val).isnull().astype(int).drop_duplicates()
 
     # check type, size of the calibration results
     assert calibration_results.shape[0] == missing_df.shape[0]
