@@ -229,8 +229,8 @@ class CP_MDA_TabPFNRegressor_newdata:
 
       self.mask_test_cor = mask_test_cor
 
-    def perf_correction(self):
-      """Add correction terms to the new masks from the test set."""
+    def perform_correction(self):
+      """Apply correction terms to the prediction intervals."""
       preds_test = self.preds_test.copy()
       lb_corr = preds_test[0] - self.mask_test_cor["correction_term"].values
       ub_corr = preds_test[2] + self.mask_test_cor["correction_term"].values
