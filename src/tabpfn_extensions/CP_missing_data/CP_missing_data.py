@@ -62,6 +62,13 @@ class CP_MDA_TabPFNRegressor:
 
         # obtain the emperical quantile
         Q_use = (1 - alpha) * (1 + 1/len(s))
+
+        # Check is Q_use if not larger then 1
+        if Q_use > 1:
+            Q_use = 1
+            warnings.warn(
+                "Some masks have very small calibration sets")
+
         correction_term = np.quantile(s, Q_use)
         return correction_term
 
@@ -123,7 +130,8 @@ class CP_MDA_TabPFNRegressor:
         mask_cols = list(self.Mask_val.columns.values)
 
         # Using merge to add the id of the mask
-        df_with_ids = self.Mask_val.merge(
+        # use original index values
+        df_with_ids = self.Mask_val.reset_index().merge(
             self.mask_unique,  
             on=mask_cols,
             how='left'
@@ -137,11 +145,11 @@ class CP_MDA_TabPFNRegressor:
             nested_masks_with_self = nested_masks + [i]  # Create new list instead of append
 
             # obtain indexes for the rows
-            indexes = df_with_ids[df_with_ids["mask_id"].isin(nested_masks_with_self)].index
+            indexes = df_with_ids[df_with_ids["mask_id"].isin(nested_masks_with_self)]["index"]
 
             # select the validation data based on the indices
-            X_val_nested = self.X_val.iloc[indexes]
-            Y_val_nested = self.Y_val.iloc[indexes]
+            X_val_nested = self.X_val.loc[indexes]
+            Y_val_nested = self.Y_val.loc[indexes]
 
             # obtain predictions
             predictions = self.model.predict(

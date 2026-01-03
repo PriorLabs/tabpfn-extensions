@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from numpy.testing import assert_array_equal
+from sklearn.model_selection import train_test_split
 
 try:
     from tabpfn_extensions.CP_missing_data import (
@@ -60,7 +61,6 @@ def test_model_CP(X_train, Y_train, seed):
     calibration_results, model_fit = model.fit()
 
     # Replicate the split to get the validation set and find its unique masks.
-    from sklearn.model_selection import train_test_split
     _, X_val, _, _ = train_test_split(X_train, Y_train, test_size=0.5, random_state=seed)
     missing_df = pd.DataFrame(X_val).isnull().astype(int).drop_duplicates()
 
