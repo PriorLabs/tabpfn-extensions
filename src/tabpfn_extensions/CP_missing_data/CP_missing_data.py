@@ -43,7 +43,7 @@ class CP_MDA_TabPFNRegressor:
 
     """
 
-    def __init__(self, X_train, Y_train, quantiles, val_size, seed):
+    def __init__(self, X_train, Y_train, quantiles, val_size, seed=None):
         self.X = pd.DataFrame(X_train)
         self.Y = Y_train
         self.quantiles = quantiles
@@ -249,5 +249,5 @@ class CP_MDA_TabPFNRegressor_newdata:
         """Convenience method to run the entire pipeline"""
         self.obtain_preds()
         self.match_mask()
-        CP_results =  self.perf_correction()
+        CP_results =  self.perform_correction()
         return CP_results
