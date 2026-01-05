@@ -151,6 +151,14 @@ class CP_MDA_TabPFNRegressor:
             X_val_nested = self.X_val.loc[indexes]
             Y_val_nested = self.Y_val.loc[indexes]
 
+            # SET ENTIRE COLUMNS TO NaN WHERE THE MASK HAS MISSING VALUES
+            current_mask = self.mask_unique[self.mask_unique["mask_id"] == i][mask_cols].iloc[0]
+
+            # For each column where the mask indicates missing (value = 1), set entire column to NaN
+            for col_idx, col_name in enumerate(mask_cols):
+                if current_mask.iloc[col_idx] == 1:
+                    X_val_nested.loc[:, col_name] = np.nan
+
             # obtain predictions
             predictions = self.model.predict(
                 X_val_nested,
