@@ -1,6 +1,6 @@
 """Tests for the CP_missing_data extension.
 
-This file tests the CP_MDA_TabPFNRegressor and CP_MDA_TabPFNRegressor_newdata functions,
+This file tests the CPMDATabPFNRegressor and CPMDATabPFNRegressorNewData functions,
 which attempts to obtain correct uncertainity estimates in case if missing data. 
 """
 
@@ -13,9 +13,9 @@ from numpy.testing import assert_array_equal
 from sklearn.model_selection import train_test_split
 
 try:
-    from tabpfn_extensions.CP_missing_data import (
-        CP_MDA_TabPFNRegressor,
-        CP_MDA_TabPFNRegressor_newdata,
+    from tabpfn_extensions.cp_missing_data import (
+        CPMDATabPFNRegressor,
+        CPMDATabPFNRegressorNewData,
     )
 except ImportError:
     pytest.skip("Required libraries (tabpfn) not installed", allow_module_level=True)
@@ -57,8 +57,8 @@ def seed():
 
 def test_model_CP(X_train, Y_train, seed):
     """Tests if the calibration corrections are of the correct shape and type."""
-    model = CP_MDA_TabPFNRegressor(X_train, Y_train,  quantiles = [0.05, 0.5, 0.95], val_size = 0.5, seed = seed)
-    calibration_results, model_fit = model.fit()
+    model = CPMDATabPFNRegressor(quantiles = [0.05, 0.5, 0.95], val_size = 0.5, seed = seed)
+    calibration_results, model_fit = model.fit(X_train, Y_train)
 
     # Replicate the split to get the validation set and find its unique masks.
     _, X_val, _, _ = train_test_split(X_train, Y_train, test_size=0.5, random_state=seed)
@@ -73,12 +73,12 @@ def test_model_CP(X_train, Y_train, seed):
 def test_reproducibility(X_train, Y_train, seed):
     """Tests that random_state ensures deterministic correction terms."""
 
-    model_1 = CP_MDA_TabPFNRegressor(X_train, Y_train, quantiles=[0.05, 0.5, 0.95], val_size = 0.5, seed = seed)
-    calibration_results_1, model_fit_1 = model_1.fit()
+    model_1 = CPMDATabPFNRegressor(quantiles=[0.05, 0.5, 0.95], val_size = 0.5, seed = seed)
+    calibration_results_1, model_fit_1 = model_1.fit(X_train, Y_train)
 
     # Second model with the same seed
-    model_2 = CP_MDA_TabPFNRegressor(X_train, Y_train, quantiles=[0.05, 0.5, 0.95] , val_size = 0.5, seed = seed)
-    calibration_results_2, model_fit_2 = model_2.fit()
+    model_2 = CPMDATabPFNRegressor(quantiles=[0.05, 0.5, 0.95] , val_size = 0.5, seed = seed)
+    calibration_results_2, model_fit_2 = model_2.fit(X_train, Y_train)
 
     # Assert that the outputs are identical
     assert_array_equal(calibration_results_1, calibration_results_2)
@@ -88,12 +88,12 @@ def test_predict(X_train, Y_train, seed, X_new):
     """Tests if the predictions have the correct shape and type."""
 
     # fit model 
-    model = CP_MDA_TabPFNRegressor(X_train, Y_train, quantiles=[0.05, 0.5, 0.95], val_size = 0.5, seed = seed)
-    calibration_results, model_fit = model.fit()
+    model = CPMDATabPFNRegressor(quantiles=[0.05, 0.5, 0.95], val_size = 0.5, seed = seed)
+    calibration_results, model_fit = model.fit(X_train, Y_train)
 
     # Apply the model to new cases 
-    cp_apply = CP_MDA_TabPFNRegressor_newdata(model_fit, X_new = X_new, quantiles=[0.05, 0.5, 0.95], calibration_results=calibration_results)
-    CP_results = cp_apply.fit()
+    cp_apply = CPMDATabPFNRegressorNewData(model_fit, quantiles=[0.05, 0.5, 0.95], calibration_results=calibration_results)
+    CP_results = cp_apply.predict(X_new)
 
     assert CP_results[1].size== X_new.shape[0]
     assert isinstance(CP_results[1], np.ndarray)

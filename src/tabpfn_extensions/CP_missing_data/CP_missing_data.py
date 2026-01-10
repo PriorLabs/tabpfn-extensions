@@ -7,26 +7,19 @@ for different missing data patterns in the input features.
 from __future__ import annotations
 
 import warnings
+from typing import Optional
+
 import numpy as np
 import pandas as pd
+from numpy.typing import ArrayLike
 from sklearn.model_selection import train_test_split
 
-try:
-    # Try standard TabPFN package first
-    from tabpfn import TabPFNRegressor
-except ImportError:
-    # Fall back to TabPFN client
-    from tabpfn_client import  TabPFNRegressor
+from tabpfn_extensions.utils import TabPFNRegressor
 
-
-class CP_MDA_TabPFNRegressor:
-    """
-    Compute the correction terms for missing data masks using conformal prediction.
+class CPMDATabPFNRegressor:
+    """Compute the correction terms for missing data masks using conformal prediction.
 
     Parameters:
-        X_train : matrix-like of shape (n_samples, n_predictors)
-
-        Y_train : array-like of continuous outcome with shape (n_samples,)
 
         quantiles : array with three arguments denoting the quantiles of interest.
             The default is [0.05, 0.5, 0.95], where the first indicates the lower bound,
@@ -43,15 +36,23 @@ class CP_MDA_TabPFNRegressor:
 
     """
 
-    def __init__(self, X_train, Y_train, quantiles, val_size, seed=None):
-        self.X = pd.DataFrame(X_train)
-        self.Y = Y_train
+    def __init__(
+        self, 
+        quantiles: list[float], 
+        val_size: float, 
+        seed: Optional[int] = None
+    ) -> None:
         self.quantiles = quantiles
         self.val_size = val_size
         self.alpha = quantiles[0] * 2
         self.seed = seed
 
-    def calc_correction_term(self, predictions, y_val, alpha):
+    def calc_correction_term(
+        self,
+        predictions: tuple[np.ndarray, np.ndarray, np.ndarray], 
+        y_val: pd.Series, 
+        alpha: float
+    ) -> float:
         """Calculate the correction term for conformal prediction."""
         # obtain the lowerbound, median, and upperbound
         lb, pred, ub = predictions
@@ -67,133 +68,167 @@ class CP_MDA_TabPFNRegressor:
         if Q_use > 1:
             Q_use = 1
             warnings.warn(
-                "Some masks have very small calibration sets")
+                "Some masks have very small calibration sets",  stacklevel=2)
 
         correction_term = np.quantile(s, Q_use)
         return correction_term
 
-    def split_data(self):
+    def split_data(self,
+        x: pd.DataFrame, 
+        y: np.ndarray
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.DataFrame, pd.DataFrame]:
         """Split data into training and validation sets."""
         # create df with missing data indicator
-        missing_bool_df = self.X.isnull().astype(int)
-        self.X_train, self.X_val, Y_train_arr, Y_val_arr, self.Mask_train, self.Mask_val = train_test_split(
-            self.X, self.Y, missing_bool_df, test_size=self.val_size, random_state = self.seed
+        missing_bool_df = x.isna().astype(int)
+        x_train, x_val, y_train_arr, y_val_arr, mask_train, mask_val = train_test_split(
+            x, y, missing_bool_df, test_size=self.val_size, random_state = self.seed
         )
 
-        # Convert Y arrays back to pandas Series to maintain .iloc functionality
-        self.Y_train = pd.Series(Y_train_arr, index=self.X_train.index)
-        self.Y_val = pd.Series(Y_val_arr, index=self.X_val.index)
+        # Convert y arrays back to pandas Series to maintain .iloc functionality
+        y_train = pd.Series(y_train_arr, index=x_train.index)
+        y_val = pd.Series(y_val_arr, index=x_val.index)
+        
+        return x_train, x_val, y_train, y_val, mask_train, mask_val
 
-    def run_TABPFN(self):
+    def run_TABPFN(self, 
+        x_train: pd.DataFrame, 
+        y_train: pd.Series
+    ) -> TabPFNRegressor:
         """Fit the TabPFN model."""
         # fit model
-        m_fit = TabPFNRegressor()
-        m_fit.fit(self.X_train, self.Y_train)
-        self.model = m_fit
+        model = TabPFNRegressor()
+        model.fit(x_train, y_train)
+        return(model)
 
-    def mask_preprocess(self):
+    def mask_preprocess(
+        self, 
+        mask_val: pd.DataFrame
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Preprocess masks and identify nested relationships."""
         # drop duplicates masks
-        mask_unique = self.Mask_val.drop_duplicates().copy()
+        mask_unique = mask_val.drop_duplicates().copy()
         # add mask id
         mask_unique["mask_id"] = range(1, len(mask_unique) + 1)
         # Get mask columns (all columns except mask_id)
-        mask_cols = [col for col in mask_unique.columns if col != 'mask_id']
+        mask_cols = [col for col in mask_unique.columns if col != "mask_id"]
 
         # Check nesting for all pairs of masks
         results = []
         for i, row_a in mask_unique.iterrows():
             mask_a = row_a[mask_cols].values
-            mask_a_id = row_a['mask_id']
+            mask_a_id = row_a["mask_id"]
             nested_masks = []
 
             for j, row_b in mask_unique.iterrows():
                 if i == j:  # Skip comparing mask with itself
                     continue
                 mask_b = row_b[mask_cols].values
-                mask_b_id = row_b['mask_id']
+                mask_b_id = row_b["mask_id"]
 
                 if ((mask_b == 1) & (mask_a == 0)).sum() == 0:
                     nested_masks.append(mask_b_id)
 
             results.append({
-                'mask_id': mask_a_id,
-                'nested_masks': nested_masks
+                "mask_id": mask_a_id,
+                "nested_masks": nested_masks
             })
 
-        self.mask_unique = mask_unique  
-        self.mask_nested = pd.DataFrame(results)
+        mask_nested = pd.DataFrame(results)
+        return mask_unique, mask_nested
 
-    def create_calibration_sets(self):
+    def create_calibration_sets(
+        self,
+        x_val: pd.DataFrame,
+        y_val: pd.Series,
+        mask_val: pd.DataFrame,
+        mask_unique: pd.DataFrame,
+        mask_nested: pd.DataFrame,
+        model: TabPFNRegressor
+    ) -> tuple[pd.DataFrame, TabPFNRegressor]:
         """Create calibration sets for each mask pattern."""
         # obtain list of columns
-        mask_cols = list(self.Mask_val.columns.values)
+        mask_cols = list(mask_val.columns.values)
 
         # Using merge to add the id of the mask
         # use original index values
-        df_with_ids = self.Mask_val.reset_index().merge(
-            self.mask_unique,  
+        df_with_ids = mask_val.reset_index().merge(
+            mask_unique,  
             on=mask_cols,
-            how='left'
+            how="left"
         )
 
-        for i in self.mask_unique["mask_id"]:
+        for i in mask_unique["mask_id"]:
             # select the nested masks
-            nested_masks = self.mask_nested[self.mask_nested["mask_id"] == i]["nested_masks"].values[0]
+            nested_masks = mask_nested[mask_nested["mask_id"] == i]["nested_masks"].values[0]
             
             # add the mask itself
-            nested_masks_with_self = nested_masks + [i]  # Create new list instead of append
+            nested_masks_with_self = [*nested_masks, i] 
 
             # obtain indexes for the rows
             indexes = df_with_ids[df_with_ids["mask_id"].isin(nested_masks_with_self)]["index"]
 
             # select the validation data based on the indices
-            X_val_nested = self.X_val.loc[indexes]
-            Y_val_nested = self.Y_val.loc[indexes]
+            x_val_nested = x_val.loc[indexes]
+            y_val_nested = y_val.loc[indexes]
 
             # SET ENTIRE COLUMNS TO NaN WHERE THE MASK HAS MISSING VALUES
-            current_mask = self.mask_unique[self.mask_unique["mask_id"] == i][mask_cols].iloc[0]
+            current_mask = mask_unique[mask_unique["mask_id"] == i][mask_cols].iloc[0]
 
             # For each column where the mask indicates missing (value = 1), set entire column to NaN
             for col_idx, col_name in enumerate(mask_cols):
                 if current_mask.iloc[col_idx] == 1:
-                    X_val_nested.loc[:, col_name] = np.nan
+                    x_val_nested.loc[:, col_name] = np.nan
 
             # obtain predictions
-            predictions = self.model.predict(
-                X_val_nested,
+            predictions = model.predict(
+                x_val_nested,
                 output_type="quantiles",
                 quantiles=self.quantiles
             )
 
             # calculate correction term
-            correction_term = self.calc_correction_term(predictions, Y_val_nested, self.alpha)
+            correction_term = self.calc_correction_term(predictions, y_val_nested, self.alpha)
 
             # save the correction term to the mask_unique dataframe
-            self.mask_unique.loc[self.mask_unique["mask_id"] == i, "correction_term"] = correction_term
-            self.mask_unique.loc[self.mask_unique["mask_id"] == i, "val_size"] =  X_val_nested.shape[0]
+            mask_unique.loc[mask_unique["mask_id"] == i, "correction_term"] = correction_term
+            mask_unique.loc[mask_unique["mask_id"] == i, "val_size"] =  x_val_nested.shape[0]
 
-
-        return self.mask_unique, self.model
-
-    def fit(self):
-        """Convenience method to run the entire pipeline"""
-        self.split_data()
-        self.run_TABPFN()
-        self.mask_preprocess()
-        mask_unique, model = self.create_calibration_sets()
 
         return mask_unique, model
 
-class CP_MDA_TabPFNRegressor_newdata:
-    """
-    Compute the correction terms for missing data masks using conformal prediction.
+    def fit(
+        self, 
+        x_train: ArrayLike, 
+        y_train: ArrayLike
+    ) -> tuple[pd.DataFrame, TabPFNRegressor]:
+        """Convenience method to run the entire pipeline
+
+        Parameters:
+            x_train : matrix-like of shape (n_samples, n_predictors)
+
+            y_train : array-like of continuous outcome with shape (n_samples,)
+        """
+
+        # Store and parse the data
+
+        x = pd.DataFrame(x_train)
+        y = y_train
+        
+        # Run trough all the functions
+        x_train, x_val, y_train, y_val, mask_train, mask_val = self.split_data(x, y)
+        model = self.run_TABPFN(x_train, y_train)
+        mask_unique, mask_nested = self.mask_preprocess(mask_val)
+        mask_unique, model = self.create_calibration_sets(
+            x_val, y_val, mask_val, mask_unique, mask_nested, model)
+
+        return mask_unique, model
+
+class CPMDATabPFNRegressorNewData:
+    """Compute the correction terms for missing data masks using conformal prediction.
 
     Parameters:
 
     TabPFN: Fitted TabPFNRegressor model.
-
-    X_new : matrix-like of shape (n_samples, n_predictors)
 
     quantiles : array with three arguments denoting the quantiles of interest used
                 in fitting the model. The default is [0.05, 0.5, 0.95].
@@ -207,55 +242,76 @@ class CP_MDA_TabPFNRegressor_newdata:
 
     """
 
-    def __init__(self,TabPFN, X_new, quantiles, calibration_results):
-        self.TabPFN = TabPFN
-        self.X = pd.DataFrame(X_new)
+    def __init__(
+        self, 
+        tabpfn: TabPFNRegressor, 
+        quantiles: list[float], 
+        calibration_results: pd.DataFrame
+    ) -> None:
+        self.tabpfn = tabpfn
         self.quantiles = quantiles
         self.calibration_results = calibration_results
 
-    def obtain_preds(self):
+    def obtain_preds(self, 
+        x: pd.DataFrame) -> np.ndarray:
         """Obtain predictions from fitted model."""
-        preds_test = self.TabPFN.predict(
-            self.X,
+        preds = self.tabpfn.predict(
+            x,
             output_type="quantiles",
             quantiles=self.quantiles
         )
-        self.preds_test = preds_test
+        return preds
 
-    def match_mask(self):
+    def match_mask(self,
+        x: pd.DataFrame) -> pd.DataFrame:
         """Add correction terms to the new masks from the test set."""
-        mask_test = self.X.isnull().astype(int)
+        mask_test = x.isna().astype(int)
         mask_cols = list(mask_test.columns.values)
 
         mask_test_cor = mask_test.merge(
                 self.calibration_results,
                 on=mask_cols,
-                how='left'
+                how="left"
             )
 
         # check if there are masks in the test set that are not in the calibration set
-        new_masks = mask_test_cor[mask_test_cor["correction_term"].isnull()][mask_cols]
+        new_masks = mask_test_cor[mask_test_cor["correction_term"].isna()][mask_cols]
 
         if new_masks.shape[0] > 0:
             warnings.warn(
                 "The following masks are not in the calibration set:\n"
                 f"{new_masks.to_string()}\n"
-                "The baseline quantile estimates will be returned for those cases."
+                "The baseline quantile estimates will be returned for those cases.",  stacklevel=2
             )
 
-        self.mask_test_cor = mask_test_cor
+        return mask_test_cor
 
-    def perform_correction(self):
+    def perform_correction(
+        self, 
+        preds: np.ndarray, 
+        mask_test_cor: pd.DataFrame
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Apply correction terms to the prediction intervals."""
-        preds_test = self.preds_test.copy()
-        lb_corr = preds_test[0] - self.mask_test_cor["correction_term"].values
-        ub_corr = preds_test[2] + self.mask_test_cor["correction_term"].values
 
-        return lb_corr, preds_test[1], ub_corr, preds_test[0], preds_test[2]
+        lb_corr = preds[0] - mask_test_cor["correction_term"].values
+        ub_corr = preds[2] + mask_test_cor["correction_term"].values
 
-    def fit(self):
-        """Convenience method to run the entire pipeline"""
-        self.obtain_preds()
-        self.match_mask()
-        CP_results =  self.perform_correction()
-        return CP_results
+        return lb_corr, preds[1], ub_corr, preds[0], preds[2]
+
+    def predict(
+        self, 
+        x_new: ArrayLike
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Convenience method to run the entire pipeline
+           Parameters:
+
+            x_new : matrix-like of shape (n_samples, n_predictors)
+        """
+
+        x = pd.DataFrame(x_new)
+
+        preds = self.obtain_preds(x)
+        mask_test_cor = self.match_mask(x)
+        cp_results = self.perform_correction(preds, mask_test_cor)
+
+        return cp_results

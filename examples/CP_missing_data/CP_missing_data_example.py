@@ -12,14 +12,9 @@ import numpy as np
 import pandas as pd
 import warnings
 
-try:
-    # Try standard TabPFN package first
-    from tabpfn import TabPFNRegressor
-except ImportError:
-    # Fall back to TabPFN client
-    from tabpfn_client import  TabPFNRegressor
+from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 
-from tabpfn_extensions.CP_missing_data import CP_MDA_TabPFNRegressor, CP_MDA_TabPFNRegressor_newdata
+from tabpfn_extensions.cp_missing_data import CPMDATabPFNRegressor, CPMDATabPFNRegressorNewData
 
 # generate some data
 np.random.seed(42)  # For reproducibility
@@ -36,13 +31,13 @@ print("\nUnique patterns:")
 print(unique_patterns)
 
 # Use TabPFN+CP-MDA
-model = CP_MDA_TabPFNRegressor(X, Y, quantiles=[0.05, 0.5, 0.95], val_size=0.5, seed = 123)
-calibration_results, model_fit = model.fit()
+model = CPMDATabPFNRegressor(quantiles=[0.05, 0.5, 0.95], val_size=0.5, seed = 123)
+calibration_results, model_fit = model.fit(X, Y)
 print(calibration_results)
 
 # Apply the model to new cases 
-cp_apply = CP_MDA_TabPFNRegressor_newdata(model_fit, X_new = X, quantiles=[0.05, 0.5, 0.95], calibration_results=calibration_results)
-CP_results = cp_apply.fit()
+cp_apply = CPMDATabPFNRegressorNewData(model_fit, quantiles=[0.05, 0.5, 0.95], calibration_results=calibration_results)
+CP_results = cp_apply.predict(X)
 
 print("\nConformal prediction results:")
 print(f"Lower bound (corrected): {CP_results[0][:5]}")  # Show first 5
