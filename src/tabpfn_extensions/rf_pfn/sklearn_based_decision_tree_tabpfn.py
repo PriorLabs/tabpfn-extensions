@@ -82,7 +82,8 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
     max_features : Union[int, float, str, None]
         The number of features to consider when looking for the best split.
     random_state : Union[int, np.random.RandomState, None]
-        Controls the randomness of the estimator.
+        Controls the randomness of the estimator. When the random_state is not None, provided
+        random_state will overrides TabPFN random_state.
     max_leaf_nodes : Optional[int]
         If not None, grow a tree with max_leaf_nodes in best-first fashion.
     min_impurity_decrease : float
@@ -101,8 +102,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         Whether to show progress bars for leaf/node fitting using TabPFN.
     fit_nodes : bool
         Whether to fit TabPFN at internal nodes (True) or only final leaves (False).
-    tree_seed : int
-        Used to set seeds for TabPFN fitting in each node.
     adaptive_tree : bool
         Whether to do adaptive node-by-node pruning using a hold-out strategy.
     adaptive_tree_min_train_samples : int
@@ -147,7 +146,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         verbose: bool | int = False,
         show_progress: bool = False,
         fit_nodes: bool = True,
-        tree_seed: int = 0,
         adaptive_tree: bool = True,
         adaptive_tree_min_train_samples: int = 50,
         adaptive_tree_max_train_samples: int = 2000,
@@ -166,7 +164,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         self.min_samples_leaf = min_samples_leaf
         self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
-        self.random_state = random_state
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
         self.class_weight = class_weight
@@ -177,7 +174,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         self.verbose = verbose
         self.show_progress = show_progress
         self.fit_nodes = fit_nodes
-        self.tree_seed = tree_seed
         self.adaptive_tree = adaptive_tree
         self.adaptive_tree_min_train_samples = adaptive_tree_min_train_samples
         self.adaptive_tree_max_train_samples = adaptive_tree_max_train_samples
@@ -198,6 +194,10 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         if BaseDecisionTree.__init__.__code__.co_varnames.__contains__("monotonic_cst"):
             optional_args_filtered["monotonic_cst"] = monotonic_cst
 
+        self.random_state = random_state
+        if self.random_state is not None:
+            self.tabpfn.random_state = random_state
+
         # Initialize the underlying DecisionTree
         super().__init__(
             criterion=self.criterion,
@@ -214,10 +214,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             **optional_args_filtered,
         )
 
-        # If the user gave a TabPFN, we do not want it to have a random_state forcibly set
-        # because we handle seeds ourselves at each node
-        if self.tabpfn is not None:
-            self.tabpfn.random_state = None
 
     def _validate_tabpfn_runtime(self) -> None:
         """Validate the TabPFN instance at runtime before using it.
@@ -308,10 +304,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
 
         # Make sure tabpfn is valid
         self._validate_tabpfn_runtime()
-
-        # Possibly randomize tree_seed if not set
-        if self.tree_seed == 0:
-            self.tree_seed = random.randint(1, 10000)
 
         sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float64)
         X, y = validate_data(
@@ -1158,10 +1150,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
             y_eval_prob[indices, classes_in_leaf[0]] = 1.0
             return y_eval_prob
 
-        # Otherwise, fit TabPFN
-        leaf_seed = leaf_id + self.tree_seed
         try:
-            self.tabpfn.random_state = leaf_seed
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
             # Handle pandas DataFrame or numpy array
@@ -1269,7 +1258,6 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         verbose=False,
         show_progress=False,
         fit_nodes=True,
-        tree_seed=0,
         adaptive_tree=True,
         adaptive_tree_min_train_samples=50,
         adaptive_tree_max_train_samples=2000,
@@ -1298,7 +1286,6 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
             verbose=verbose,
             show_progress=show_progress,
             fit_nodes=fit_nodes,
-            tree_seed=tree_seed,
             adaptive_tree=adaptive_tree,
             adaptive_tree_min_train_samples=adaptive_tree_min_train_samples,
             adaptive_tree_max_train_samples=adaptive_tree_max_train_samples,
@@ -1373,10 +1360,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
             y_eval[indices] = y_train_leaf[0]
             return y_eval
 
-        # Fit TabPFNRegressor
-        leaf_seed = leaf_id + self.tree_seed
         try:
-            self.tabpfn.random_state = leaf_seed
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
             # Handle pandas DataFrame or numpy array

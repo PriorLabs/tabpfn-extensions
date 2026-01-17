@@ -11,6 +11,7 @@ import time
 import numpy as np
 import torch
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.utils import check_random_state
 from sklearn.utils.multiclass import unique_labels
 from tabpfn_common_utils.telemetry import set_extension
 
@@ -145,12 +146,11 @@ class RandomForestTabPFNBase:
 
         # Initialize estimators list
         self.estimators_ = []
-
+        rng = check_random_state(self.random_state)
         # Generate bootstrapped datasets and fit trees
         for i in range(n_estimators):
             # Clone the base estimator
             tree = self.init_base_estimator()
-
             # Bootstrap sample if requested (like in RandomForest)
             if self.bootstrap:
                 n_samples = X.shape[0]
@@ -169,7 +169,7 @@ class RandomForestTabPFNBase:
                 )
 
                 # Generate random indices for bootstrapping
-                indices = np.random.choice(
+                indices = rng.choice(
                     n_samples,
                     size=sample_size,
                     replace=True,
