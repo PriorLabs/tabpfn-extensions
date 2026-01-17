@@ -51,7 +51,7 @@ class TestRandomForestClassifier(BaseClassifierTests):
         - Same random_state produces identical decision paths
         - Different random_state produces different decision paths
         """
-        X_iris, y_iris = load_digits(return_X_y=True)
+        X_digits, y_digits = load_digits(return_X_y=True)
 
         rf_clf_1 = RandomForestTabPFNClassifier(
             tabpfn=tabpfn_classifier,
@@ -72,11 +72,11 @@ class TestRandomForestClassifier(BaseClassifierTests):
             random_state=123,
         )
 
-        rf_clf_1.fit(X_iris, y_iris)
-        rf_clf_2.fit(X_iris, y_iris)
-        rf_clf_3.fit(X_iris, y_iris)
+        rf_clf_1.fit(X_digits, y_digits)
+        rf_clf_2.fit(X_digits, y_digits)
+        rf_clf_3.fit(X_digits, y_digits)
 
-        test_random_descision_path(X_iris, y_iris, rf_clf_1, rf_clf_2, rf_clf_3)
+        test_random_decision_path(X_digits, y_digits, rf_clf_1, rf_clf_2, rf_clf_3)
 
 
 class TestRandomForestRegressor(BaseRegressorTests):
@@ -145,10 +145,10 @@ class TestRandomForestRegressor(BaseRegressorTests):
         rf_reg_2.fit(X_diabetes, y_diabetes)
         rf_reg_3.fit(X_diabetes, y_diabetes)
 
-        test_random_descision_path(X_diabetes, y_diabetes, rf_reg_1, rf_reg_2, rf_reg_3)
+        test_random_decision_path(X_diabetes, y_diabetes, rf_reg_1, rf_reg_2, rf_reg_3)
 
 
-def test_random_descision_path(
+def test_random_decision_path(
     X, y, estimator_same_seed_1, estimator_same_seed_2, estimator_diff_seed
 ):
     # Get decision paths for both instances with same random_state
