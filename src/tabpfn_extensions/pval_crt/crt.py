@@ -1,24 +1,37 @@
+from __future__ import annotations
+
 import numpy as np
 import torch
+
+from typing import Any, Dict, Optional
 from sklearn.model_selection import train_test_split
-from tabpfn import TabPFNRegressor, TabPFNClassifier
+
+try:
+    from tabpfn import TabPFNRegressor, TabPFNClassifier
+except ImportError as err:
+    raise ImportError(
+        "pval_crt requires the full TabPFN package and does not support "
+        "the tabpfn-client backend."
+    ) from err
+
 from tabpfn.constants import ModelVersion
 
 from .utils import is_categorical, logp_from_full_output, logp_from_proba
 
 def tabpfn_crt(
-    X,
-    y,
-    j,
+    X: np.ndarray,
+    y: np.ndarray,
+    j: int,
     *,
-    B=200,
-    alpha=0.05,
-    test_size=0.2,
-    seed=0,
-    device=None,
-    K=100,
-    max_unique_cat=10,
-):
+    B: int = 200,
+    alpha: float = 0.05,
+    test_size: float = 0.2,
+    seed: int = 0,
+    device: Optional[str] = None,
+    K: int = 100,
+    max_unique_cat: int = 10,
+) -> Dict[str, Any]:
+
     """
     Conditional Randomization Test (CRT) using TabPFN as a fixed predictive model.
 
