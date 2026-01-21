@@ -111,7 +111,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
     adaptive_tree_min_valid_samples_fraction_of_train : float
         Fraction controlling the minimum valid/test points to consider a node for re-fitting.
     adaptive_tree_overwrite_metric : Optional[str]
-        If set, override the default metric for pruning. E.g., "roc" or "rmse".
+        If set, overrides the default metric for pruning. E.g., "roc" or "rmse".
     adaptive_tree_test_size : float
         Fraction of data to hold out for adaptive pruning if no separate valid set is provided.
     average_logits : bool
