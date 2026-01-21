@@ -83,7 +83,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         The number of features to consider when looking for the best split.
     random_state : Union[int, np.random.RandomState, None]
         Controls the randomness of the estimator. When the random_state is not None, provided
-        random_state will overrides TabPFN random_state.
+        random_state will override TabPFN random_state.
     max_leaf_nodes : Optional[int]
         If not None, grow a tree with max_leaf_nodes in best-first fashion.
     min_impurity_decrease : float
