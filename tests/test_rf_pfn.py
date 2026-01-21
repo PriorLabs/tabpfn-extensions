@@ -151,19 +151,29 @@ class TestRandomForestRegressor(BaseRegressorTests):
 def test_random_decision_path(
     X, y, estimator_same_seed_1, estimator_same_seed_2, estimator_diff_seed
 ):
-    # Get decision paths for both instances with same random_state
-    decision_path_1 = estimator_same_seed_1.estimators_[0].decision_path(X)
-    decision_path_2 = estimator_same_seed_2.estimators_[0].decision_path(X)
+    """Test that random_state properly controls decision paths across all estimators.
 
-    # Assert same random_state produces same decision paths
-    assert (
-        decision_path_1.toarray() == decision_path_2.toarray()
-    ).all(), "Same random_state should produce identical decision paths"
+    This test verifies:
+    1. Same random_state produces identical decision paths for all estimators
+    2. Different random_state produces different decision paths for all estimators
+    """
+    n_estimators = len(estimator_same_seed_1.estimators_)
 
-    # Get decision path for estimator with different random_state
-    decision_path_3 = estimator_diff_seed.estimators_[0].decision_path(X)
+    # Check all estimators
+    for i in range(n_estimators):
+        # Get decision paths for both instances with same random_state
+        decision_path_1 = estimator_same_seed_1.estimators_[i].decision_path(X)
+        decision_path_2 = estimator_same_seed_2.estimators_[i].decision_path(X)
 
-    # Assert different random_state produces different decision paths
-    assert not (
-        decision_path_1.toarray() == decision_path_3.toarray()
-    ).all(), "Different random_state should produce different decision paths"
+        # Assert same random_state produces same decision paths for each estimator
+        assert (
+            decision_path_1.toarray() == decision_path_2.toarray()
+        ).all(), f"Same random_state should produce identical decision paths for estimator {i}"
+
+        # Get decision path for estimator with different random_state
+        decision_path_3 = estimator_diff_seed.estimators_[i].decision_path(X)
+
+        # Assert different random_state produces different decision paths for each estimator
+        assert not (
+            decision_path_1.toarray() == decision_path_3.toarray()
+        ).all(), f"Different random_state should produce different decision paths for estimator {i}"

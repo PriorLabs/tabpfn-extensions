@@ -370,12 +370,15 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
         Returns:
             A new DecisionTreeTabPFNClassifier instance
         """
+        random_state = check_random_state(self.random_state)
+        estimator_random_state = random_state.randint(np.iinfo(np.int32).max)
+
         return DecisionTreeTabPFNClassifier(
             tabpfn=self.tabpfn,
             min_samples_split=self.min_samples_split,
             min_samples_leaf=self.min_samples_leaf,
             max_features=self.max_features,
-            random_state=self.random_state,
+            random_state=estimator_random_state,
             categorical_features=self.categorical_features,
             max_depth=self.max_depth,
             show_progress=self.show_progress,
@@ -641,12 +644,15 @@ class RandomForestTabPFNRegressor(RandomForestTabPFNBase, RandomForestRegressor)
         Returns:
             A new DecisionTreeTabPFNRegressor instance
         """
+        random_state = check_random_state(self.random_state)
+        estimator_random_state = random_state.randint(np.iinfo(np.int32).max)
+
         return DecisionTreeTabPFNRegressor(
             tabpfn=self.tabpfn,
             min_samples_split=self.min_samples_split,
             min_samples_leaf=self.min_samples_leaf,
             max_features=self.max_features,
-            random_state=self.random_state,
+            random_state=estimator_random_state,
             categorical_features=self.categorical_features,
             max_depth=self.max_depth,
             show_progress=self.show_progress,
