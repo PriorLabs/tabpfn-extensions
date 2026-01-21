@@ -11,7 +11,7 @@ from typing_extensions import override
 import numpy as np
 import pytest
 import torch
-from sklearn.datasets import load_diabetes, load_digits
+from sklearn.datasets import make_classification, make_regression
 
 from tabpfn_extensions.rf_pfn.sklearn_based_random_forest_tabpfn import (
     RandomForestTabPFNClassifier,
@@ -51,7 +51,7 @@ class TestRandomForestClassifier(BaseClassifierTests):
         - Same random_state produces identical decision paths
         - Different random_state produces different decision paths
         """
-        X_digits, y_digits = load_digits(return_X_y=True)
+        X, Y = make_classification(n_samples = 5000,n_features=500, n_redundant=0, random_state=1)
 
         rf_clf_1 = RandomForestTabPFNClassifier(
             tabpfn=tabpfn_classifier,
@@ -69,14 +69,17 @@ class TestRandomForestClassifier(BaseClassifierTests):
             tabpfn=tabpfn_classifier,
             n_estimators=2,
             max_depth=3,
-            random_state=123,
+            random_state=12,
         )
 
-        rf_clf_1.fit(X_digits, y_digits)
-        rf_clf_2.fit(X_digits, y_digits)
-        rf_clf_3.fit(X_digits, y_digits)
+        rf_clf_1.fit(X, Y)
+        rf_clf_2.fit(X, Y)
+        rf_clf_3.fit(X, Y)
 
-        test_random_decision_path(X_digits, y_digits, rf_clf_1, rf_clf_2, rf_clf_3)
+        check_random_decision_path(X, Y, rf_clf_1, rf_clf_2, rf_clf_3)
+        assert_tree_path(rf_clf_1, X)
+        assert_tree_path(rf_clf_2, X)
+        assert_tree_path(rf_clf_3, X)
 
 
 class TestRandomForestRegressor(BaseRegressorTests):
@@ -119,8 +122,7 @@ class TestRandomForestRegressor(BaseRegressorTests):
         - Same random_state produces identical decision paths
         - Different random_state produces different decision paths
         """
-
-        X_diabetes, y_diabetes = load_diabetes(return_X_y=True)
+        X, Y = make_regression(n_samples = 5000,n_features=500, random_state=1)
 
         rf_reg_1 = RandomForestTabPFNRegressor(
             tabpfn=tabpfn_regressor,
@@ -138,17 +140,20 @@ class TestRandomForestRegressor(BaseRegressorTests):
             tabpfn=tabpfn_regressor,
             n_estimators=2,
             max_depth=3,
-            random_state=123,
+            random_state=29,
         )
 
-        rf_reg_1.fit(X_diabetes, y_diabetes)
-        rf_reg_2.fit(X_diabetes, y_diabetes)
-        rf_reg_3.fit(X_diabetes, y_diabetes)
+        rf_reg_1.fit(X, Y)
+        rf_reg_2.fit(X, Y)
+        rf_reg_3.fit(X, Y)
 
-        test_random_decision_path(X_diabetes, y_diabetes, rf_reg_1, rf_reg_2, rf_reg_3)
+        check_random_decision_path(X, Y, rf_reg_1, rf_reg_2, rf_reg_3)
+        assert_tree_path(rf_reg_1, X)
+        assert_tree_path(rf_reg_2, X)
+        assert_tree_path(rf_reg_3, X)
 
 
-def test_random_decision_path(
+def check_random_decision_path(
     X, y, estimator_same_seed_1, estimator_same_seed_2, estimator_diff_seed
 ):
     """Test that random_state properly controls decision paths across all estimators.
@@ -174,6 +179,38 @@ def test_random_decision_path(
         decision_path_3 = estimator_diff_seed.estimators_[i].decision_path(X)
 
         # Assert different random_state produces different decision paths for each estimator
-        assert not (
-            decision_path_1.toarray() == decision_path_3.toarray()
-        ).all(), f"Different random_state should produce different decision paths for estimator {i}"
+        assert not equal_decision_path(decision_path_1, decision_path_3)
+
+
+def assert_tree_path(rf_clf, X):
+    """Test that each estimator in a random forest has different decision paths.
+
+    Since each tree now receives a deterministically different random seed,
+    they should produce different tree structures and thus different decision paths.
+
+    Parameters
+    ----------
+    rf_clf : RandomForestTabPFNClassifier or RandomForestTabPFNRegressor
+        A fitted random forest estimator with multiple estimators.
+    X : array-like
+        The input samples to compute decision paths for.
+    """
+    # Collect all decision paths
+    decision_paths = [
+        rf_clf.estimators_[i].decision_path(X).toarray()
+        for i in range(len(rf_clf.estimators_))
+    ]
+
+    # Verify all pairs of estimators have different decision paths
+    for i in range(len(decision_paths)):
+        for j in range(i + 1, len(decision_paths)):
+            assert not equal_decision_path(decision_paths[i], decision_paths[j])
+
+def equal_decision_path(path_a, path_b):
+    # valid possibilites:
+    # - decision path with different shape. It implicitly means different decision
+    #   path
+    # - decision path with same shape should have different decision path
+    if (len(path_a.shape) != len(path_b.shape)) or (path_a.shape != path_b.shape):
+        return False
+    return np.array_equal(path_a, path_b)
