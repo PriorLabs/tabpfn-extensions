@@ -112,8 +112,10 @@ class RandomForestTabPFNBase:
         """
         # Validate tabpfn parameter
         self._validate_tabpfn()
+        rng = check_random_state(self.random_state)
+        estimator_random_state = rng.randint(np.iinfo(np.int32).max)
 
-        self.estimator = self.init_base_estimator()
+        self.estimator = self.init_base_estimator(estimator_random_state)
         self.X = X
         self.n_estimators = self.get_n_estimators(X)
 
@@ -146,11 +148,12 @@ class RandomForestTabPFNBase:
 
         # Initialize estimators list
         self.estimators_ = []
-        rng = check_random_state(self.random_state)
+       
         # Generate bootstrapped datasets and fit trees
         for i in range(n_estimators):
+            estimator_random_state = rng.randint(np.iinfo(np.int32).max)
             # Clone the base estimator
-            tree = self.init_base_estimator()
+            tree = self.init_base_estimator(estimator_random_state)
             # Bootstrap sample if requested (like in RandomForest)
             if self.bootstrap:
                 n_samples = X.shape[0]
@@ -364,21 +367,18 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
             tags.estimator_type = "regressor"
         return tags
 
-    def init_base_estimator(self):
+    def init_base_estimator(self, random_state):
         """Initialize a base decision tree estimator.
 
         Returns:
             A new DecisionTreeTabPFNClassifier instance
         """
-        random_state = check_random_state(self.random_state)
-        estimator_random_state = random_state.randint(np.iinfo(np.int32).max)
-
         return DecisionTreeTabPFNClassifier(
             tabpfn=self.tabpfn,
             min_samples_split=self.min_samples_split,
             min_samples_leaf=self.min_samples_leaf,
             max_features=self.max_features,
-            random_state=estimator_random_state,
+            random_state=random_state,
             categorical_features=self.categorical_features,
             max_depth=self.max_depth,
             show_progress=self.show_progress,
@@ -638,21 +638,18 @@ class RandomForestTabPFNRegressor(RandomForestTabPFNBase, RandomForestRegressor)
         self.max_predict_time = max_predict_time
         self.rf_average_logits = rf_average_logits
 
-    def init_base_estimator(self):
+    def init_base_estimator(self, random_state):
         """Initialize a base decision tree estimator.
 
         Returns:
             A new DecisionTreeTabPFNRegressor instance
         """
-        random_state = check_random_state(self.random_state)
-        estimator_random_state = random_state.randint(np.iinfo(np.int32).max)
-
         return DecisionTreeTabPFNRegressor(
             tabpfn=self.tabpfn,
             min_samples_split=self.min_samples_split,
             min_samples_leaf=self.min_samples_leaf,
             max_features=self.max_features,
-            random_state=estimator_random_state,
+            random_state=random_state,
             categorical_features=self.categorical_features,
             max_depth=self.max_depth,
             show_progress=self.show_progress,

@@ -81,6 +81,9 @@ class TestRandomForestClassifier(BaseClassifierTests):
         assert_tree_path(rf_clf_2, X)
         assert_tree_path(rf_clf_3, X)
 
+        # Check that all estimators' tabpfn random_state are equal for the same random seed
+        assert_tabpfn_random_state_equal(rf_clf_1, rf_clf_2)
+
 
 class TestRandomForestRegressor(BaseRegressorTests):
     """Test RandomForestTabPFNRegressor using the BaseRegressorTests framework."""
@@ -152,6 +155,9 @@ class TestRandomForestRegressor(BaseRegressorTests):
         assert_tree_path(rf_reg_2, X)
         assert_tree_path(rf_reg_3, X)
 
+        # Check that all estimators' tabpfn random_state are equal for the same random seed
+        assert_tabpfn_random_state_equal(rf_reg_1, rf_reg_2)
+
 
 def check_random_decision_path(
     X, y, estimator_same_seed_1, estimator_same_seed_2, estimator_diff_seed
@@ -214,3 +220,27 @@ def equal_decision_path(path_a, path_b):
     if (len(path_a.shape) != len(path_b.shape)) or (path_a.shape != path_b.shape):
         return False
     return np.array_equal(path_a, path_b)
+
+
+def assert_tabpfn_random_state_equal(rf_clf_1, rf_clf_2):
+    """Verify that all estimators' tabpfn random_state are equal for the same random seed.
+
+    This checks that when two RandomForestTabPFN models are initialized with the same
+    random_state, their corresponding estimators have the same tabpfn random_state.
+
+    Parameters
+    ----------
+    rf_clf_1, rf_clf_2 : RandomForestTabPFNClassifier or RandomForestTabPFNRegressor
+        Two fitted random forest estimators with the same random_state.
+    """
+    n_estimators = len(rf_clf_1.estimators_)
+    assert n_estimators == len(rf_clf_2.estimators_), \
+        "Both forests should have the same number of estimators"
+
+    for i in range(n_estimators):
+        rs_1 = rf_clf_1.estimators_[i].tabpfn.random_state
+        rs_2 = rf_clf_2.estimators_[i].tabpfn.random_state
+
+        assert rs_1 == rs_2, \
+            f"Estimator {i} tabpfn random_state mismatch: {rs_1} != {rs_2}. " \
+            "All estimators should have the same tabpfn random_state for the same random seed."

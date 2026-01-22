@@ -36,6 +36,7 @@ from tabpfn_extensions.scoring.scoring_utils import (
     score_regression,
 )
 from tabpfn_extensions.utils import softmax
+from sklearn.utils import check_random_state
 
 ###############################################################################
 #                             BASE DECISION TREE                              #
@@ -195,8 +196,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             optional_args_filtered["monotonic_cst"] = monotonic_cst
 
         self.random_state = random_state
-        if self.random_state is not None:
-            self.tabpfn.random_state = random_state
 
         # Initialize the underlying DecisionTree
         super().__init__(
@@ -213,7 +212,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             ccp_alpha=self.ccp_alpha,
             **optional_args_filtered,
         )
-
 
     def _validate_tabpfn_runtime(self) -> None:
         """Validate the TabPFN instance at runtime before using it.
@@ -1149,8 +1147,9 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
         if len(classes_in_leaf) == 1:
             y_eval_prob[indices, classes_in_leaf[0]] = 1.0
             return y_eval_prob
-
+        leaf_seed = leaf_id + self.random_state
         try:
+            self.tabpfn.random_state = leaf_seed
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
             # Handle pandas DataFrame or numpy array
@@ -1359,8 +1358,9 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         if np.all(y_train_leaf == y_train_leaf[0]):
             y_eval[indices] = y_train_leaf[0]
             return y_eval
-
+        leaf_seed = leaf_id + self.random_state
         try:
+            self.tabpfn.random_state = leaf_seed
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
             # Handle pandas DataFrame or numpy array
