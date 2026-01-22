@@ -51,7 +51,9 @@ class TestRandomForestClassifier(BaseClassifierTests):
         - Same random_state produces identical decision paths
         - Different random_state produces different decision paths
         """
-        X, Y = make_classification(n_samples = 5000,n_features=500, n_redundant=0, random_state=1)
+        X, Y = make_classification(
+            n_samples=5000, n_features=500, n_redundant=0, random_state=1
+        )
 
         rf_clf_1 = RandomForestTabPFNClassifier(
             tabpfn=tabpfn_classifier,
@@ -125,7 +127,7 @@ class TestRandomForestRegressor(BaseRegressorTests):
         - Same random_state produces identical decision paths
         - Different random_state produces different decision paths
         """
-        X, Y = make_regression(n_samples = 5000,n_features=500, random_state=1)
+        X, Y = make_regression(n_samples=5000, n_features=500, random_state=1)
 
         rf_reg_1 = RandomForestTabPFNRegressor(
             tabpfn=tabpfn_regressor,
@@ -177,9 +179,9 @@ def check_random_decision_path(
         decision_path_2 = estimator_same_seed_2.estimators_[i].decision_path(X)
 
         # Assert same random_state produces same decision paths for each estimator
-        assert (
-            decision_path_1.toarray() == decision_path_2.toarray()
-        ).all(), f"Same random_state should produce identical decision paths for estimator {i}"
+        assert (decision_path_1.toarray() == decision_path_2.toarray()).all(), (
+            f"Same random_state should produce identical decision paths for estimator {i}"
+        )
 
         # Get decision path for estimator with different random_state
         decision_path_3 = estimator_diff_seed.estimators_[i].decision_path(X)
@@ -212,6 +214,7 @@ def assert_tree_path(rf_clf, X):
         for j in range(i + 1, len(decision_paths)):
             assert not equal_decision_path(decision_paths[i], decision_paths[j])
 
+
 def equal_decision_path(path_a, path_b):
     # valid possibilites:
     # - decision path with different shape. It implicitly means different decision
@@ -219,7 +222,9 @@ def equal_decision_path(path_a, path_b):
     # - decision path with same shape should have different decision path
     if (len(path_a.shape) != len(path_b.shape)) or (path_a.shape != path_b.shape):
         return False
-    return np.array_equal(path_a, path_b)
+    path_a_dense = path_a.toarray() if hasattr(path_a, "toarray") else path_a
+    path_b_dense = path_b.toarray() if hasattr(path_b, "toarray") else path_b
+    return np.array_equal(path_a_dense, path_b_dense)
 
 
 def assert_tabpfn_random_state_equal(rf_clf_1, rf_clf_2):
@@ -234,13 +239,15 @@ def assert_tabpfn_random_state_equal(rf_clf_1, rf_clf_2):
         Two fitted random forest estimators with the same random_state.
     """
     n_estimators = len(rf_clf_1.estimators_)
-    assert n_estimators == len(rf_clf_2.estimators_), \
+    assert n_estimators == len(rf_clf_2.estimators_), (
         "Both forests should have the same number of estimators"
+    )
 
     for i in range(n_estimators):
         rs_1 = rf_clf_1.estimators_[i].tabpfn.random_state
         rs_2 = rf_clf_2.estimators_[i].tabpfn.random_state
 
-        assert rs_1 == rs_2, \
-            f"Estimator {i} tabpfn random_state mismatch: {rs_1} != {rs_2}. " \
+        assert rs_1 == rs_2, (
+            f"Estimator {i} tabpfn random_state mismatch: {rs_1} != {rs_2}. "
             "All estimators should have the same tabpfn random_state for the same random seed."
+        )
