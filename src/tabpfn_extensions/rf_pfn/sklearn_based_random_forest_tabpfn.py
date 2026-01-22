@@ -148,7 +148,7 @@ class RandomForestTabPFNBase:
 
         # Initialize estimators list
         self.estimators_ = []
-       
+        
         # Generate bootstrapped datasets and fit trees
         for i in range(n_estimators):
             estimator_random_state = rng.randint(np.iinfo(np.int32).max)
@@ -367,7 +367,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
             tags.estimator_type = "regressor"
         return tags
 
-    def init_base_estimator(self, random_state):
+    def init_base_estimator(self,random_state):
         """Initialize a base decision tree estimator.
 
         Returns:

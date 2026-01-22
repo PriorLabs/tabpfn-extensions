@@ -36,7 +36,6 @@ from tabpfn_extensions.scoring.scoring_utils import (
     score_regression,
 )
 from tabpfn_extensions.utils import softmax
-from sklearn.utils import check_random_state
 
 ###############################################################################
 #                             BASE DECISION TREE                              #
@@ -83,8 +82,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
     max_features : Union[int, float, str, None]
         The number of features to consider when looking for the best split.
     random_state : Union[int, np.random.RandomState, None]
-        Controls the randomness of the estimator. When the random_state is not None, provided
-        random_state will override TabPFN random_state.
+        Controls the randomness of the estimator.
     max_leaf_nodes : Optional[int]
         If not None, grow a tree with max_leaf_nodes in best-first fashion.
     min_impurity_decrease : float
@@ -165,6 +163,7 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         self.min_samples_leaf = min_samples_leaf
         self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
+        self.random_state = random_state
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
         self.class_weight = class_weight
@@ -195,8 +194,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         if BaseDecisionTree.__init__.__code__.co_varnames.__contains__("monotonic_cst"):
             optional_args_filtered["monotonic_cst"] = monotonic_cst
 
-        self.random_state = random_state
-
         # Initialize the underlying DecisionTree
         super().__init__(
             criterion=self.criterion,
@@ -212,6 +209,11 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             ccp_alpha=self.ccp_alpha,
             **optional_args_filtered,
         )
+
+        # If the user gave a TabPFN, we do not want it to have a random_state forcibly set
+        # because we handle seeds ourselves at each node
+        if self.tabpfn is not None:
+            self.tabpfn.random_state = None
 
     def _validate_tabpfn_runtime(self) -> None:
         """Validate the TabPFN instance at runtime before using it.
@@ -1147,6 +1149,8 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
         if len(classes_in_leaf) == 1:
             y_eval_prob[indices, classes_in_leaf[0]] = 1.0
             return y_eval_prob
+
+        # Otherwise, fit TabPFN
         leaf_seed = leaf_id + self.random_state
         try:
             self.tabpfn.random_state = leaf_seed
@@ -1358,6 +1362,8 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         if np.all(y_train_leaf == y_train_leaf[0]):
             y_eval[indices] = y_train_leaf[0]
             return y_eval
+
+        # Fit TabPFNRegressor
         leaf_seed = leaf_id + self.random_state
         try:
             self.tabpfn.random_state = leaf_seed
