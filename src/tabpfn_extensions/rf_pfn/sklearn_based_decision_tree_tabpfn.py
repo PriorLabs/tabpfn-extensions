@@ -1151,8 +1151,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
         # Otherwise, fit TabPFN
         leaf_seed = leaf_id + self.tree_seed
         try:
-            if leaf_seed is not None:
-                self.tabpfn.random_state = leaf_seed
+            self.tabpfn.random_state = leaf_seed
 
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
@@ -1366,8 +1365,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         # Fit TabPFNRegressor
         leaf_seed = leaf_id + self.tree_seed
         try:
-            if leaf_seed is not None:
-                self.tabpfn.random_state = leaf_seed
+            self.tabpfn.random_state = leaf_seed
 
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
