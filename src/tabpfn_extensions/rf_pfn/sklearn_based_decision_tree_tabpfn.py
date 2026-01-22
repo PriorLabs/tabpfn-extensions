@@ -210,11 +210,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             **optional_args_filtered,
         )
 
-        # If the user gave a TabPFN, we do not want it to have a random_state forcibly set
-        # because we handle seeds ourselves at each node
-        if self.tabpfn is not None:
-            self.tabpfn.random_state = None
-
     def _validate_tabpfn_runtime(self) -> None:
         """Validate the TabPFN instance at runtime before using it.
 
@@ -1150,10 +1145,14 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
             y_eval_prob[indices, classes_in_leaf[0]] = 1.0
             return y_eval_prob
 
+        leaf_seed = None
         # Otherwise, fit TabPFN
-        leaf_seed = leaf_id + self.random_state
+        if self.random_state is not None:
+            leaf_seed = leaf_id + self.random_state
         try:
-            self.tabpfn.random_state = leaf_seed
+            if leaf_seed is not None:
+                self.tabpfn.random_state = leaf_seed
+
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
             # Handle pandas DataFrame or numpy array
