@@ -148,7 +148,7 @@ class RandomForestTabPFNBase:
 
         # Initialize estimators list
         self.estimators_ = []
-        
+
         # Generate bootstrapped datasets and fit trees
         for i in range(n_estimators):
             estimator_random_state = rng.randint(np.iinfo(np.int32).max)
