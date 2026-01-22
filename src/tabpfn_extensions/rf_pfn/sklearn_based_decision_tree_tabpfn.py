@@ -23,6 +23,7 @@ from sklearn.tree import (
     DecisionTreeClassifier,
     DecisionTreeRegressor,
 )
+from sklearn.utils import check_random_state
 from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import (
     _check_sample_weight,
@@ -174,6 +175,8 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         self.verbose = verbose
         self.show_progress = show_progress
         self.fit_nodes = fit_nodes
+        random_state = check_random_state(self.random_state)
+        self.tree_seed = random_state.randint(np.iinfo(np.int32).max)
         self.adaptive_tree = adaptive_tree
         self.adaptive_tree_min_train_samples = adaptive_tree_min_train_samples
         self.adaptive_tree_max_train_samples = adaptive_tree_max_train_samples
@@ -1145,10 +1148,8 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
             y_eval_prob[indices, classes_in_leaf[0]] = 1.0
             return y_eval_prob
 
-        leaf_seed = None
         # Otherwise, fit TabPFN
-        if self.random_state is not None:
-            leaf_seed = leaf_id + self.random_state
+        leaf_seed = leaf_id + self.tree_seed
         try:
             if leaf_seed is not None:
                 self.tabpfn.random_state = leaf_seed
@@ -1363,9 +1364,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
             return y_eval
 
         # Fit TabPFNRegressor
-        leaf_seed= None
-        if self.random_state is not None:
-            leaf_seed = leaf_id + self.random_state
+        leaf_seed = leaf_id + self.tree_seed
         try:
             if leaf_seed is not None:
                 self.tabpfn.random_state = leaf_seed
