@@ -1363,9 +1363,13 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
             return y_eval
 
         # Fit TabPFNRegressor
-        leaf_seed = leaf_id + self.random_state
+        leaf_seed= None
+        if self.random_state is not None:
+            leaf_seed = leaf_id + self.random_state
         try:
-            self.tabpfn.random_state = leaf_seed
+            if leaf_seed is not None:
+                self.tabpfn.random_state = leaf_seed
+
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
             # Handle pandas DataFrame or numpy array
