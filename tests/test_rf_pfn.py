@@ -212,11 +212,8 @@ def assert_tree_path(rf_clf, X):
 
 
 def equal_decision_path(path_a, path_b):
-    # valid possibilites:
-    # - decision path with different shape. It implicitly means different decision
-    #   path
-    # - decision path with same shape should have different decision path
-    if (len(path_a.shape) != len(path_b.shape)) or (path_a.shape != path_b.shape):
+    # Helper function to compare two decision paths for equality.
+    if path_a.shape != path_b.shape:
         return False
     path_a_dense = path_a.toarray() if hasattr(path_a, "toarray") else path_a
     path_b_dense = path_b.toarray() if hasattr(path_b, "toarray") else path_b
