@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import random
 import warnings
 
 # For type checking only
@@ -23,6 +22,7 @@ from sklearn.tree import (
     DecisionTreeClassifier,
     DecisionTreeRegressor,
 )
+from sklearn.utils import check_random_state
 from sklearn.utils.multiclass import unique_labels
 from sklearn.utils.validation import (
     _check_sample_weight,
@@ -101,8 +101,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         Whether to show progress bars for leaf/node fitting using TabPFN.
     fit_nodes : bool
         Whether to fit TabPFN at internal nodes (True) or only final leaves (False).
-    tree_seed : int
-        Used to set seeds for TabPFN fitting in each node.
     adaptive_tree : bool
         Whether to do adaptive node-by-node pruning using a hold-out strategy.
     adaptive_tree_min_train_samples : int
@@ -147,7 +145,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         verbose: bool | int = False,
         show_progress: bool = False,
         fit_nodes: bool = True,
-        tree_seed: int = 0,
         adaptive_tree: bool = True,
         adaptive_tree_min_train_samples: int = 50,
         adaptive_tree_max_train_samples: int = 2000,
@@ -177,7 +174,8 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
         self.verbose = verbose
         self.show_progress = show_progress
         self.fit_nodes = fit_nodes
-        self.tree_seed = tree_seed
+        random_state = check_random_state(self.random_state)
+        self.tree_seed = random_state.randint(np.iinfo(np.int32).max)
         self.adaptive_tree = adaptive_tree
         self.adaptive_tree_min_train_samples = adaptive_tree_min_train_samples
         self.adaptive_tree_max_train_samples = adaptive_tree_max_train_samples
@@ -213,11 +211,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
             ccp_alpha=self.ccp_alpha,
             **optional_args_filtered,
         )
-
-        # If the user gave a TabPFN, we do not want it to have a random_state forcibly set
-        # because we handle seeds ourselves at each node
-        if self.tabpfn is not None:
-            self.tabpfn.random_state = None
 
     def _validate_tabpfn_runtime(self) -> None:
         """Validate the TabPFN instance at runtime before using it.
@@ -308,10 +301,6 @@ class DecisionTreeTabPFNBase(BaseDecisionTree, BaseEstimator):
 
         # Make sure tabpfn is valid
         self._validate_tabpfn_runtime()
-
-        # Possibly randomize tree_seed if not set
-        if self.tree_seed == 0:
-            self.tree_seed = random.randint(1, 10000)
 
         sample_weight = _check_sample_weight(sample_weight, X, dtype=np.float64)
         X, y = validate_data(
@@ -1162,6 +1151,7 @@ class DecisionTreeTabPFNClassifier(DecisionTreeTabPFNBase, ClassifierMixin):
         leaf_seed = leaf_id + self.tree_seed
         try:
             self.tabpfn.random_state = leaf_seed
+
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
             # Handle pandas DataFrame or numpy array
@@ -1269,7 +1259,6 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         verbose=False,
         show_progress=False,
         fit_nodes=True,
-        tree_seed=0,
         adaptive_tree=True,
         adaptive_tree_min_train_samples=50,
         adaptive_tree_max_train_samples=2000,
@@ -1298,7 +1287,6 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
             verbose=verbose,
             show_progress=show_progress,
             fit_nodes=fit_nodes,
-            tree_seed=tree_seed,
             adaptive_tree=adaptive_tree,
             adaptive_tree_min_train_samples=adaptive_tree_min_train_samples,
             adaptive_tree_max_train_samples=adaptive_tree_max_train_samples,
@@ -1377,6 +1365,7 @@ class DecisionTreeTabPFNRegressor(DecisionTreeTabPFNBase, RegressorMixin):
         leaf_seed = leaf_id + self.tree_seed
         try:
             self.tabpfn.random_state = leaf_seed
+
             self.tabpfn.fit(X_train_leaf, y_train_leaf)
 
             # Handle pandas DataFrame or numpy array
