@@ -158,7 +158,7 @@ class TestRandomForestRegressor(BaseRegressorTests):
 
 
 def check_random_decision_path(
-    X, y, estimator_same_seed_1, estimator_same_seed_2, estimator_diff_seed
+    X, estimator_same_seed_1, estimator_same_seed_2, estimator_diff_seed
 ):
     """Test that random_state properly controls decision paths across all estimators.
 

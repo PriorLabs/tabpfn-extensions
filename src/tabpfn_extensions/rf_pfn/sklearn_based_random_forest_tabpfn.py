@@ -367,7 +367,7 @@ class RandomForestTabPFNClassifier(RandomForestTabPFNBase, RandomForestClassifie
             tags.estimator_type = "regressor"
         return tags
 
-    def init_base_estimator(self,random_state):
+    def init_base_estimator(self, random_state):
         """Initialize a base decision tree estimator.
 
         Returns:
