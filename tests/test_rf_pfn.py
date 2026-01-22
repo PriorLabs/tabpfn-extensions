@@ -78,11 +78,10 @@ class TestRandomForestClassifier(BaseClassifierTests):
         rf_clf_2.fit(X, Y)
         rf_clf_3.fit(X, Y)
 
-        check_random_decision_path(X, Y, rf_clf_1, rf_clf_2, rf_clf_3)
+        check_random_decision_path(X, rf_clf_1, rf_clf_2, rf_clf_3)
         assert_tree_path(rf_clf_1, X)
         assert_tree_path(rf_clf_2, X)
         assert_tree_path(rf_clf_3, X)
-
 
 
 class TestRandomForestRegressor(BaseRegressorTests):
@@ -150,11 +149,10 @@ class TestRandomForestRegressor(BaseRegressorTests):
         rf_reg_2.fit(X, Y)
         rf_reg_3.fit(X, Y)
 
-        check_random_decision_path(X, Y, rf_reg_1, rf_reg_2, rf_reg_3)
+        check_random_decision_path(X, rf_reg_1, rf_reg_2, rf_reg_3)
         assert_tree_path(rf_reg_1, X)
         assert_tree_path(rf_reg_2, X)
         assert_tree_path(rf_reg_3, X)
-
 
 
 def check_random_decision_path(
@@ -175,15 +173,16 @@ def check_random_decision_path(
         decision_path_2 = estimator_same_seed_2.estimators_[i].decision_path(X)
 
         # Assert same random_state produces same decision paths for each estimator
-        assert (decision_path_1.toarray() == decision_path_2.toarray()).all(), (
-            f"Same random_state should produce identical decision paths for estimator {i}"
-        )
+        assert safe_sparse_equal(
+            decision_path_1, decision_path_2
+        ), f"Same random_state should produce identical decision paths for estimator {i}"
 
         # Get decision path for estimator with different random_state
         decision_path_3 = estimator_diff_seed.estimators_[i].decision_path(X)
-
         # Assert different random_state produces different decision paths for each estimator
-        assert not equal_decision_path(decision_path_1, decision_path_3)
+        assert not safe_sparse_equal(
+            decision_path_1, decision_path_3
+        ), f"Same random_state should produce different decision paths for estimator {i}"
 
 
 def assert_tree_path(rf_clf, X):
@@ -201,20 +200,18 @@ def assert_tree_path(rf_clf, X):
     """
     # Collect all decision paths
     decision_paths = [
-        rf_clf.estimators_[i].decision_path(X).toarray()
-        for i in range(len(rf_clf.estimators_))
+        rf_clf.estimators_[i].decision_path(X) for i in range(len(rf_clf.estimators_))
     ]
 
     # Verify all pairs of estimators have different decision paths
     for i in range(len(decision_paths)):
         for j in range(i + 1, len(decision_paths)):
-            assert not equal_decision_path(decision_paths[i], decision_paths[j])
+            assert not safe_sparse_equal(decision_paths[i], decision_paths[j])
 
 
-def equal_decision_path(path_a, path_b):
-    # Helper function to compare two decision paths for equality.
-    if path_a.shape != path_b.shape:
+def safe_sparse_equal(a, b):
+    # sparse array of different shape returns bool instead of sparse array.
+    # This utility function handles all the cases for the safe sparse matrix comparison
+    if a.shape != b.shape:
         return False
-    path_a_dense = path_a.toarray() if hasattr(path_a, "toarray") else path_a
-    path_b_dense = path_b.toarray() if hasattr(path_b, "toarray") else path_b
-    return np.array_equal(path_a_dense, path_b_dense)
+    return (a != b).nnz == 0
