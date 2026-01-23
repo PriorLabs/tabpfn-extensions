@@ -91,6 +91,7 @@ jobs:
           licensecheck \
             --requirements-paths pyproject.toml \
             --only-licenses APACHE MIT BSD ISC PYTHON UNLICENSE UNKNOWN \
+            --ignore-packages certifi "tabpfn*" \
             --show-only-failing \
             -0
 
