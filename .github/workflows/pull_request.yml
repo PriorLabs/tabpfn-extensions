@@ -84,6 +84,14 @@ jobs:
           fi
         shell: bash
 
+      - name: Check for forbidden licenses
+        run: |
+          licensecheck \
+            --requirements-paths pyproject.toml \
+            --only-licenses APACHE MIT BSD ISC PYTHON UNLICENSE UNKNOWN \
+            --show-only-failing \
+            -0
+
       - name: Run Tests (Unix)
         if: runner.os != 'Windows'
         env:
