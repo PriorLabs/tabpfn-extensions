@@ -86,7 +86,8 @@ jobs:
 
       - name: Check for forbidden licenses
         run: |
-          uv run licensecheck \
+          source .venv/bin/activate
+          licensecheck \
             --requirements-paths pyproject.toml \
             --only-licenses APACHE MIT BSD ISC PYTHON UNLICENSE UNKNOWN \
             --show-only-failing \
