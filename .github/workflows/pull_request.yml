@@ -78,11 +78,23 @@ jobs:
           # we don't install all dev dependencies here for speed
           uv pip install --system -r requirements.txt
           uv pip install --system pytest psutil
+          # licensecheck is required for license checking
+          uv pip install --system licensecheck
           # onnx is not supported on python 3.13 yet https://github.com/onnx/onnx/issues/6339
           if [[ "${{ matrix.python-version }}" != "3.13" ]]; then
             uv pip install --system onnx
           fi
         shell: bash
+
+      - name: Check for forbidden licenses
+        if: runner.os == 'MacOS' && matrix.python-version == '3.9'
+        run: |
+          licensecheck \
+            --requirements-paths pyproject.toml \
+            --only-licenses APACHE MIT BSD ISC PYTHON UNLICENSE UNKNOWN \
+            --ignore-packages certifi "tabpfn*" \
+            --show-only-failing \
+            -0
 
       - name: Run Tests (Unix)
         if: runner.os != 'Windows'
