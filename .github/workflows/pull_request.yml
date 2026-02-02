@@ -99,7 +99,7 @@ jobs:
 
       # Download all models fails, if there is a missing model that can't be downloaded.
       - name: Download models from Hugging Face
-        run: uv run --no-sync python scripts/download_all_models.py
+        run: python scripts/download_all_models.py
 
       - name: Save model cache
         uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
