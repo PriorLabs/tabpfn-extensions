@@ -86,6 +86,28 @@ jobs:
           fi
         shell: bash
 
+      - name: Restore model cache
+        id: restore-model-cache
+        uses: actions/cache/restore@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        with:
+          path: ${{ github.workspace }}/model_cache
+          # This cache read will always fail as the model_cache directory is empty.
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          restore-keys: |
+            model-cache-
+          enableCrossOsArchive: true
+
+      # Download all models fails, if there is a missing model that can't be downloaded.
+      - name: Download models from Hugging Face
+        run: uv run --no-sync python scripts/download_all_models.py
+
+      - name: Save model cache
+        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true
+
       - name: Check for forbidden licenses
         if: runner.os == 'MacOS' && matrix.python-version == '3.9'
         run: |
@@ -99,15 +121,12 @@ jobs:
       - name: Run Tests (Unix)
         if: runner.os != 'Windows'
         env:
-          TABPFN_EXCLUDE_DEVICES: "mps"
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TABPFN_EXCLUDE_DEVICES: mps
         run: |
           FAST_TEST_MODE=1 pytest tests/
 
       - name: Run Tests (Windows)
         if: runner.os == 'Windows'
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           $env:FAST_TEST_MODE = 1
           pytest tests/
