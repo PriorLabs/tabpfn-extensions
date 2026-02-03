@@ -15,7 +15,12 @@ from pathlib import Path
 from hyperopt import hp
 from tabpfn_common_utils.telemetry import set_extension
 
-from tabpfn.model_loading import ModelSource, ModelVersion, download_model
+from tabpfn.model_loading import (
+    ModelSource,
+    ModelVersion,
+    download_model,
+    get_cache_dir,
+)
 
 
 def enumerate_preprocess_transforms():
@@ -79,7 +84,8 @@ def get_param_grid_hyperopt(
         task_type: Either "multiclass" or "regression"
         model_version: Version of the TabPFN model to use.
         model_dir: Directory to store or look for TabPFN model checkpoints.
-            If None, defaults to "hpo_models" directory next to this file.
+            If None, uses the TABPFN_MODEL_CACHE_DIR environment variable if set,
+            otherwise defaults to the tabpfn library's cache directory.
         download_models_if_missing: Whether to download model checkpoints if they
             are not found in the specified model directory.
 
@@ -135,7 +141,7 @@ def get_param_grid_hyperopt(
     }
 
     if model_dir is None:
-        model_dir = (Path(__file__).parent / "hpo_models").resolve()
+        model_dir = get_cache_dir()
 
     if task_type == "multiclass" and model_version == ModelVersion.V2:
         model_source = ModelSource.get_classifier_v2()
