@@ -7,40 +7,38 @@ for different missing data patterns in the input features.
 from __future__ import annotations
 
 import warnings
-from typing import Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-from numpy.typing import ArrayLike
 from sklearn.model_selection import train_test_split
 
 from tabpfn_extensions.utils import TabPFNRegressor
+
+if TYPE_CHECKING:
+    from numpy.typing import ArrayLike
+
 
 class CPMDATabPFNRegressor:
     """Compute the correction terms for missing data masks using conformal prediction.
 
     Parameters:
-
         quantiles : array with three arguments denoting the quantiles of interest.
             The default is [0.05, 0.5, 0.95], where the first indicates the lower bound,
             the second the median, and the third the upper bound.
-
         val_size : float between 0 and 1, indicating the size of the validation set
             as a fraction of the training data.
 
-
     Returns:
-     mask_unique: DataFrame with the correction terms for each mask.
-
-     model: Fitted TabPFNRegressor model.
-
+        mask_unique: DataFrame with the correction terms for each mask.
+        model: Fitted TabPFNRegressor model.
     """
 
     def __init__(
-        self, 
-        quantiles: list[float], 
-        val_size: float, 
-        seed: Optional[int] = None
+        self,
+        quantiles: list[float],
+        val_size: float,
+        seed: int | None = None
     ) -> None:
         self.quantiles = quantiles
         self.val_size = val_size
@@ -49,8 +47,8 @@ class CPMDATabPFNRegressor:
 
     def calc_correction_term(
         self,
-        predictions: tuple[np.ndarray, np.ndarray, np.ndarray], 
-        y_val: pd.Series, 
+        predictions: tuple[np.ndarray, np.ndarray, np.ndarray],
+        y_val: pd.Series,
         alpha: float
     ) -> float:
         """Calculate the correction term for conformal prediction."""
@@ -74,7 +72,7 @@ class CPMDATabPFNRegressor:
         return correction_term
 
     def split_data(self,
-        x: pd.DataFrame, 
+        x: pd.DataFrame,
         y: np.ndarray
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.DataFrame, pd.DataFrame]:
         """Split data into training and validation sets."""
@@ -87,11 +85,11 @@ class CPMDATabPFNRegressor:
         # Convert y arrays back to pandas Series to maintain .iloc functionality
         y_train = pd.Series(y_train_arr, index=x_train.index)
         y_val = pd.Series(y_val_arr, index=x_val.index)
-        
+
         return x_train, x_val, y_train, y_val, mask_train, mask_val
 
-    def run_TABPFN(self, 
-        x_train: pd.DataFrame, 
+    def run_TABPFN(self,
+        x_train: pd.DataFrame,
         y_train: pd.Series
     ) -> TabPFNRegressor:
         """Fit the TabPFN model."""
@@ -101,7 +99,7 @@ class CPMDATabPFNRegressor:
         return(model)
 
     def mask_preprocess(
-        self, 
+        self,
         mask_val: pd.DataFrame
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Preprocess masks and identify nested relationships."""
@@ -152,7 +150,7 @@ class CPMDATabPFNRegressor:
         # Using merge to add the id of the mask
         # use original index values
         df_with_ids = mask_val.reset_index().merge(
-            mask_unique,  
+            mask_unique,
             on=mask_cols,
             how="left"
         )
@@ -160,9 +158,9 @@ class CPMDATabPFNRegressor:
         for i in mask_unique["mask_id"]:
             # select the nested masks
             nested_masks = mask_nested[mask_nested["mask_id"] == i]["nested_masks"].values[0]
-            
+
             # add the mask itself
-            nested_masks_with_self = [*nested_masks, i] 
+            nested_masks_with_self = [*nested_masks, i]
 
             # obtain indexes for the rows
             indexes = df_with_ids[df_with_ids["mask_id"].isin(nested_masks_with_self)]["index"]
@@ -193,27 +191,23 @@ class CPMDATabPFNRegressor:
             mask_unique.loc[mask_unique["mask_id"] == i, "correction_term"] = correction_term
             mask_unique.loc[mask_unique["mask_id"] == i, "val_size"] =  x_val_nested.shape[0]
 
-
         return mask_unique, model
 
     def fit(
-        self, 
-        x_train: ArrayLike, 
+        self,
+        x_train: ArrayLike,
         y_train: ArrayLike
     ) -> tuple[pd.DataFrame, TabPFNRegressor]:
-        """Convenience method to run the entire pipeline
+        """Convenience method to run the entire pipeline.
 
         Parameters:
             x_train : matrix-like of shape (n_samples, n_predictors)
-
             y_train : array-like of continuous outcome with shape (n_samples,)
         """
-
         # Store and parse the data
-
         x = pd.DataFrame(x_train)
         y = y_train
-        
+
         # Run trough all the functions
         x_train, x_val, y_train, y_val, mask_train, mask_val = self.split_data(x, y)
         model = self.run_TABPFN(x_train, y_train)
@@ -223,36 +217,28 @@ class CPMDATabPFNRegressor:
 
         return mask_unique, model
 
+
 class CPMDATabPFNRegressorNewData:
     """Compute the correction terms for missing data masks using conformal prediction.
 
     Parameters:
-
-    TabPFN: Fitted TabPFNRegressor model.
-
-    quantiles : array with three arguments denoting the quantiles of interest used
-                in fitting the model. The default is [0.05, 0.5, 0.95].
-
-    calibration_results : matrix with the correction terms for each mask.
-
-
-    Returns:
-     CP_results: DataFrame with shape (n_samples, 5). Included are the corrected lower bound,
-     prediction, corrected upper bound, non-corrected lower bound, and non-corrected upper bound.
-
+        tabpfn : Fitted TabPFNRegressor model.
+        quantiles : Array with three arguments denoting the quantiles of interest used
+            in fitting the model. The default is [0.05, 0.5, 0.95].
+        calibration_results : Matrix with the correction terms for each mask.
     """
 
     def __init__(
-        self, 
-        tabpfn: TabPFNRegressor, 
-        quantiles: list[float], 
+        self,
+        tabpfn: TabPFNRegressor,
+        quantiles: list[float],
         calibration_results: pd.DataFrame
     ) -> None:
         self.tabpfn = tabpfn
         self.quantiles = quantiles
         self.calibration_results = calibration_results
 
-    def obtain_preds(self, 
+    def obtain_preds(self,
         x: pd.DataFrame) -> np.ndarray:
         """Obtain predictions from fitted model."""
         preds = self.tabpfn.predict(
@@ -287,27 +273,25 @@ class CPMDATabPFNRegressorNewData:
         return mask_test_cor
 
     def perform_correction(
-        self, 
-        preds: np.ndarray, 
+        self,
+        preds: np.ndarray,
         mask_test_cor: pd.DataFrame
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Apply correction terms to the prediction intervals."""
-
         lb_corr = preds[0] - mask_test_cor["correction_term"].values
         ub_corr = preds[2] + mask_test_cor["correction_term"].values
 
         return lb_corr, preds[1], ub_corr, preds[0], preds[2]
 
     def predict(
-        self, 
+        self,
         x_new: ArrayLike
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Convenience method to run the entire pipeline
-           Parameters:
+        """Convenience method to run the entire pipeline.
 
+        Parameters:
             x_new : matrix-like of shape (n_samples, n_predictors)
         """
-
         x = pd.DataFrame(x_new)
 
         preds = self.obtain_preds(x)
