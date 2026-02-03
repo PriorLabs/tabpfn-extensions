@@ -106,13 +106,6 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python scripts/download_all_models.py
 
-      - name: Save model cache
-        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
-        with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          enableCrossOsArchive: true
-
       - name: Check for forbidden licenses
         if: runner.os == 'MacOS' && matrix.python-version == '3.9'
         run: |
@@ -135,3 +128,11 @@ jobs:
         run: |
           $env:FAST_TEST_MODE = 1
           pytest tests/
+
+      - name: Save model cache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true

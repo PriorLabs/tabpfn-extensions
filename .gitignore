@@ -141,8 +141,12 @@ sftp_freiburg.json
 # Model files
 *.ckpt
 /src/tabpfn_extensions/hpo/hpo_models/
+TabPFNModels
 
 # Temporary files
 *.py.new
 commit_messages.txt
+
+# claude files
 CLAUDE.md
+.claude/*.local.*
