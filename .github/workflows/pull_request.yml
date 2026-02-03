@@ -102,6 +102,8 @@ jobs:
 
       # Download all models fails, if there is a missing model that can't be downloaded.
       - name: Download models from Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python scripts/download_all_models.py
 
       - name: Save model cache
