@@ -54,6 +54,9 @@ jobs:
             dependency-set: maximum
     runs-on: ${{ matrix.os }}
 
+    env:
+      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
@@ -78,24 +81,57 @@ jobs:
           # we don't install all dev dependencies here for speed
           uv pip install --system -r requirements.txt
           uv pip install --system pytest psutil
+          # licensecheck is required for license checking
+          uv pip install --system licensecheck
           # onnx is not supported on python 3.13 yet https://github.com/onnx/onnx/issues/6339
           if [[ "${{ matrix.python-version }}" != "3.13" ]]; then
             uv pip install --system onnx
           fi
         shell: bash
 
+      - name: Restore model cache
+        id: restore-model-cache
+        uses: actions/cache/restore@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        with:
+          path: ${{ github.workspace }}/model_cache
+          # This cache read will always fail as the model_cache directory is empty.
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          restore-keys: |
+            model-cache-
+          enableCrossOsArchive: true
+
+      # Download all models fails, if there is a missing model that can't be downloaded.
+      - name: Download models from Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: python scripts/download_all_models.py
+
+      - name: Save model cache
+        uses: actions/cache/save@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true
+
+      - name: Check for forbidden licenses
+        if: runner.os == 'MacOS' && matrix.python-version == '3.9'
+        run: |
+          licensecheck \
+            --requirements-paths pyproject.toml \
+            --only-licenses APACHE MIT BSD ISC PYTHON UNLICENSE UNKNOWN \
+            --ignore-packages certifi "tabpfn*" \
+            --show-only-failing \
+            -0
+
       - name: Run Tests (Unix)
         if: runner.os != 'Windows'
         env:
-          TABPFN_EXCLUDE_DEVICES: "mps"
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TABPFN_EXCLUDE_DEVICES: mps
         run: |
           FAST_TEST_MODE=1 pytest tests/
 
       - name: Run Tests (Windows)
         if: runner.os == 'Windows'
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           $env:FAST_TEST_MODE = 1
           pytest tests/
