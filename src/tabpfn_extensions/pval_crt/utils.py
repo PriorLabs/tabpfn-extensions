@@ -75,7 +75,7 @@ def is_categorical(arr, max_unique=10):
     """
     arr = np.asarray(arr)
     uniq = np.unique(arr[~np.isnan(arr)])
-    return len(uniq) < max_unique
+    return len(uniq) <= max_unique
 
 
 def logp_from_full_output(full_out, y_np):
