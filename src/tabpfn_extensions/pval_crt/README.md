@@ -1,13 +1,13 @@
 # TabPFN-CRT
 
-This provides functionality for performing feature-level hypothesis testing
-with foundation models using a Conditional Randomization Test (CRT).
+This repository provides functionality for feature-level hypothesis testing
+using foundation models via the Conditional Randomization Test (CRT).
+
 The implementation treats TabPFN as a fixed predictive model and uses its predictive
 log-likelihood to construct a valid test statistic.
 
 The goal is to bridge modern foundation models with classical confirmatory inference,
 particularly in settings where p-values and formal hypothesis tests are required.
-
 
 ----------------------------------------------------------------------
 Motivation
@@ -22,10 +22,23 @@ Many scientific disciplines still require:
 - explicit null hypotheses
 - interpretable feature relevance decisions
 
-This repository demonstrates how Conditional Randomization Testing (CRT) can be combined
-with TabPFN outputs to provide valid feature-level inference without retraining or
-modifying the underlying model.
+----------------------------------------------------------------------
+When Should You Use TabPFN-CRT?
+----------------------------------------------------------------------
 
+Use TabPFN-CRT when you want to test whether a specific feature
+provides predictive information about the target beyond other
+covariates, while still using a strong foundation model.
+
+For example, this can be useful when:
+
+• validating whether a scientific variable is truly predictive  
+• auditing black-box model feature importance  
+• performing feature selection with statistically valid p-values  
+• working in regulated or high-stakes settings requiring hypothesis tests
+
+Unlike heuristic importance measures (e.g., permutation importance or SHAP),
+TabPFN-CRT provides formal hypothesis testing with calibrated p-values.
 
 ----------------------------------------------------------------------
 Method Overview
@@ -45,46 +58,11 @@ Crucially:
 - No Bayesian correctness or uncertainty calibration is assumed
 - Validity relies on the CRT framework, not on TabPFN being probabilistically correct
 
-
-----------------------------------------------------------------------
-Empirical Validation
-----------------------------------------------------------------------
-
-We provide preliminary empirical results illustrating the calibration
-properties of the TabPFN-based Conditional Randomization Test.
-
-![CRT null p-value QQ plot](paper/qq.png)
-
-**Figure 1.** QQ plot of empirical CRT p-values under the null hypothesis
-against the Uniform(0,1) distribution. Approximate alignment with the
-diagonal indicates proper Type I error control.
-
-![CRT p-value calibration](paper/ROC.png)
-
-**Figure 2.** Empirical CDFs of CRT p-values for relevant and irrelevant
-features. P-values for irrelevant features are approximately uniform,
-while relevant features exhibit strong left-skew, indicating power.
-
-These results are intended as sanity checks rather than exhaustive
-benchmarks. Theoretical validity of the procedure follows from the CRT
-framework; empirical performance depends on the quality of the
-conditional model for X_j | X_-j.
-
-----------------------------------------------------------------------
-Scope and Limitations
-----------------------------------------------------------------------
-
-- This is research code, not a production library
-- The categorical/continuous distinction is heuristic
-- Validity depends on how well X_j | X_-j is approximated
-- Intended for methodological exploration, not automated large-scale testing
-
-
 ----------------------------------------------------------------------
 Basic Usage
 ----------------------------------------------------------------------
 
-Example:
+Example 1 — Test a single feature by index:
 
     from tabpfn_extensions.pval_crt import tabpfn_crt
 
@@ -98,12 +76,45 @@ Example:
 
     print(result["p_value"], result["reject_null"])
 
-Returned values include:
+
+Example 2 — Test a single feature by name (when X is a DataFrame):
+
+    result = tabpfn_crt(
+        X,
+        y,
+        j="age",
+    )
+
+    print(result["p_value"])
+
+
+Example 3 — Test multiple features simultaneously:
+
+    results = tabpfn_crt(
+        X,
+        y,
+        j=["age", "income", "education"],
+    )
+
+    for feature, res in results.items():
+        print(feature, res["p_value"])
+
+
+Returned values
+---------------
+
+Single feature testing returns a dictionary containing:
+
 - p_value
 - reject_null
 - observed test statistic
 - null distribution
 - feature and model metadata
+
+Multiple feature testing returns:
+
+- dict[feature → result dictionary]
+
 
 ----------------------------------------------------------------------
 Relation to Prior Work
