@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Union
 
 import numpy as np
 import pandas as pd
 import torch
 
-FeatureSpec = int | str
+FeatureSpec = Union[int, str]
 
 def coerce_X_y_to_numpy(
     X: Any,
