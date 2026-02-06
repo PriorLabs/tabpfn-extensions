@@ -1,18 +1,19 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any
+
 import numpy as np
-import torch
 import pandas as pd
+import torch
 
-from typing import Any, Optional, Sequence, Tuple, Union
-
-FeatureSpec = Union[int, str]
+FeatureSpec = int | str
 
 def coerce_X_y_to_numpy(
     X: Any,
     y: Any,
-) -> Tuple[np.ndarray, np.ndarray, Optional[Sequence[str]]]:
-    """
-    Convert X and y to numpy arrays while preserving feature names if X is a DataFrame.
-    """
+) -> tuple[np.ndarray, np.ndarray, Sequence[str] | None]:
+    """Convert X and y to numpy arrays while preserving feature names if X is a DataFrame."""
     feature_names = None
 
     if pd is not None and isinstance(X, pd.DataFrame):
@@ -30,12 +31,10 @@ def coerce_X_y_to_numpy(
 
 def resolve_feature_index(
     j: FeatureSpec,
-    feature_names: Optional[Sequence[str]],
+    feature_names: Sequence[str] | None,
     n_features: int,
-) -> Tuple[int, Optional[str]]:
-    """
-    Resolve feature identifier j into integer index and optional name.
-    """
+) -> tuple[int, str | None]:
+    """Resolve feature identifier j into integer index and optional name."""
     if isinstance(j, int):
         if j < 0 or j >= n_features:
             raise IndexError(
@@ -58,8 +57,7 @@ def resolve_feature_index(
     raise TypeError("j must be int or str.")
 
 def is_categorical(arr, max_unique=10):
-    """
-    Heuristic to determine whether a variable should be treated as categorical.
+    """Heuristic to determine whether a variable should be treated as categorical.
 
     Parameters
     ----------
@@ -68,7 +66,7 @@ def is_categorical(arr, max_unique=10):
     max_unique : int
         Maximum number of unique values for categorical treatment.
 
-    Returns
+    Returns:
     -------
     bool
         True if categorical, False otherwise.
@@ -79,8 +77,7 @@ def is_categorical(arr, max_unique=10):
 
 
 def logp_from_full_output(full_out, y_np):
-    """
-    Extract log predictive density from TabPFN 'full' prediction output.
+    """Extract log predictive density from TabPFN 'full' prediction output.
 
     Parameters
     ----------
@@ -89,7 +86,7 @@ def logp_from_full_output(full_out, y_np):
     y_np : array-like
         Ground-truth targets.
 
-    Returns
+    Returns:
     -------
     np.ndarray
         Log predictive density for each observation.
@@ -108,8 +105,7 @@ def logp_from_full_output(full_out, y_np):
 
 
 def logp_from_proba(probs, y_true, classes):
-    """
-    Compute log p(y_true | x) from class probabilities.
+    """Compute log p(y_true | x) from class probabilities.
 
     probs: shape (n, C)
     y_true: shape (n,)

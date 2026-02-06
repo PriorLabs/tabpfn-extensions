@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any
+
 import numpy as np
 import torch
-
-from typing import Any, Dict, Optional, Union, Sequence
 from sklearn.model_selection import train_test_split
 
 try:
-    from tabpfn import TabPFNRegressor, TabPFNClassifier
+    from tabpfn import TabPFNClassifier, TabPFNRegressor
 except ImportError as err:
     raise ImportError(
         "pval_crt requires the full TabPFN package and does not support "
@@ -15,25 +16,31 @@ except ImportError as err:
     ) from err
 
 from tabpfn.constants import ModelVersion
-from .utils import is_categorical, logp_from_full_output, logp_from_proba, coerce_X_y_to_numpy, resolve_feature_index
+
+from .utils import (
+    coerce_X_y_to_numpy,
+    is_categorical,
+    logp_from_full_output,
+    logp_from_proba,
+    resolve_feature_index,
+)
+
 
 def tabpfn_crt(
     X: Any,
     y: Any,
-    j: Union[int, str, Sequence[Union[int, str]]],
+    j: int | str | Sequence[int | str],
     *,
     B: int = 200,
     alpha: float = 0.05,
     test_size: float = 0.2,
     seed: int = 0,
-    device: Optional[str] = None,
+    device: str | None = None,
     K: int = 100,
     max_unique_cat: int = 10,
     model_version: ModelVersion = ModelVersion.V2,
-) -> Union[Dict[str, Any], Dict[Union[int, str], Dict[str, Any]]]:
-
-    """
-    Conditional Randomization Test (CRT) using TabPFN.
+) -> dict[str, Any] | dict[int | str, dict[str, Any]]:
+    """Conditional Randomization Test (CRT) using TabPFN.
 
     This function tests whether one or more features contain predictive
     information about the target variable y beyond the remaining covariates.
@@ -57,12 +64,11 @@ def tabpfn_crt(
         • single feature testing
         • batch feature testing
 
-    Returns
+    Returns:
     -------
-    Single feature → result dict  
+    Single feature → result dict
     Multiple features → dict[feature → result dict]
     """
-
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -70,7 +76,7 @@ def tabpfn_crt(
     # Input normalization
     # ---------------------------
     X_np, y_np, feature_names = coerce_X_y_to_numpy(X, y)
-    
+
     # ---------------------------
     # Train / evaluation split
     # ---------------------------
@@ -114,7 +120,7 @@ def tabpfn_crt(
     # Observed T_obs
     # ---------------------------
     T_obs_global = np.mean(logp_plus)
-    
+
     # ---------------------------
     # Multi-feature support
     # ---------------------------
@@ -190,8 +196,7 @@ def _tabpfn_crt_single(
     seed,
     model_version,
 ):
-    """
-    Execute the Conditional Randomization Test (CRT) for a single feature.
+    """Execute the Conditional Randomization Test (CRT) for a single feature.
 
     This helper assumes that the main CRT preparation steps have already
     been completed, including:
@@ -254,7 +259,7 @@ def _tabpfn_crt_single(
         Base random seed used to generate feature-specific reproducible
         CRT resampling streams.
 
-    Returns
+    Returns:
     -------
     dict
         Dictionary containing CRT results for the tested feature, including:
@@ -286,7 +291,7 @@ def _tabpfn_crt_single(
         feature_name : str or None
             Optional name of the tested feature.
 
-    Notes
+    Notes:
     -----
     • The predictive model p(y | X) is NOT refit during CRT resampling.
     • The test is right-tailed: larger predictive log-density indicates
@@ -294,8 +299,6 @@ def _tabpfn_crt_single(
     • A feature-specific RNG stream is used to guarantee reproducibility
       independent of feature ordering.
     """
-
-
     rng_feature = np.random.RandomState(seed + j_idx)
 
     # ---------------------------
@@ -322,7 +325,7 @@ def _tabpfn_crt_single(
     # ---------------------------
     if not xj_is_cat:
         q_grid = np.linspace(0, 1, K)
-        Q = np.asarray(model_xj.predict(Xm_ev,output_type="quantiles",quantiles=q_grid,))
+        Q = np.asarray(model_xj.predict(Xm_ev,output_type="quantiles",quantiles=q_grid))
         if Q.shape[0] != K:
             Q = Q.T  # ensure (K, n_ev)
     else:
@@ -373,7 +376,7 @@ def _tabpfn_crt_single(
                 n_try += 1
 
         X_ev_null[:, j_idx] = np.asarray(xj_null)
-        
+
         if y_is_cat:
             probs_null = model_y.predict_proba(X_ev_null)
             logp_null = logp_from_proba(probs_null, y_ev, model_y.classes_)
@@ -382,9 +385,8 @@ def _tabpfn_crt_single(
             logp_null = logp_from_full_output(full_null, y_ev)
 
         T_null[b] = np.mean(logp_null)
-    # ---------------------------
-    # p-value (right-tailed)
-    # ---------------------------
+
+    # Compute right-tailed p-value
     p_value = float((1 + np.sum(T_null >= T_obs)) / (B + 1))
 
     # ---------------------------
@@ -396,13 +398,13 @@ def _tabpfn_crt_single(
 
     if reject:
         relevance_stmt = (
-            f"Result: REJECT H0 at α = {alpha:.2f}.\n"
+            f"Result: REJECT H0 at alpha = {alpha:.2f}.\n"
             f"Interpretation: The variable X[{feat_label}] provides information about the "
             f"target Y that is not explained by the remaining covariates."
         )
     else:
         relevance_stmt = (
-            f"Result: FAIL TO REJECT H0 at α = {alpha:.2f}.\n"
+            f"Result: FAIL TO REJECT H0 at alpha = {alpha:.2f}.\n"
             f"Interpretation: There is no evidence that the variable X[{feat_label}] provides additional "
             f"information about the target Y beyond the remaining covariates."
         )
