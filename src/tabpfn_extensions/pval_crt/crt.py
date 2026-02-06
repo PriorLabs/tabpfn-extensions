@@ -92,7 +92,7 @@ def tabpfn_crt(
         test_size=test_size,
         random_state=seed,
         shuffle=True,
-        stratify=None,   # Explicitly enforced
+        stratify=None,  # Explicitly enforced
     )
 
     # ---------------------------
@@ -177,6 +177,7 @@ def tabpfn_crt(
         seed=seed,
         model_version=model_version,
     )
+
 
 def _tabpfn_crt_single(
     *,
@@ -325,7 +326,9 @@ def _tabpfn_crt_single(
     # ---------------------------
     if not xj_is_cat:
         q_grid = np.linspace(0, 1, K)
-        Q = np.asarray(model_xj.predict(Xm_ev,output_type="quantiles",quantiles=q_grid))
+        Q = np.asarray(
+            model_xj.predict(Xm_ev, output_type="quantiles", quantiles=q_grid)
+        )
         if Q.shape[0] != K:
             Q = Q.T  # ensure (K, n_ev)
     else:
@@ -334,7 +337,9 @@ def _tabpfn_crt_single(
 
         if not np.all(np.isfinite(probs)):
             i = np.argwhere(~np.isfinite(probs))[0][0]
-            raise ValueError(f"bad probs: non-finite probabilities found at row {i}: {probs[i]}")
+            raise ValueError(
+                f"bad probs: non-finite probabilities found at row {i}: {probs[i]}"
+            )
         row_sums = probs.sum(axis=1)
         if not np.allclose(row_sums, 1.0, atol=1e-6):
             i = np.argmax(np.abs(row_sums - 1.0))

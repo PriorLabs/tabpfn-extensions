@@ -9,6 +9,7 @@ import torch
 
 FeatureSpec = Union[int, str]
 
+
 def coerce_X_y_to_numpy(
     X: Any,
     y: Any,
@@ -28,6 +29,7 @@ def coerce_X_y_to_numpy(
         y_np = np.asarray(y).reshape(-1)
 
     return X_np, y_np, feature_names
+
 
 def resolve_feature_index(
     j: FeatureSpec,
@@ -55,6 +57,7 @@ def resolve_feature_index(
         return idx, j
 
     raise TypeError("j must be int or str.")
+
 
 def is_categorical(arr, max_unique=10):
     """Heuristic to determine whether a variable should be treated as categorical.

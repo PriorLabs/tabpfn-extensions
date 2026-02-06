@@ -28,6 +28,7 @@ def test_crt_detects_relevant_feature():
     assert 0 <= res["p_value"] <= 1
     assert res["p_value"] < 0.1
 
+
 @pytest.mark.local_compatible
 def test_crt_handles_irrelevant_feature():
     rng = np.random.RandomState(1)
@@ -49,4 +50,3 @@ def test_crt_handles_irrelevant_feature():
     assert "p_value" in res
     assert 0 <= res["p_value"] <= 1
     assert res["reject_null"] is False
-
