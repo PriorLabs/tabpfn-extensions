@@ -42,6 +42,7 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 - **unsupervised**: Data generation and outlier detection
 - **embedding**: Get TabPFNs internal dense sample embeddings
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
+- **pval_crt**: Statistical feature relevance testing
 
 Detailed documentation for each extension is available in the respective module directories.
 
