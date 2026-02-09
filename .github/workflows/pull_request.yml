@@ -77,11 +77,11 @@ jobs:
       - name: Install dependencies
         run: |
           uv pip install --system ".[all]"
-          # Install dev dependencies (includes setuptools needed for tabpfn pkg_resources)
-          uv pip install --system --group dev
           # onnx is required for onnx export tests
           uv pip install --system -r requirements.txt
           uv pip install --system pytest psutil
+          # we don't install all dev dependencies here for speed
+          uv pip install --system setuptools
           # licensecheck is required for license checking
           uv pip install --system licensecheck
           # onnx is not supported on python 3.13 yet https://github.com/onnx/onnx/issues/6339
