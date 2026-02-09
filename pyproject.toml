@@ -12,6 +12,7 @@ dependencies = [
     "scipy>=1.11.1,<2",
     "tabpfn>=6.0.5,<7",
     "tabpfn-common-utils[telemetry-interactive]>=0.2.0",
+    "setuptools>=67.0.0",  # Required for tabpfn's pkg_resources import
 ]
 
 requires-python = ">=3.9"
