@@ -76,13 +76,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Install setuptools first (needed for tabpfn's pkg_resources import)
-          # Use version >=67.0.0 to ensure pkg_resources is available
-          uv pip install --system "setuptools>=67.0.0"
-          # Verify setuptools is installed
-          python -c "import pkg_resources; print(f'setuptools version: {pkg_resources.get_distribution(\"setuptools\").version}')"
           uv pip install --system ".[all]"
           # onnx is required for onnx export tests
+          # we don't install all dev dependencies here for speed
           uv pip install --system -r requirements.txt
           uv pip install --system pytest psutil
           # licensecheck is required for license checking
