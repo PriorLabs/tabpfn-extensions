@@ -69,7 +69,7 @@ post_hoc_ensembles = [
 hpo = [
     "hyperopt>=0.2.7",
     # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
-    "setuptools>=67.0.0,<82",
+    "setuptools>=67.0.0,<83",
 ]
 survival = [
     "scikit-survival>=0.25.0; python_version >= '3.10'",
@@ -88,7 +88,7 @@ all = [
     "llvmlite>=0.30.0",
     "hyperopt>=0.2.7",
     # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
-    "setuptools>=67.0.0,<82",
+    "setuptools>=67.0.0,<83",
     "autogluon.tabular==1.4.0",
 
     "scikit-survival>=0.25.0; python_version >= '3.10'",
