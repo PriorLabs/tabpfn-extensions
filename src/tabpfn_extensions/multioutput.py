@@ -1,4 +1,4 @@
-"""Utilities for multi-output learning with TabPFN."""
+"""Wrapper for multi-output learning with TabPFN."""
 
 from __future__ import annotations
 
