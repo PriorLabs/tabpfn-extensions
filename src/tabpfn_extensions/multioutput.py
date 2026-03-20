@@ -40,7 +40,7 @@ class _TabPFNMultiOutputMixin:
     ) -> dict[str, Any]:  # pragma: no cover - delegating to sklearn
         """Return parameters for this estimator with TabPFN kwargs included."""
         params = super().get_params(deep=deep)
-        if getattr(self, "_estimator_is_default", False):
+        if self._estimator_is_default:
             params.pop("estimator", None)
             params.update(self.tabpfn_params)
         return params
