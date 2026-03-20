@@ -1,0 +1,138 @@
+from __future__ import annotations
+
+import numpy as np
+import pytest
+from numpy.testing import assert_array_equal
+
+try:
+    from tabpfn_extensions.survival import SurvivalTabPFN
+except ImportError:
+    pytest.skip(
+        "Required libraries (sksurv, tabpfn) not installed", allow_module_level=True
+    )
+
+
+# Deterministic test samples used across tests
+_X_TEST_SAMPLES = np.array(
+    [
+        [0.1, 0.2],
+        [0.3, 0.4],
+        [0.5, 0.6],
+        [0.7, 0.8],
+        [0.9, 0.1],
+    ]
+)
+
+
+# A tiny, reusable synthetic dataset
+@pytest.fixture
+def tiny_data():
+    """Provides a small, consistent dataset for testing."""
+    X = np.array(
+        [
+            [0.5, 0.2],
+            [0.8, 0.1],
+            [0.3, 0.9],
+            [0.6, 0.4],
+            [0.1, 0.7],
+            [0.9, 0.8],
+            [0.2, 0.3],
+            [0.7, 0.6],
+            [0.4, 0.5],
+            [0.0, 1.0],
+        ]
+    )
+
+    y_data = [
+        (True, 10.0),  # event
+        (False, 20.0),  # censored
+        (True, 5.0),  # event
+        (True, 15.0),  # event
+        (False, 8.0),  # censored
+        (True, 1.0),  # event
+        (False, 3.0),  # censored
+        (True, 12.0),  # event
+        (True, 6.0),  # event
+        (False, 7.0),  # censored
+    ]
+
+    # Convert to sksurv's structured array format
+    y = np.array(y_data, dtype=[("event", "bool"), ("time", "f8")])
+    return X, y
+
+
+# --- Tests ---
+
+
+def test_model_predict(tiny_data):
+    """Tests if 'predict' returns risk scores of the correct shape and type."""
+    X, y = tiny_data
+    model = SurvivalTabPFN(random_state=42).fit(X, y)
+
+    # Test prediction on training data
+    preds_train = model.predict(X)
+    assert preds_train.shape == (X.shape[0],)
+    assert np.issubdtype(preds_train.dtype, np.floating)
+
+    # Test prediction on new, unseen data
+    preds_test = model.predict(_X_TEST_SAMPLES)
+    assert preds_test.shape == (_X_TEST_SAMPLES.shape[0],)
+    assert np.issubdtype(preds_test.dtype, np.floating)
+
+
+def test_model_score(tiny_data):
+    """Tests the 'score' method for sksurv API compliance."""
+    X, y = tiny_data
+    model = SurvivalTabPFN(random_state=42).fit(X, y)
+
+    # .score() will call .predict() and then run concordance_index_censored
+    score = model.score(X, y)
+
+    assert isinstance(score, float)
+    # Concordance index should be between 0.0 and 1.0
+    assert 0.0 <= score <= 1.0
+
+
+def test_reproducibility(tiny_data):
+    """Tests that random_state ensures deterministic predictions."""
+    X, y = tiny_data
+    # First model and prediction
+    model_1 = SurvivalTabPFN(random_state=42)
+    model_1.fit(X, y)
+    preds_1 = model_1.predict(_X_TEST_SAMPLES)
+
+    # Second model and prediction with the same seed
+    model_2 = SurvivalTabPFN(random_state=42)
+    model_2.fit(X, y)
+    preds_2 = model_2.predict(_X_TEST_SAMPLES)
+
+    # Assert that the outputs are identical
+    assert_array_equal(preds_1, preds_2)
+
+
+def test_fit_with_two_events():
+    """Model should train when exactly two events are present."""
+    X = np.array(
+        [
+            [0.1, 0.2],
+            [0.3, 0.4],
+            [0.5, 0.6],
+            [0.7, 0.8],
+        ]
+    )
+    y = np.array(
+        [
+            (True, 10.0),
+            (False, 20.0),
+            (True, 5.0),
+            (False, 8.0),
+        ],
+        dtype=[("event", "bool"), ("time", "f8")],
+    )
+
+    model = SurvivalTabPFN(random_state=42)
+
+    model.fit(X, y)
+    preds = model.predict(X)
+
+    assert preds.shape == (X.shape[0],)

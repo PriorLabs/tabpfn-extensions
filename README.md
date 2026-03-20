@@ -42,12 +42,13 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 - **unsupervised**: Data generation and outlier detection
 - **embedding**: Get TabPFNs internal dense sample embeddings
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
+- **pval_crt**: Statistical feature relevance testing (p-values)
 
 Detailed documentation for each extension is available in the respective module directories.
 
 ### Backend Options
 
-TabPFN Extensions works with two TabPFN implementations:
+Many TabPFN Extensions works with two TabPFN implementations:
 
 1. ** TabPFN Package** - Full PyTorch implementation for local inference:
    ```bash
@@ -60,6 +61,8 @@ TabPFN Extensions works with two TabPFN implementations:
    ```
 
 Choose the backend that fits your needs - most extensions work with either option!
+
+Exceptions to this include Post Hoc Ensembling and Embeddings.
 
 ## License
 
@@ -230,13 +233,18 @@ export TABPFN_DISABLE_TELEMETRY=1
 
 Interested in adding your own extension? We welcome contributions!
 
+We use [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage the project's environment, so install that first.
+
 ```bash
 # Clone and set up for development
 git clone https://github.com/PriorLabs/tabpfn-extensions.git
 cd tabpfn-extensions
+uv sync
+source .venv/bin/activate
 
-# Lightweight dev setup (fast)
-pip install -e ".[dev]"
+# If you add optional dependencies for your extension in pyproject.toml, install them
+# like this
+uv sync --extra [your extension name]
 
 # Test your extension with fast mode
 FAST_TEST_MODE=1 pytest tests/test_your_extension.py -v

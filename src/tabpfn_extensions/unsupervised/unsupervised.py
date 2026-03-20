@@ -638,7 +638,13 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
                 y_tensor = y_predict.clone().detach().to(logits.device)
 
-                pred = pred["criterion"].pdf(logits_tensor, y_tensor).to(log_p.device)
+                # TODO: We use 1/pdf here because pdf() returns probability densities that
+                # can be >> 1, causing exp(sum(log(p))) to overflow. Using 1/p keeps values
+                # small and numerically stable. Ideally, refactor to work in log space
+                # throughout and avoid exponentiating altogether.
+                pred = (1.0 / pred["criterion"].pdf(logits_tensor, y_tensor)).to(
+                    log_p.device
+                )
 
             # Handle zero or negative probabilities (avoid log(0))
             pred = torch.clamp(pred, min=1e-10)
