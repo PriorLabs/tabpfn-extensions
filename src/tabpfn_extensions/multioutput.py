@@ -20,7 +20,7 @@ class _TabPFNMultiOutputMixin:
         self,
         estimator: _EstimatorT | None = None,
         *,
-        n_jobs: int | None = None,
+        n_preprocessing_jobs: int | None = None,
         **tabpfn_params: Any,
     ) -> None:
         if estimator is not None and tabpfn_params:
