@@ -2,6 +2,7 @@
 #  Licensed under the Apache License, Version 2.0
 from __future__ import annotations
 
+import importlib.util
 import itertools
 import logging
 import os
@@ -14,6 +15,7 @@ import numpy as np
 
 # Type checking imports
 if TYPE_CHECKING:
+    import torch
     from numpy.typing import NDArray
 
 T = TypeVar("T")
@@ -40,26 +42,43 @@ def is_tabpfn(estimator: Any) -> bool:
         return False
 
 
-try:
-    from tabpfn.utils import infer_device_and_type
-except ImportError:
-    # Fallback for environments without tabpfn package, in these environments
-    # prediction uses the API client, so we can just return "cpu"
+DeviceSpecification = Literal["auto", "cuda", "cpu"]
 
-    # torch device mock dataclass
-    @dataclass
-    class DeviceType:
-        type: str
 
-    def infer_device_and_type(device: Literal["cpu", "cuda", "auto"]):
-        if device in ("cuda"):
+@dataclass
+class FakeTorchDevice:
+    """Fake used to represent torch.device used when PyTorch is not installed."""
+
+    type: str
+
+
+def infer_device(device: DeviceSpecification) -> torch.device | FakeTorchDevice:
+    if importlib.util.find_spec("tabpfn") is None:
+        # If tabpfn is not installed then prediction will use the API client, thus we
+        # just return "cpu". We use a fake device because PyTorch may also not be
+        # installed.
+
+        if device not in ("cpu", "auto"):
             warnings.warn(
-                "CUDA device requested but 'tabpfn' package not found. "
+                f"{device} device requested but 'tabpfn' package not found. "
                 "Falling back to CPU as the client-based API does not support GPU.",
                 UserWarning,
                 stacklevel=2,
             )
-        return DeviceType(type="cpu")
+        return FakeTorchDevice(type="cpu")
+
+    try:
+        # tabpfn < 2.1.4
+        from tabpfn.utils import infer_device_and_type
+
+        return infer_device_and_type(device)
+    except ImportError:
+        pass
+
+    # tabpfn >= 2.1.4
+    from tabpfn.utils import infer_devices
+
+    return infer_devices(device)[0]
 
 
 USE_TABPFN_LOCAL = os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"

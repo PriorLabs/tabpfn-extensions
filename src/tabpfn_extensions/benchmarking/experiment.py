@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+from tabpfn_common_utils.telemetry import set_extension
 
 
+@set_extension("benchmarking")
 class Experiment:
     """Base class for experiments.
     Experiments should be reproducible, i.e. the settings should give all the information

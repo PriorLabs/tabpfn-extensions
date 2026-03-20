@@ -2,24 +2,27 @@
 
 Welcome to TabPFN Extensions! This repository is a collection of community-contributed packages that extend and enhance TabPFN, a foundation model for tabular data. We welcome all contributions and aim to make the process as simple as possible.
 
+Before developing a feature / opening a PR, please open a GitHub issue and describe the bug or feature request.
+This allows us to discuss the proposal and helps avoid unnecessary work.
+
 ## 📋 Quick Start
 
 1. **Setup your development environment**:
 
+    We use [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage the project's environment, so install that first.
+    Then, run the following:
 ```bash
 # Clone the repository
 git clone https://github.com/PriorLabs/tabpfn-extensions.git
 cd tabpfn-extensions
 
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Lightweight install for extension development
-pip install -e ".[dev]"  # Only installs base requirements
-
+# Install a lightweight environment for extension development
+uv sync  # Only installs base requirements
 # OR full install with all dependencies (may take longer)
-pip install -e ".[dev,all]"
+uv sync --all-extras
+
+# Activate the environment
+source .venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 2. **Create your extension package**:

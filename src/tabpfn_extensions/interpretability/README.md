@@ -1,5 +1,13 @@
 # TabPFN Interpretability
 
+## TabPFN Partial Dependence Plots
+
+``partial_dependence_plots`` provides a way to visualize how one or two features
+influence the predictions of a TabPFN model. Built on scikit-learn’s
+`PartialDependenceDisplay`, it supports both partial dependence (average effect)
+and ICE (individual conditional expectation) curves, making it easy to interpret
+feature impact on model outputs.
+
 ## TabPFN shapiq
 
 ``shapiq`` is a library for computing Shapley-based explanations like Shapley values or Shapley

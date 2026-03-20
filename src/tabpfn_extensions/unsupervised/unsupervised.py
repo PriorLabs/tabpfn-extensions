@@ -49,6 +49,7 @@ import numpy as np
 import pandas as pd
 import torch
 from sklearn.base import BaseEstimator
+from tabpfn_common_utils.telemetry import set_extension
 from tqdm import tqdm
 
 # Import TabPFN models from extensions (which handles backend compatibility)
@@ -351,7 +352,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                     torch.distributions.Categorical(probs=pred).sample().float()
                 )
 
-            impute_X[torch.isnan(y_predict), column_idx] = pred_sampled
+            impute_X[torch.isnan(y_predict), column_idx] = pred_sampled.to(
+                y_predict.dtype
+            )
 
         return impute_X
 
@@ -402,7 +405,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 t,
             )
 
-            impute_X[torch.isnan(y_predict), column_idx] = pred_sampled
+            impute_X[torch.isnan(y_predict), column_idx] = pred_sampled.to(
+                y_predict.dtype
+            )
 
         return impute_X, pred
 
@@ -532,6 +537,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         return model, X_predict, y_predict
 
+    @set_extension("unsupervised:impute")
     def impute(
         self,
         X: torch.Tensor | np.ndarray | pd.DataFrame,
@@ -632,7 +638,13 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
                 y_tensor = y_predict.clone().detach().to(logits.device)
 
-                pred = pred["criterion"].pdf(logits_tensor, y_tensor).to(log_p.device)
+                # TODO: We use 1/pdf here because pdf() returns probability densities that
+                # can be >> 1, causing exp(sum(log(p))) to overflow. Using 1/p keeps values
+                # small and numerically stable. Ideally, refactor to work in log space
+                # throughout and avoid exponentiating altogether.
+                pred = (1.0 / pred["criterion"].pdf(logits_tensor, y_tensor)).to(
+                    log_p.device
+                )
 
             # Handle zero or negative probabilities (avoid log(0))
             pred = torch.clamp(pred, min=1e-10)
@@ -695,6 +707,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         self.X_ = X_store
         return pmf
 
+    @set_extension("unsupervised:outliers")
     def outliers(
         self,
         X: torch.Tensor | np.ndarray | pd.DataFrame,
@@ -767,6 +780,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         densities_tensor = torch.stack(densities_clean)
         return densities_tensor.mean(dim=0)
 
+    @set_extension("unsupervised:synthetic")
     def generate_synthetic_data(
         self,
         n_samples: int = 100,
@@ -826,6 +840,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             fast_mode=fast_mode,
         )
 
+    @set_extension("unsupervised:embeddings")
     def get_embeddings(self, X: torch.tensor, per_column: bool = False) -> torch.tensor:
         """Get the transformer embeddings for the test data X.
 

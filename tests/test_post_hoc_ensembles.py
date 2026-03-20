@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import os
 
+import numpy as np
+import pandas as pd
 import pytest
+from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.utils.estimator_checks import check_estimator
 
 from conftest import FAST_TEST_MODE
@@ -24,7 +27,7 @@ def _run_sklearn_estimator_checks(estimator_instance, non_deterministic_indices)
     nan_test_index = 9
 
     for i, (name, check) in enumerate(
-        check_estimator(estimator_instance, generate_only=True)
+        check_estimator(estimator_instance, generate_only=True),
     ):
         if i == nan_test_index and "allow_nan" in estimator_instance._get_tags():
             continue
@@ -144,8 +147,94 @@ class TestAutoTabPFNRegressor(BaseRegressorTests):
         pass
 
 
+class MockTabPFNClassifier:
+    """Mock TabPFNClassifier that behaves like DummyClassifier."""
+
+    def __init__(self, **kwargs):
+        self._dummy_model = DummyClassifier(strategy="stratified")
+        self._is_fitted = False
+        self.ignore_pretraining_limits = kwargs["ignore_pretraining_limits"]
+
+    def fit(self, X, y, **kwargs):
+        # Simulate the 10k row limit check
+        if len(X) > 10000 and not self.ignore_pretraining_limits:
+            raise AssertionError("training set size is above 10k rows")
+
+        self._dummy_model.fit(X, y)
+        self._is_fitted = True
+        return self
+
+    def predict(self, X, **kwargs):
+        if not self._is_fitted:
+            raise ValueError("This MockTabPFNClassifier instance is not fitted yet.")
+        return self._dummy_model.predict(X)
+
+    def predict_proba(self, X, **kwargs):
+        if not self._is_fitted:
+            raise ValueError("This MockTabPFNClassifier instance is not fitted yet.")
+        return self._dummy_model.predict_proba(X)
+
+
+class MockTabPFNRegressor:
+    """Mock TabPFNRegressor that behaves like DummyRegressor."""
+
+    def __init__(self, **kwargs):
+        self._dummy_model = DummyRegressor(strategy="mean")
+        self._is_fitted = False
+        self.ignore_pretraining_limits = kwargs["ignore_pretraining_limits"]
+
+    def fit(self, X, y, **kwargs):
+        # Simulate the 10k row limit check
+        if len(X) > 10000 and not self.ignore_pretraining_limits:
+            raise AssertionError("training set size is above 10k rows")
+
+        self._dummy_model.fit(X, y)
+        self._is_fitted = True
+        return self
+
+    def predict(self, X, **kwargs):
+        if not self._is_fitted:
+            raise ValueError("This MockTabPFNRegressor instance is not fitted yet.")
+        return self._dummy_model.predict(X)
+
+
 # Additional PHE-specific tests
 class TestPHESpecificFeatures:
     """Test PHE-specific features that aren't covered by the base tests."""
 
-    pass
+    def test_ignore_pretraining_limits_allows_large_dataset(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Training should succeed on >10k rows when limits are ignored."""
+        # Patch TabPFN models
+        monkeypatch.setattr(
+            "tabpfn.TabPFNClassifier",
+            MockTabPFNClassifier,
+        )
+        monkeypatch.setattr(
+            "tabpfn.TabPFNRegressor",
+            MockTabPFNRegressor,
+        )
+
+        # Create dataset above the 10k limit
+        X = pd.DataFrame(np.random.randn(20_000, 2), columns=["a", "b"])
+        y = pd.Series(np.random.randn(20_000))
+
+        # Test with ignore_pretraining_limits=True
+        model = AutoTabPFNRegressor(
+            ignore_pretraining_limits=True,
+            max_time=5,
+        )
+        model.fit(X, y)
+
+        # Test with ignore_pretraining_limits=False (should fail)
+        model_no_flag = AutoTabPFNRegressor(
+            ignore_pretraining_limits=False,
+            max_time=5,
+        )
+
+        # TODO: would be better to check for the specific AssertionError
+        # caught by AutoGluon:
+        # AssertionError: ag.max_rows=10000 but...
+        with pytest.raises(RuntimeError):
+            model_no_flag.fit(X, y)

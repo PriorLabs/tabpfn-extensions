@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import numpy as np
+from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 
 
+@set_extension("embedding")
 class TabPFNEmbedding:
     """TabPFNEmbedding is a utility for extracting embeddings from TabPFNClassifier or TabPFNRegressor models.
     It supports standard training (vanilla embedding) as well as K-fold cross-validation for embedding extraction.

@@ -135,7 +135,9 @@ class TestSearchSpaceCompatibility:
         This verifies compatibility between the HPO search space and the
         TabPFN core library's expected configuration.
         """
-        full_search_space = get_param_grid_hyperopt(task_type)
+        full_search_space = get_param_grid_hyperopt(
+            task_type, download_models_if_missing=False
+        )
         rng = np.random.default_rng(42)
 
         for i in range(NUM_CONFIGS_TO_TEST):

@@ -352,6 +352,32 @@ def pandas_regression_data(dataset_generator):
 
 
 @pytest.fixture
+def pandas_classification_dataset_many_classes_mixed_types(dataset_generator):
+    """Return a classification dataset as pandas DataFrame with many classes and mixed types."""
+    import pandas as pd
+
+    test_size = SMALL_TEST_SIZE if FAST_TEST_MODE else DEFAULT_TEST_SIZE
+
+    # Create a numerical classification dataset with many classes
+    X, y = dataset_generator.generate_classification_data(
+        n_samples=test_size,
+        n_features=3,
+        n_classes=20,
+        as_pandas=True,
+    )
+
+    # Get additional columns
+    additional_columns = dataset_generator.generate_mixed_types_dataset(
+        n_samples=test_size,
+        n_numerical=0,
+        n_categorical=3,
+    )
+
+    X = pd.concat([X, additional_columns], axis=1)
+    return X, y
+
+
+@pytest.fixture
 def mixed_type_data(dataset_generator):
     """Return a dataset with mixed numerical and categorical features."""
     test_size = SMALL_TEST_SIZE if FAST_TEST_MODE else DEFAULT_TEST_SIZE

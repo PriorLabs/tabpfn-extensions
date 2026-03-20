@@ -19,8 +19,14 @@ from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import check_is_fitted
+from tabpfn_common_utils.telemetry import set_extension
 
-from tabpfn_extensions.utils import infer_categorical_features, infer_device_and_type
+from tabpfn.model_loading import ModelVersion
+from tabpfn_extensions.utils import (
+    DeviceSpecification,
+    infer_categorical_features,
+    infer_device,
+)
 
 
 class TaskType(str, Enum):
@@ -98,13 +104,14 @@ class AutoTabPFNBase(BaseEstimator):
         max_time: int | None = 3600,
         eval_metric: str | None = None,
         presets: list[str] | str | None = None,
-        device: Literal["cpu", "cuda", "auto"] = "auto",
+        device: DeviceSpecification = "auto",
         random_state: int | None | np.random.RandomState = None,
         phe_init_args: dict | None = None,
         phe_fit_args: dict | None = None,
         n_ensemble_models: int = 20,
         n_estimators: int = 8,
         ignore_pretraining_limits: bool = False,
+        model_version: ModelVersion = ModelVersion.V2_5,
     ):
         self.max_time = max_time
         self.eval_metric = eval_metric
@@ -118,12 +125,12 @@ class AutoTabPFNBase(BaseEstimator):
         self.n_ensemble_models = n_ensemble_models
         self.n_estimators = n_estimators
         self.ignore_pretraining_limits = ignore_pretraining_limits
-
+        self.model_version = model_version
         self._is_classifier = False
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         default_args = {"verbosity": 1, "path": f"TabPFNModels/m-{timestamp}"}
         user_args = self.phe_init_args or {}
         return {**default_args, **user_args}
@@ -153,10 +160,10 @@ class AutoTabPFNBase(BaseEstimator):
         DataFrame, using the provided `feature_names` or generating default names.
         Finally, it resolves the categorical feature indices to be used.
         """
-        self.device_ = infer_device_and_type(self.device)
+        self.device_ = infer_device(self.device)
         if self.n_ensemble_models < 1:
             raise ValueError(
-                f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}"
+                f"n_ensemble_models must be >= 1, got {self.n_ensemble_models}",
             )
         if self.max_time is not None and self.max_time <= 0:
             raise ValueError("max_time must be a positive integer or None.")
@@ -214,7 +221,6 @@ class AutoTabPFNBase(BaseEstimator):
         # Generate hyperparameter configurations for TabPFN Ensemble
 
         task_type = "multiclass" if self._is_classifier else "regression"
-
         if self.n_ensemble_models > 1:
             rng = check_random_state(self.random_state)
             seed = rng.randint(np.iinfo(np.int32).max)
@@ -225,6 +231,7 @@ class AutoTabPFNBase(BaseEstimator):
                 n_estimators=self.n_estimators,
                 ignore_pretraining_limits=self.ignore_pretraining_limits,
                 seed=seed,
+                model_version=self.model_version,
                 **self.get_task_args_(),
             )
         else:
@@ -233,7 +240,24 @@ class AutoTabPFNBase(BaseEstimator):
                 "ignore_pretraining_limits": self.ignore_pretraining_limits,
                 **self.get_task_args_(),
             }
+
+        def _add_ignore_constraints_inplace(config: dict[str, Any]) -> None:
+            """Add AutoGluon ag_args to bypass training constraints when requested."""
+            ag_args_fit = config.setdefault("ag_args_fit", {})
+            ag_args_fit["ignore_constraints"] = self.ignore_pretraining_limits
+
+        if isinstance(tabpfn_configs, list):
+            for cfg in tabpfn_configs:
+                _add_ignore_constraints_inplace(cfg)
+        else:
+            _add_ignore_constraints_inplace(tabpfn_configs)
+
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
+        if isinstance(self.presets, str) and self.presets == "extreme_quality":
+            raise ValueError(
+                "Extreme quality preset is not supported at the moment, as it does not "
+                "accept hyperparameters."
+            )
 
         # Set GPU count
         num_gpus = 0
@@ -262,6 +286,7 @@ class AutoTabPFNBase(BaseEstimator):
         return {"allow_nan": True, "non_deterministic": True}
 
 
+@set_extension("post_hoc_ensembles")
 class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
     """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN classifiers.
 
@@ -328,6 +353,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         n_estimators: int = 8,
         balance_probabilities: bool = False,
         ignore_pretraining_limits: bool = False,
+        model_version: ModelVersion = ModelVersion.V2_5,
     ):
         super().__init__(
             max_time=max_time,
@@ -340,6 +366,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
             n_ensemble_models=n_ensemble_models,
             n_estimators=n_estimators,
             ignore_pretraining_limits=ignore_pretraining_limits,
+            model_version=model_version,
         )
 
         self.balance_probabilities = balance_probabilities
@@ -404,7 +431,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
 
         # Re-align predict_proba output to match self.classes_
         proba_df = self.predictor_.predict_proba(
-            pd.DataFrame(X, columns=self._column_names), as_pandas=True
+            pd.DataFrame(X, columns=self._column_names),
+            as_pandas=True,
         )
         original_cols = self.label_encoder_.inverse_transform(proba_df.columns)
         proba_df.columns = original_cols
@@ -414,6 +442,7 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         return {"balance_probabilities": self.balance_probabilities}
 
 
+@set_extension("post_hoc_ensembles")
 class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
     """An AutoGluon-powered scikit-learn wrapper for ensembling TabPFN regressors.
 
@@ -474,6 +503,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         n_ensemble_models: int = 20,
         n_estimators: int = 8,
         ignore_pretraining_limits: bool = False,
+        model_version: ModelVersion = ModelVersion.V2_5,
     ):
         super().__init__(
             max_time=max_time,
@@ -486,6 +516,7 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
             n_ensemble_models=n_ensemble_models,
             n_estimators=n_estimators,
             ignore_pretraining_limits=ignore_pretraining_limits,
+            model_version=model_version,
         )
 
         self._is_classifier = False
