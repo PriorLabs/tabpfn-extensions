@@ -67,7 +67,7 @@ jobs:
           architecture: x64
 
       - name: Install uv
-        uses: astral-sh/setup-uv@e06108dd0aef18192324c70427afc47652e63a82 # v7.5.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
 
@@ -91,7 +91,7 @@ jobs:
 
       - name: Restore model cache
         id: restore-model-cache
-        uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ${{ github.workspace }}/model_cache
           # This cache read will always fail as the model_cache directory is empty.
@@ -131,7 +131,7 @@ jobs:
 
       - name: Save model cache
         if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ${{ github.workspace }}/model_cache
           key: model-cache-${{ hashFiles('model_cache/**') }}
