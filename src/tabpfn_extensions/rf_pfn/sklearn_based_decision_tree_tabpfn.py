@@ -39,7 +39,6 @@ from tabpfn_extensions.scoring.scoring_utils import (
 )
 from tabpfn_extensions.utils import softmax
 
-# Define a module-level logger
 logger = logging.getLogger(__name__)
 
 ###############################################################################
