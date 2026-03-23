@@ -6,7 +6,9 @@ import pytest
 from tabpfn_extensions.pval_crt import tabpfn_crt
 
 
-@pytest.mark.skip(reason="Flaky: stochastic test on random data can fail due to inherent false-positive rate")
+@pytest.mark.skip(
+    reason="Flaky: stochastic test on random data can fail due to inherent false-positive rate"
+)
 @pytest.mark.local_compatible
 def test_crt_detects_relevant_feature():
     rng = np.random.RandomState(0)
@@ -30,7 +32,9 @@ def test_crt_detects_relevant_feature():
     assert res["p_value"] < 0.1
 
 
-@pytest.mark.skip(reason="Flaky: stochastic test on random data can fail due to inherent false-positive rate")
+@pytest.mark.skip(
+    reason="Flaky: stochastic test on random data can fail due to inherent false-positive rate"
+)
 @pytest.mark.local_compatible
 def test_crt_handles_irrelevant_feature():
     rng = np.random.RandomState(1)
