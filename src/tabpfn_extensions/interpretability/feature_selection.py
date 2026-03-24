@@ -97,6 +97,7 @@ def _feature_selection(
         estimator,
         n_features_to_select=n_features_to_select,
         direction="forward",
+        **kwargs,
     )
     sfs.fit(X, y)
     sfs.get_support()
