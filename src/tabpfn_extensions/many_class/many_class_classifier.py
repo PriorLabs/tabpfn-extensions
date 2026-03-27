@@ -276,11 +276,20 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         """
         if self._pool_alive or self.n_jobs <= 1:
             return
+        if getattr(self, "no_mapping_needed_", False):
+            return  # No pool needed when n_classes <= alphabet_size
         from ._parallel import start_pool
 
         self._workers, self._task_queues, self._result_queue = start_pool(
             self.n_jobs
         )
+        # Send the user's estimator to each worker (not a hardcoded model)
+        for tq in self._task_queues:
+            tq.put({"cmd": "init", "estimator": self.estimator})
+        for _ in range(self.n_jobs):
+            r = self._result_queue.get(timeout=120)
+            if r.get("status") != "init_done":
+                raise RuntimeError(f"Worker init failed: {r}")
         self._pool_alive = True
 
     def stop_pool(self) -> None:
@@ -346,6 +355,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
                         "categorical_features": categorical_features,
                         "fit_params": self.fit_params_,
                         "cache_preprocessing": self.cache_preprocessing,
+                        "row_weighter": self._row_weighter,
                     })
                     n_sent += 1
 

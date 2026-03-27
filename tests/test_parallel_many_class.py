@@ -1,7 +1,8 @@
 """Tests for the parallel multi-GPU dispatch in ManyClassClassifier.
 
-Validates that n_jobs > 1 with cache_preprocessing produces predictions
-equivalent to the sequential path (n_jobs=1).
+Validates that n_jobs > 1 with cache_preprocessing produces valid,
+well-formed predictions (correct shapes, probabilities sum to 1,
+diverse class assignments on separable data).
 """
 from __future__ import annotations
 
