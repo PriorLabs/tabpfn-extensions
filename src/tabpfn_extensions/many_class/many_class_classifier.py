@@ -45,9 +45,13 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         codebook_config: CodebookConfig | str | None = None,
         row_weighting_config: RowWeightingConfig | WeightMode | str | None = None,
         aggregation_config: AggregationConfig | None = None,
+        n_jobs: int = 1,
+        cache_preprocessing: bool = True,
     ) -> None:
         self.estimator = estimator
         self.alphabet_size = alphabet_size
+        self.n_jobs = n_jobs
+        self.cache_preprocessing = cache_preprocessing
         self.n_estimators = n_estimators
         self.n_estimators_redundancy = n_estimators_redundancy
         self.random_state = random_state
@@ -62,6 +66,12 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         self._aggregation_config: AggregationConfig | None = None
         self._codebook_strategy = None
         self._row_weighter = None
+
+        # Multi-GPU pool state
+        self._workers: list = []
+        self._task_queues: list = []
+        self._result_queue = None
+        self._pool_alive = False
 
         # Attributes populated during fitting
         self.fit_params_: dict[str, Any] | None = None
@@ -252,6 +262,38 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
         return self
 
+    # ------------------------------------------------------------------
+    # Multi-GPU pool management
+    # ------------------------------------------------------------------
+    def start_pool(self) -> None:
+        """Start persistent worker pool for multi-GPU inference.
+
+        Call once before multiple predict_proba() invocations to amortize
+        the TabPFN model loading cost across all calls. Each worker loads
+        the model once and stays alive until stop_pool() is called.
+
+        Requires n_jobs > 1 (set in __init__).
+        """
+        if self._pool_alive or self.n_jobs <= 1:
+            return
+        from ._parallel import start_pool
+
+        self._workers, self._task_queues, self._result_queue = start_pool(
+            self.n_jobs
+        )
+        self._pool_alive = True
+
+    def stop_pool(self) -> None:
+        """Stop the persistent worker pool."""
+        if not self._pool_alive:
+            return
+        from ._parallel import stop_pool
+
+        stop_pool(self._workers, self._task_queues, self._result_queue)
+        self._workers, self._task_queues = [], []
+        self._result_queue = None
+        self._pool_alive = False
+
     def predict_proba(self, X) -> np.ndarray:
         check_is_fitted(self, ["classes_", "n_features_in_"])
         self._set_verbosity()
@@ -278,54 +320,102 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         if self.code_book_ is None or self.Y_train_per_estimator is None:
             raise RuntimeError("Fit method did not initialize mapping structures.")
 
-        categorical_features = getattr(self, "categorical_features", None)
-        iterator = range(self.code_book_.shape[0])
-        iterable = tqdm.tqdm(iterator, disable=(self.verbose < 2))
-
+        n_est = self.code_book_.shape[0]
         has_rest = bool(self.codebook_stats_.get("has_rest_symbol", False))
         rest_code = self.codebook_stats_.get("rest_class_code") if has_rest else None
+        categorical_features = getattr(self, "categorical_features", None)
 
-        row_results: list[RowRunResult] = []
-        entropies: list[float | None] = []
-        accuracies: list[float | None] = []
-        supports: list[int] = []
-        raw_weights: list[float] = []
+        if self._pool_alive and self.n_jobs > 1:
+            # ── Parallel path: dispatch batches to persistent GPU workers ──
+            batches: list[list] = [[] for _ in range(self.n_jobs)]
+            for i in range(n_est):
+                row_codes = self.Y_train_per_estimator[i]
+                mask = None
+                if has_rest and self._codebook_config.legacy_filter_rest_train:
+                    mask = (row_codes != rest_code)
+                batches[i % self.n_jobs].append((i, row_codes, mask))
 
-        for row_idx in iterable:
-            row_codes = self.Y_train_per_estimator[row_idx]
-            mask = None
-            if has_rest and self._codebook_config.legacy_filter_rest_train:
-                mask = row_codes != rest_code
-            result = run_row(
-                self.estimator,
-                self.X_train,
-                row_codes,
-                X_validated,
-                alphabet_size=self.alphabet_size_,
-                categorical_features=categorical_features,
-                mask=mask,
-                fit_params=self.fit_params_,
-                row_weighter=self._row_weighter,
+            n_sent = 0
+            for g in range(self.n_jobs):
+                if batches[g]:
+                    self._task_queues[g].put({
+                        "X_train": self.X_train,
+                        "X_test": X_validated,
+                        "rows": batches[g],
+                        "alphabet_size": self.alphabet_size_,
+                        "categorical_features": categorical_features,
+                        "fit_params": self.fit_params_,
+                        "cache_preprocessing": self.cache_preprocessing,
+                    })
+                    n_sent += 1
+
+            all_results: dict[int, RowRunResult] = {}
+            for _ in range(n_sent):
+                r = self._result_queue.get(timeout=600)
+                if r["status"] == "done":
+                    all_results.update(r["results"])
+                else:
+                    raise RuntimeError(f"Parallel worker error: {r}")
+
+            row_results = [all_results[i] for i in range(n_est)]
+            proba_rows = np.stack(
+                [rr.proba_test for rr in row_results], axis=0
             )
-            row_results.append(result)
-            entropies.append(result.entropy)
-            accuracies.append(result.accuracy)
-            supports.append(result.support)
-            raw_weights.append(result.weight)
+            weights = normalize_weights(
+                np.asarray([rr.weight for rr in row_results], dtype=float)
+            )
 
-        if not row_results:
-            raise RuntimeError("No ECOC rows were generated; check configuration.")
+        else:
+            # ── Sequential path (original behavior) ──
+            iterator = range(n_est)
+            iterable = tqdm.tqdm(iterator, disable=(self.verbose < 2))
 
-        proba_rows = np.stack([result.proba_test for result in row_results], axis=0)
-        weights = normalize_weights(np.asarray(raw_weights, dtype=float))
+            row_results_seq: list[RowRunResult] = []
+            raw_weights: list[float] = []
+
+            for row_idx in iterable:
+                row_codes = self.Y_train_per_estimator[row_idx]
+                mask = None
+                if has_rest and self._codebook_config.legacy_filter_rest_train:
+                    mask = row_codes != rest_code
+                result = run_row(
+                    self.estimator,
+                    self.X_train,
+                    row_codes,
+                    X_validated,
+                    alphabet_size=self.alphabet_size_,
+                    categorical_features=categorical_features,
+                    mask=mask,
+                    fit_params=self.fit_params_,
+                    row_weighter=self._row_weighter,
+                )
+                row_results_seq.append(result)
+                raw_weights.append(result.weight)
+
+            if not row_results_seq:
+                raise RuntimeError(
+                    "No ECOC rows were generated; check configuration."
+                )
+
+            row_results = row_results_seq
+            proba_rows = np.stack(
+                [result.proba_test for result in row_results], axis=0
+            )
+            weights = normalize_weights(
+                np.asarray(raw_weights, dtype=float)
+            )
 
         self.row_weights_ = weights
-        self.row_train_support_ = np.asarray(supports, dtype=int)
+        self.row_train_support_ = np.asarray(
+            [rr.support for rr in row_results], dtype=int
+        )
         self.row_train_entropy_ = np.asarray(
-            [np.nan if val is None else float(val) for val in entropies], dtype=float
+            [np.nan if rr.entropy is None else float(rr.entropy) for rr in row_results],
+            dtype=float,
         )
         self.row_train_acc_ = np.asarray(
-            [np.nan if val is None else float(val) for val in accuracies], dtype=float
+            [np.nan if rr.accuracy is None else float(rr.accuracy) for rr in row_results],
+            dtype=float,
         )
 
         rest_mask = None
