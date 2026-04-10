@@ -245,7 +245,7 @@ if sklearn_version < parse_version("1.4"):
                     f" details. Extra parameters passed are: {set(params)}",
                 )
 
-    def _is_pandas_df(X):
+    def is_pandas_df(X):
         """Return True if the X is a pandas dataframe."""
         try:
             pd = sys.modules["pandas"]
@@ -260,7 +260,6 @@ else:
     )
     from sklearn.utils.validation import (
         _is_fitted,  # noqa: F401
-        _is_pandas_df,  # noqa: F401
     )
 
 
@@ -861,3 +860,15 @@ else:
         check_X_y,  # noqa: F401
         validate_data,  # noqa: F401
     )
+
+
+########################################################################################
+# Upgrading for scikit-learn 1.8
+########################################################################################
+
+
+if sklearn_version < parse_version("1.8"):
+    if sklearn_version >= parse_version("1.4"):
+        from sklearn.utils.validation import _is_pandas_df as is_pandas_df
+else:
+    from sklearn.utils._dataframe import is_pandas_df  # noqa: F401
