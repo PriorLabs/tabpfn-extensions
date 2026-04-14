@@ -104,6 +104,7 @@ jobs:
       - name: Download models from Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
         run: python scripts/download_all_models.py
 
       - name: Check for forbidden licenses
