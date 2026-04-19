@@ -71,8 +71,8 @@ hpo = [
     # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
     "setuptools>=67.0.0,<82",
 ]
-# [survival] extra is empty; install scikit-survival manually if you need
-# SurvivalTabPFN: `pip install scikit-survival`.
+# Install scikit-survival manually if you need SurvivalTabPFN
+# `pip install scikit-survival`. Excluded due to GPL.
 survival = []
 many_class = []
 classifier_as_regressor = []
