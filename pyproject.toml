@@ -71,9 +71,9 @@ hpo = [
     # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
     "setuptools>=67.0.0,<82",
 ]
-survival = [
-    "scikit-survival>=0.25.0; python_version >= '3.10'",
-]
+# [survival] extra is empty; install scikit-survival manually if you need
+# SurvivalTabPFN: `pip install scikit-survival`.
+survival = []
 many_class = []
 classifier_as_regressor = []
 rf_pfn = []
@@ -90,8 +90,7 @@ all = [
     # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
     "setuptools>=67.0.0,<82",
     "autogluon.tabular==1.4.0",
-
-    "scikit-survival>=0.25.0; python_version >= '3.10'",
+    # scikit-survival not included; install manually if you need SurvivalTabPFN.
 ]
 
 [dependency-groups]
