@@ -21,7 +21,7 @@ try:
 except ImportError as _err:  # pragma: no cover
     raise ImportError(
         "SurvivalTabPFN requires scikit-survival. Install it with:\n\n"
-        "    pip install scikit-survival"
+        "    pip install scikit-survival. Excluded due to GPL."
     ) from _err
 
 from tabpfn_common_utils.telemetry import set_extension
