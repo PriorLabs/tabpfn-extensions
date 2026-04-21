@@ -1,59 +1,12 @@
 from __future__ import annotations
 
-import functools
 from typing import Any, Literal
 
 import numpy as np
-import torch
 from hyperopt.pyll import stochastic
 
-from tabpfn.inference_config import InferenceConfig
 from tabpfn.model_loading import ModelVersion
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
-
-
-@functools.cache
-def _read_ckpt_ag_limits(model_path: str) -> dict[str, int] | None:
-    """Read AutoGluon max_* limits from a TabPFN checkpoint's embedded inference_config.
-
-    Returns a dict of {max_rows, max_features, max_classes}, or None if the
-    checkpoint does not embed an inference_config (v2 and v2.5 do not).
-    """
-    ck = torch.load(model_path, map_location="cpu", weights_only=False)
-    ic = ck.get("inference_config")
-    if isinstance(ic, dict):
-        return {
-            "max_rows": ic["MAX_NUMBER_OF_SAMPLES"],
-            "max_features": ic["MAX_NUMBER_OF_FEATURES"],
-            "max_classes": ic["MAX_NUMBER_OF_CLASSES"],
-        }
-    return None
-
-
-def _get_tabpfn_ag_limits(
-    task_type: Literal["regression", "multiclass"],
-    model_version: ModelVersion,
-    model_path: str,
-) -> dict[str, int]:
-    """Resolve AutoGluon max_rows/max_features/max_classes from the checkpoint.
-
-    Prefer the checkpoint's embedded inference_config (v2.6+); fall back to
-    tabpfn's static defaults via `InferenceConfig.get_default` for v2 and v2.5,
-    where the config is not stored in the checkpoint.
-
-    These values are used as `ag_args` overrides so that AutoGluon's hardcoded
-    defaults for TabPFNv2 (10000 / 500 / 10) do not clip larger-capacity
-    checkpoints.
-    """
-    embedded = _read_ckpt_ag_limits(model_path)
-    if embedded is not None:
-        return embedded
-    cfg = InferenceConfig.get_default(task_type=task_type, model_version=model_version)
-    return {
-        "max_rows": cfg.MAX_NUMBER_OF_SAMPLES,
-        "max_features": cfg.MAX_NUMBER_OF_FEATURES,
-        "max_classes": cfg.MAX_NUMBER_OF_CLASSES,
-    }
 
 
 def prepare_tabpfnv2_config(
@@ -63,7 +16,6 @@ def prepare_tabpfnv2_config(
     ignore_pretraining_limits: bool,
     *,
     refit_folds: bool = True,
-    ag_limits: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Prepare a raw TabPFN hyperparameter configuration for TabPFNv2.
 
@@ -74,8 +26,8 @@ def prepare_tabpfnv2_config(
     - Applies or removes `balance_probabilities`.
     - Handles the special case when `model_type == 'dt_pfn'`.
     - Removes the deprecated `max_depth` key if present.
-    - Optionally injects per-checkpoint `max_rows`/`max_features`/`max_classes`
-      overrides into `ag_args` via `ag_limits`.
+    - Disables AutoGluon's v2-era static `max_rows` / `max_features` /
+      `max_classes` guardrails so gating is delegated to TabPFN itself.
 
     Parameters
     ----------
@@ -86,14 +38,9 @@ def prepare_tabpfnv2_config(
     balance_probabilities : Optional[bool]
         If True/False, set for classification; if None, removed (regression).
     ignore_pretraining_limits : bool
-        Whether to bypass default pretraining limits.
+        Whether to bypass default pretraining limits in the wrapped TabPFN.
     refit_folds : bool, optional
         Whether each fold should be refit (default is True).
-    ag_limits : Optional[Dict[str, int]]
-        Per-checkpoint AutoGluon limits (`max_rows`, `max_features`,
-        `max_classes`) to merge into `ag_args_fit`. Overrides the hardcoded
-        10000/500/10 defaults in AutoGluon's TabPFNv2 integration so that
-        larger-capacity checkpoints (v2.5, v2.6) are not artificially capped.
 
     Returns:
     -------
@@ -134,13 +81,16 @@ def prepare_tabpfnv2_config(
     # Remove deprecated keys
     config.pop("max_depth", None)
 
-    # Per-checkpoint AutoGluon limit overrides. AutoGluon's TabPFNv2 integration
-    # hardcodes max_rows=10000 / max_features=500 / max_classes=10 (tuned for v2);
-    # we override via ag_args_fit (AutoGluon's params_aux bucket) so v2.5/v2.6
-    # checkpoints can use their full capacity.
-    if ag_limits is not None:
-        ag_args_fit = config.setdefault("ag_args_fit", {})
-        ag_args_fit.update(ag_limits)
+    # AutoGluon's TabPFNv2 integration hardcodes max_rows=10000 /
+    # max_features=500 / max_classes=10 in `_get_default_auxiliary_params`.
+    # These are v2-era values and are wrong for v2.5 (50K / 2000) and v2.6
+    # (100K / 2000). Rather than mirroring them here, we disable the AG-side
+    # checks entirely and let TabPFN's own validation (which knows the actual
+    # loaded checkpoint's `inference_config.MAX_NUMBER_OF_*`) be the single
+    # authority. TabPFN gating itself is still controlled by
+    # `ignore_pretraining_limits` above.
+    ag_args_fit = config.setdefault("ag_args_fit", {})
+    ag_args_fit.update({"max_rows": None, "max_features": None, "max_classes": None})
 
     return config
 
@@ -195,23 +145,15 @@ def search_space_func(
         task_type=task_type, model_version=model_version
     )
     rng = np.random.default_rng(seed)
-    tabpfn_configs = []
-    for _ in range(n_ensemble_models):
-        raw_config = dict(stochastic.sample(search_space, rng=rng))
-        ag_limits = _get_tabpfn_ag_limits(
-            task_type=task_type,
-            model_version=model_version,
-            model_path=raw_config["model_path"],
+    tabpfn_configs = [
+        prepare_tabpfnv2_config(
+            raw_config=dict(stochastic.sample(search_space, rng=rng)),
+            n_estimators=n_estimators,
+            balance_probabilities=balance_probabilities,
+            ignore_pretraining_limits=ignore_pretraining_limits,
         )
-        tabpfn_configs.append(
-            prepare_tabpfnv2_config(
-                raw_config=raw_config,
-                n_estimators=n_estimators,
-                balance_probabilities=balance_probabilities,
-                ignore_pretraining_limits=ignore_pretraining_limits,
-                ag_limits=ag_limits,
-            )
-        )
+        for _ in range(n_ensemble_models)
+    ]
 
     assert len(tabpfn_configs) > 0
 
