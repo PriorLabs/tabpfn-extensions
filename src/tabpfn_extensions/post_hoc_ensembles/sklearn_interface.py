@@ -81,7 +81,8 @@ class AutoTabPFNBase(BaseEstimator):
         Higher values can improve performance but increase resource usage.
     ignore_pretraining_limits : bool, default=False
         If `True`, let TabPFN accept inputs that exceed the loaded checkpoint's
-        pretraining limits. Performance is not guaranteed above the limits.
+        pretraining limits. **Warning:** Use with caution, as performance is
+        not guaranteed and may be poor when exceeding these limits.
 
     Attributes:
     ----------
@@ -328,7 +329,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         for classification tasks with imbalanced classes.
     ignore_pretraining_limits : bool, default=False
         If `True`, let TabPFN accept inputs that exceed the loaded checkpoint's
-        pretraining limits. Performance is not guaranteed above the limits.
+        pretraining limits. **Warning:** Use with caution, as performance is
+        not guaranteed and may be poor when exceeding these limits.
 
     Attributes:
     ----------
@@ -480,7 +482,8 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         Higher values can improve performance but increase resource usage.
     ignore_pretraining_limits : bool, default=False
         If `True`, let TabPFN accept inputs that exceed the loaded checkpoint's
-        pretraining limits. Performance is not guaranteed above the limits.
+        pretraining limits. **Warning:** Use with caution, as performance is
+        not guaranteed and may be poor when exceeding these limits.
 
     Attributes:
     ----------
