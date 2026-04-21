@@ -91,7 +91,7 @@ def prepare_tabpfnv2_config(
         Whether each fold should be refit (default is True).
     ag_limits : Optional[Dict[str, int]]
         Per-checkpoint AutoGluon limits (`max_rows`, `max_features`,
-        `max_classes`) to merge into `ag_args`. Overrides the hardcoded
+        `max_classes`) to merge into `ag_args_fit`. Overrides the hardcoded
         10000/500/10 defaults in AutoGluon's TabPFNv2 integration so that
         larger-capacity checkpoints (v2.5, v2.6) are not artificially capped.
 
@@ -136,10 +136,11 @@ def prepare_tabpfnv2_config(
 
     # Per-checkpoint AutoGluon limit overrides. AutoGluon's TabPFNv2 integration
     # hardcodes max_rows=10000 / max_features=500 / max_classes=10 (tuned for v2);
-    # we override via ag_args so v2.5/v2.6 checkpoints can use their full capacity.
+    # we override via ag_args_fit (AutoGluon's params_aux bucket) so v2.5/v2.6
+    # checkpoints can use their full capacity.
     if ag_limits is not None:
-        ag_args = config.setdefault("ag_args", {})
-        ag_args.update(ag_limits)
+        ag_args_fit = config.setdefault("ag_args_fit", {})
+        ag_args_fit.update(ag_limits)
 
     return config
 
