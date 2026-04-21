@@ -246,16 +246,28 @@ class AutoTabPFNBase(BaseEstimator):
                 **self.get_task_args_(),
             }
 
-        def _add_ignore_constraints_inplace(config: dict[str, Any]) -> None:
-            """Add AutoGluon ag_args to bypass training constraints when requested."""
+        def _patch_ag_args_fit_inplace(config: dict[str, Any]) -> None:
+            """Patch AutoGluon's per-model params_aux for TabPFN sub-models.
+
+            - Disable AutoGluon's static max_rows / max_features / max_classes
+              asserts so TabPFN's own per-checkpoint validation is the single
+              authority. TODO: Fix upstream in AutoGluon's `TabPFNV2Model`. A
+              single class handles all v2.x checkpoints with v2-era limits
+              hardcoded in `_get_default_auxiliary_params`, which is wrong for
+              v2.5+. Until that lands, we override per sub-model here.
+            - Forward the user's `ignore_pretraining_limits` flag to TabPFN.
+            """
             ag_args_fit = config.setdefault("ag_args_fit", {})
+            ag_args_fit["max_rows"] = None
+            ag_args_fit["max_features"] = None
+            ag_args_fit["max_classes"] = None
             ag_args_fit["ignore_constraints"] = self.ignore_pretraining_limits
 
         if isinstance(tabpfn_configs, list):
             for cfg in tabpfn_configs:
-                _add_ignore_constraints_inplace(cfg)
+                _patch_ag_args_fit_inplace(cfg)
         else:
-            _add_ignore_constraints_inplace(tabpfn_configs)
+            _patch_ag_args_fit_inplace(tabpfn_configs)
 
         hyperparameters = {TabPFNV2Model: tabpfn_configs}
         if isinstance(self.presets, str) and self.presets == "extreme_quality":

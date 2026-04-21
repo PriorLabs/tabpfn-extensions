@@ -26,8 +26,6 @@ def prepare_tabpfnv2_config(
     - Applies or removes `balance_probabilities`.
     - Handles the special case when `model_type == 'dt_pfn'`.
     - Removes the deprecated `max_depth` key if present.
-    - Disables AutoGluon's v2-era static `max_rows` / `max_features` /
-      `max_classes` guardrails so gating is delegated to TabPFN itself.
 
     Parameters
     ----------
@@ -80,17 +78,6 @@ def prepare_tabpfnv2_config(
 
     # Remove deprecated keys
     config.pop("max_depth", None)
-
-    # Disable AutoGluon's static max_rows / max_features / max_classes asserts
-    # so TabPFN's own per-checkpoint validation is the single authority; user's
-    # `ignore_pretraining_limits` still gates TabPFN itself.
-    #
-    # TODO: Fix this upstream in AutoGluon's `TabPFNV2Model`. A single class
-    # handles all v2.x checkpoints with v2-era limits hardcoded in
-    # `_get_default_auxiliary_params`, which is wrong for v2.5+. Until that
-    # lands, we override per sub-model here.
-    ag_args_fit = config.setdefault("ag_args_fit", {})
-    ag_args_fit.update({"max_rows": None, "max_features": None, "max_classes": None})
 
     return config
 
