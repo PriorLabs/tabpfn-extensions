@@ -82,8 +82,12 @@ def prepare_tabpfnv2_config(
     config.pop("max_depth", None)
 
     # Disable AutoGluon's static max_rows / max_features / max_classes asserts
-    # (v2-era values) so TabPFN's own per-checkpoint validation is the single
-    # authority. User's `ignore_pretraining_limits` still gates TabPFN itself.
+    # so TabPFN's own per-checkpoint validation is the single authority; user's
+    # `ignore_pretraining_limits` still gates TabPFN itself. Ideally we would
+    # fix this in AutoGluon's `TabPFNV2Model._get_default_auxiliary_params`
+    # (one class handles all v2.x checkpoints, with v2-era limits hardcoded),
+    # but AutoGluon is an external dependency with its own release cycle, so we
+    # override per sub-model here to unblock AutoTabPFN users immediately.
     ag_args_fit = config.setdefault("ag_args_fit", {})
     ag_args_fit.update({"max_rows": None, "max_features": None, "max_classes": None})
 
