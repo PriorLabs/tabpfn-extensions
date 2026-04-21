@@ -137,10 +137,10 @@ class AutoTabPFNBase(BaseEstimator):
 
     def _get_predictor_fit_args(self) -> dict[str, Any]:
         """Constructs the fit arguments for AutoGluon's TabularPredictor."""
-        # Keep verbosity >= 2. At verbosity=1, AutoGluon suppresses the per-sub-model
-        # "Time limit exceeded... Skipping" lines, which are the main signal when no
-        # models complete within `max_time` and the run ends with the unhelpful
-        # `RuntimeError: No models were trained successfully`.
+        # Highly suggested to keep verbosity at the AutoGluon default of 2. For
+        # verbosity < 2, important per-model errors are suppressed that make it
+        # hard to understand why AutoTabPFN fails (e.g. if the time budget is
+        # too small).
         default_args = {
             "num_bag_folds": 8,
             "fit_weighted_ensemble": True,
