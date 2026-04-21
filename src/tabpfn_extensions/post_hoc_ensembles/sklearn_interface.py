@@ -130,21 +130,22 @@ class AutoTabPFNBase(BaseEstimator):
 
     def _get_predictor_init_args(self) -> dict[str, Any]:
         """Constructs the initialization arguments for AutoGluon's TabularPredictor."""
+        # Don't override AutoGluon's default verbosity (2) — anything lower
+        # suppresses per-model errors that make it hard to understand why
+        # AutoTabPFN fails (e.g. when the time budget is too small, each
+        # sub-model logs "Time limit exceeded... Skipping" at verbosity >= 2
+        # but is silenced at 1, leaving only the generic
+        # `RuntimeError: No models were trained successfully`).
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        default_args = {"verbosity": 1, "path": f"TabPFNModels/m-{timestamp}"}
+        default_args = {"path": f"TabPFNModels/m-{timestamp}"}
         user_args = self.phe_init_args or {}
         return {**default_args, **user_args}
 
     def _get_predictor_fit_args(self) -> dict[str, Any]:
         """Constructs the fit arguments for AutoGluon's TabularPredictor."""
-        # Highly suggested to keep verbosity at the AutoGluon default of 2. For
-        # verbosity < 2, important per-model errors are suppressed that make it
-        # hard to understand why AutoTabPFN fails (e.g. if the time budget is
-        # too small).
         default_args = {
             "num_bag_folds": 8,
             "fit_weighted_ensemble": True,
-            "verbosity": 2,
         }
         user_args = self.phe_fit_args or {}
         return {**default_args, **user_args}
