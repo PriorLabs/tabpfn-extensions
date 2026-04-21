@@ -81,14 +81,9 @@ def prepare_tabpfnv2_config(
     # Remove deprecated keys
     config.pop("max_depth", None)
 
-    # AutoGluon's TabPFNv2 integration hardcodes max_rows=10000 /
-    # max_features=500 / max_classes=10 in `_get_default_auxiliary_params`.
-    # These are v2-era values and are wrong for v2.5 (50K / 2000) and v2.6
-    # (100K / 2000). Rather than mirroring them here, we disable the AG-side
-    # checks entirely and let TabPFN's own validation (which knows the actual
-    # loaded checkpoint's `inference_config.MAX_NUMBER_OF_*`) be the single
-    # authority. TabPFN gating itself is still controlled by
-    # `ignore_pretraining_limits` above.
+    # Disable AutoGluon's static max_rows / max_features / max_classes asserts
+    # (v2-era values) so TabPFN's own per-checkpoint validation is the single
+    # authority. User's `ignore_pretraining_limits` still gates TabPFN itself.
     ag_args_fit = config.setdefault("ag_args_fit", {})
     ag_args_fit.update({"max_rows": None, "max_features": None, "max_classes": None})
 

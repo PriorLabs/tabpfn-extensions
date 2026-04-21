@@ -80,16 +80,8 @@ class AutoTabPFNBase(BaseEstimator):
         The number of internal transformers to ensemble within each individual TabPFN model.
         Higher values can improve performance but increase resource usage.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses the pretraining limits enforced by each TabPFN
-        sub-model. By default (`False`), the wrapped TabPFN raises a
-        `TabPFNValidationError` when the input exceeds the loaded checkpoint's
-        `MAX_NUMBER_OF_SAMPLES` / `MAX_NUMBER_OF_FEATURES` (v2: 10,000 / 500;
-        v2.5: 50,000 / 2,000; v2.6: 100,000 / 2,000). AutoGluon's own
-        `max_rows` / `max_features` / `max_classes` guardrails are always
-        disabled because they hardcode v2-era values and would otherwise clip
-        larger-capacity checkpoints. **Warning:** Use with caution, as
-        performance is not guaranteed and may be poor when exceeding these
-        limits.
+        If `True`, let TabPFN accept inputs that exceed the loaded checkpoint's
+        pretraining limits. Performance is not guaranteed above the limits.
 
     Attributes:
     ----------
@@ -335,16 +327,8 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         Whether to balance the output probabilities from TabPFN. This can be beneficial
         for classification tasks with imbalanced classes.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses the pretraining limits enforced by each TabPFN
-        sub-model. By default (`False`), the wrapped TabPFN raises a
-        `TabPFNValidationError` when the input exceeds the loaded checkpoint's
-        `MAX_NUMBER_OF_SAMPLES` / `MAX_NUMBER_OF_FEATURES` (v2: 10,000 / 500;
-        v2.5: 50,000 / 2,000; v2.6: 100,000 / 2,000). AutoGluon's own
-        `max_rows` / `max_features` / `max_classes` guardrails are always
-        disabled because they hardcode v2-era values and would otherwise clip
-        larger-capacity checkpoints. **Warning:** Use with caution, as
-        performance is not guaranteed and may be poor when exceeding these
-        limits.
+        If `True`, let TabPFN accept inputs that exceed the loaded checkpoint's
+        pretraining limits. Performance is not guaranteed above the limits.
 
     Attributes:
     ----------
@@ -495,16 +479,8 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         The number of internal transformers to ensemble within each individual TabPFN model.
         Higher values can improve performance but increase resource usage.
     ignore_pretraining_limits : bool, default=False
-        If `True`, bypasses the pretraining limits enforced by each TabPFN
-        sub-model. By default (`False`), the wrapped TabPFN raises a
-        `TabPFNValidationError` when the input exceeds the loaded checkpoint's
-        `MAX_NUMBER_OF_SAMPLES` / `MAX_NUMBER_OF_FEATURES` (v2: 10,000 / 500;
-        v2.5: 50,000 / 2,000; v2.6: 100,000 / 2,000). AutoGluon's own
-        `max_rows` / `max_features` / `max_classes` guardrails are always
-        disabled because they hardcode v2-era values and would otherwise clip
-        larger-capacity checkpoints. **Warning:** Use with caution, as
-        performance is not guaranteed and may be poor when exceeding these
-        limits.
+        If `True`, let TabPFN accept inputs that exceed the loaded checkpoint's
+        pretraining limits. Performance is not guaranteed above the limits.
 
     Attributes:
     ----------
