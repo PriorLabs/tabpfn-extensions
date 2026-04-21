@@ -36,9 +36,11 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.9"
             dependency-set: lowest-direct
-          - os: macos-15-intel # We need x86 as ARM is  python>= 3.11 only.
-            # https://github.com/actions/setup-python/issues/855
-            python-version: "3.9"
+          - os: macos-latest
+            # Use 3.10 as the minimum Python version for Macs, as that is the earliest
+            # version that supports Apple Silicon, and Apple Silicon is required by
+            # TabPFN's minimum PyTorch.
+            python-version: "3.10"
             dependency-set: lowest-direct
           - os: windows-latest
             python-version: "3.9"
