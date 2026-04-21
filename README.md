@@ -62,7 +62,7 @@ Many TabPFN Extensions works with two TabPFN implementations:
 
 Choose the backend that fits your needs - most extensions work with either option!
 
-Exceptions to this are Post Hoc Ensembling and Embeddings, which only work with the local `tabpfn` package.
+Exceptions to this are **post_hoc_ensembles** and **embedding**, which only work with the local `tabpfn` package.
 
 ## Documentation
 
@@ -70,7 +70,7 @@ Documentation for `tabpfn-extensions` is spread across several sources. If you a
 
 ### Examples
 
-Runnable scripts and notebooks for each extension live in the [`examples/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples) directory of this repository:
+Runnable scripts and notebooks for extensions and general use cases live in the [`examples/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples) directory of this repository:
 
 - [`embedding/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding) — access TabPFN's internal dense sample embeddings
 - [`hpo/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/hpo) — automatic hyperparameter tuning
