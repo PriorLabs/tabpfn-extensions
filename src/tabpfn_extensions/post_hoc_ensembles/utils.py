@@ -12,7 +12,7 @@ from tabpfn.model_loading import ModelVersion
 from tabpfn_extensions.hpo.search_space import get_param_grid_hyperopt
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _read_ckpt_ag_limits(model_path: str) -> dict[str, int] | None:
     """Read AutoGluon max_* limits from a TabPFN checkpoint's embedded inference_config.
 
