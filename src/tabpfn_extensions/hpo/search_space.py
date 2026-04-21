@@ -163,9 +163,9 @@ def get_param_grid_hyperopt(
         )
 
     else:
-        raise ValueError(
-            f"Unknown combination of task type {task_type} and "
-            "model version {model_version}!"
+        raise NotImplementedError(
+            f"No hpo search space is defined for task type {task_type} and "
+            f"model version {model_version}."
         )
 
     # Make sure models are downloaded.
