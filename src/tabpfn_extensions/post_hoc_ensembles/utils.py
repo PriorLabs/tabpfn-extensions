@@ -36,7 +36,7 @@ def prepare_tabpfnv2_config(
     balance_probabilities : Optional[bool]
         If True/False, set for classification; if None, removed (regression).
     ignore_pretraining_limits : bool
-        Whether to bypass default pretraining limits.
+        Whether to bypass default pretraining limits in the wrapped TabPFN.
     refit_folds : bool, optional
         Whether each fold should be refit (default is True).
 
