@@ -198,9 +198,24 @@ class AutoTabPFNBase(BaseEstimator):
         This method should be called from the child class's fit method after validation.
         """
         from autogluon.tabular import TabularPredictor
-        from autogluon.tabular.models import TabPFNV2Model
+        from autogluon.tabular.models import RealTabPFNv2Model, RealTabPFNv25Model
 
         from tabpfn_extensions.post_hoc_ensembles.utils import search_space_func
+
+        # Route to the AutoGluon TabPFN model class that matches the requested
+        # TabPFN model version. Each class ships with the correct per-version
+        # max_rows/max_features/max_classes limits, so we no longer need to
+        # override them via ag_args_fit.
+        if self.model_version == ModelVersion.V2:
+            ag_model_class = RealTabPFNv2Model
+        elif self.model_version == ModelVersion.V2_5:
+            ag_model_class = RealTabPFNv25Model
+        else:
+            raise NotImplementedError(
+                f"AutoTabPFN does not support TabPFN model version "
+                f"{self.model_version.value!r} yet. Supported versions: "
+                f"{ModelVersion.V2.value!r}, {ModelVersion.V2_5.value!r}.",
+            )
 
         if isinstance(X, pd.DataFrame):
             training_df = X.copy()
@@ -248,20 +263,8 @@ class AutoTabPFNBase(BaseEstimator):
             }
 
         def _patch_ag_args_fit_inplace(config: dict[str, Any]) -> None:
-            """Patch AutoGluon's per-model params_aux for TabPFN sub-models.
-
-            - Disable AutoGluon's static max_rows / max_features / max_classes
-              asserts so TabPFN's own per-checkpoint validation is the single
-              authority. TODO: Fix upstream in AutoGluon's `TabPFNV2Model`. A
-              single class handles all v2.x checkpoints with v2-era limits
-              hardcoded in `_get_default_auxiliary_params`, which is wrong for
-              v2.5+. Until that lands, we override per sub-model here.
-            - Forward the user's `ignore_pretraining_limits` flag to TabPFN.
-            """
+            """Forward the user's `ignore_pretraining_limits` flag to TabPFN."""
             ag_args_fit = config.setdefault("ag_args_fit", {})
-            ag_args_fit["max_rows"] = None
-            ag_args_fit["max_features"] = None
-            ag_args_fit["max_classes"] = None
             ag_args_fit["ignore_constraints"] = self.ignore_pretraining_limits
 
         if isinstance(tabpfn_configs, list):
@@ -270,7 +273,7 @@ class AutoTabPFNBase(BaseEstimator):
         else:
             _patch_ag_args_fit_inplace(tabpfn_configs)
 
-        hyperparameters = {TabPFNV2Model: tabpfn_configs}
+        hyperparameters = {ag_model_class: tabpfn_configs}
         if isinstance(self.presets, str) and self.presets == "extreme_quality":
             raise ValueError(
                 "Extreme quality preset is not supported at the moment, as it does not "
