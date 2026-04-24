@@ -444,7 +444,7 @@ def product_dict(d: dict[str, list[T]]) -> Iterator[dict[str, T]]:
     keys = d.keys()
     values = [d[key] for key in keys]
     for combination in itertools.product(*values):
-        yield dict(zip(keys, combination, strict=False))
+        yield dict(zip(keys, combination, strict=True))
 
 
 # Get the TabPFN models with our wrappers applied
