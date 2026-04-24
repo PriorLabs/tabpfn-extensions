@@ -178,13 +178,6 @@ def get_param_grid_hyperopt(
                 model_name=ckpt_name,
             )
 
-    # AutoGluon 1.5's TabPFN model classes read the checkpoint filename from the
-    # ``zip_model_path`` hyperparameter as ``[classification_ckpt, regression_ckpt]``
-    # and join it with their own resolved cache directory. We pass the same
-    # filename in both slots because each sampled config is task-specific; AG
-    # picks the slot that matches its TabularPredictor's problem_type.
-    search_space["zip_model_path"] = hp.choice(
-        "zip_model_path",
-        [[ckpt_name, ckpt_name] for ckpt_name in model_source.filenames],
-    )
+    model_paths = [str(model_dir / ckpt_name) for ckpt_name in model_source.filenames]
+    search_space["model_path"] = hp.choice("model_path", model_paths)
     return search_space

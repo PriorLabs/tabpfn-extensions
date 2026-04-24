@@ -10,10 +10,12 @@ import os
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.utils.estimator_checks import check_estimator
 
 from conftest import FAST_TEST_MODE
+from tabpfn.model_loading import ModelVersion
 from tabpfn_extensions.post_hoc_ensembles.sklearn_interface import (
     AutoTabPFNClassifier,
     AutoTabPFNRegressor,
@@ -154,6 +156,8 @@ class MockTabPFNClassifier:
         self._dummy_model = DummyClassifier(strategy="stratified")
         self._is_fitted = False
         self.ignore_pretraining_limits = kwargs["ignore_pretraining_limits"]
+        # AG 1.5's TabPFN model class reads `devices_` via `get_device()`.
+        self.devices_ = (torch.device("cpu"),)
 
     def fit(self, X, y, **kwargs):
         # Simulate the 10k row limit check
@@ -174,6 +178,9 @@ class MockTabPFNClassifier:
             raise ValueError("This MockTabPFNClassifier instance is not fitted yet.")
         return self._dummy_model.predict_proba(X)
 
+    def to(self, device):  # pragma: no cover - invoked only by AG's _set_device
+        return self
+
 
 class MockTabPFNRegressor:
     """Mock TabPFNRegressor that behaves like DummyRegressor."""
@@ -182,6 +189,8 @@ class MockTabPFNRegressor:
         self._dummy_model = DummyRegressor(strategy="mean")
         self._is_fitted = False
         self.ignore_pretraining_limits = kwargs["ignore_pretraining_limits"]
+        # AG 1.5's TabPFN model class reads `devices_` via `get_device()`.
+        self.devices_ = (torch.device("cpu"),)
 
     def fit(self, X, y, **kwargs):
         # Simulate the 10k row limit check
@@ -197,6 +206,9 @@ class MockTabPFNRegressor:
             raise ValueError("This MockTabPFNRegressor instance is not fitted yet.")
         return self._dummy_model.predict(X)
 
+    def to(self, device):  # pragma: no cover - invoked only by AG's _set_device
+        return self
+
 
 # Additional PHE-specific tests
 class TestPHESpecificFeatures:
@@ -205,7 +217,13 @@ class TestPHESpecificFeatures:
     def test_ignore_pretraining_limits_allows_large_dataset(
         self, monkeypatch: pytest.MonkeyPatch
     ):
-        """Training should succeed on >10k rows when limits are ignored."""
+        """Training should succeed on datasets beyond the base model's row
+        limit when ``ignore_pretraining_limits=True``.
+
+        We pin to v2 (10k row limit) so the assertion fires at a size that is
+        also cheap to fit; the default v2.5 has a 100k limit which would
+        require a much larger synthetic dataset to trigger.
+        """
         # Patch TabPFN models
         monkeypatch.setattr(
             "tabpfn.TabPFNClassifier",
@@ -216,7 +234,7 @@ class TestPHESpecificFeatures:
             MockTabPFNRegressor,
         )
 
-        # Create dataset above the 10k limit
+        # Create dataset above v2's 10k row limit
         X = pd.DataFrame(np.random.randn(20_000, 2), columns=["a", "b"])
         y = pd.Series(np.random.randn(20_000))
 
@@ -224,6 +242,7 @@ class TestPHESpecificFeatures:
         model = AutoTabPFNRegressor(
             ignore_pretraining_limits=True,
             max_time=5,
+            model_version=ModelVersion.V2,
         )
         model.fit(X, y)
 
@@ -231,6 +250,7 @@ class TestPHESpecificFeatures:
         model_no_flag = AutoTabPFNRegressor(
             ignore_pretraining_limits=False,
             max_time=5,
+            model_version=ModelVersion.V2,
         )
 
         # TODO: would be better to check for the specific AssertionError

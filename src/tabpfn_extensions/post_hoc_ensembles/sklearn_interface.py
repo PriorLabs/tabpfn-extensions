@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
@@ -262,16 +263,31 @@ class AutoTabPFNBase(BaseEstimator):
                 **self.get_task_args_(),
             }
 
-        def _patch_ag_args_fit_inplace(config: dict[str, Any]) -> None:
-            """Forward the user's `ignore_pretraining_limits` flag to TabPFN."""
+        def _adapt_config_for_autogluon_inplace(config: dict[str, Any]) -> None:
+            """Forward `ignore_pretraining_limits` and translate `model_path`.
+
+            - AutoGluon 1.5 expects the checkpoint to be passed as
+              ``zip_model_path=[classification_ckpt, regression_ckpt]`` (just
+              the filenames; AG joins with its own resolved cache dir). The
+              search space produces a TabPFN-compatible ``model_path=<abs path>``
+              so that it can also be consumed directly by core TabPFN; here we
+              translate it to the form AG expects and drop the original key.
+            - Forward the user's ``ignore_pretraining_limits`` flag into AG's
+              ``ag_args_fit.ignore_constraints``.
+            """
             ag_args_fit = config.setdefault("ag_args_fit", {})
             ag_args_fit["ignore_constraints"] = self.ignore_pretraining_limits
 
+            full_path = config.pop("model_path", None)
+            if full_path is not None:
+                ckpt_name = Path(full_path).name
+                config["zip_model_path"] = [ckpt_name, ckpt_name]
+
         if isinstance(tabpfn_configs, list):
             for cfg in tabpfn_configs:
-                _patch_ag_args_fit_inplace(cfg)
+                _adapt_config_for_autogluon_inplace(cfg)
         else:
-            _patch_ag_args_fit_inplace(tabpfn_configs)
+            _adapt_config_for_autogluon_inplace(tabpfn_configs)
 
         hyperparameters = {ag_model_class: tabpfn_configs}
         if isinstance(self.presets, str) and self.presets == "extreme_quality":
