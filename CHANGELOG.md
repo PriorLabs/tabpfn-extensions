@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Widened `tabpfn` dependency cap from `<7` to `<8` (#259). This allows `tabpfn-extensions` to resolve against `tabpfn >= 7.x` (TabPFN v2.6). Fixes the Colab issue where `tabpfn-extensions[all]` transitively pinned `tabpfn` to `6.4.1` (v2.5 model).
-- Standardised random state handling across Random Forest extensions (#235).
+- Standardized random state handling across Random Forest extensions (#235).
 - Added license checks to CI (#238).
 
 ### Removed
