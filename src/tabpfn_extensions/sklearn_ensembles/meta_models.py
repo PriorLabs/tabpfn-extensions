@@ -97,6 +97,7 @@ def get_tabpfn_outer_ensemble(config: configs.TabPFNConfig, **kwargs):
     for ensemble_member_index, sub_config in zip(
         range(config.n_estimators),
         relevant_config_product,
+        strict=False,
     ):
         member_config = copy.deepcopy(config)
         for k, v in sub_config.items():

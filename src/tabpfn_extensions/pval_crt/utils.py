@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import torch
 
-FeatureSpec = Union[int, str]
+FeatureSpec = int | str
 
 
 def coerce_X_y_to_numpy(
@@ -23,7 +23,7 @@ def coerce_X_y_to_numpy(
     else:
         X_np = np.asarray(X)
 
-    if pd is not None and isinstance(y, (pd.Series, pd.DataFrame)):
+    if pd is not None and isinstance(y, pd.Series | pd.DataFrame):
         y_np = np.asarray(y).reshape(-1)
     else:
         y_np = np.asarray(y).reshape(-1)

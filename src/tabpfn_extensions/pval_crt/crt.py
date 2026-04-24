@@ -124,7 +124,7 @@ def tabpfn_crt(
     # ---------------------------
     # Multi-feature support
     # ---------------------------
-    if isinstance(j, Sequence) and not isinstance(j, (str, bytes)):
+    if isinstance(j, Sequence) and not isinstance(j, str | bytes):
         results = {}
 
         for feat in j:

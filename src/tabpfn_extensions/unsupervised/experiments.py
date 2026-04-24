@@ -141,6 +141,7 @@ class GenerateSyntheticDataExperiment(Experiment):
                         zip(
                             self.feature_names,
                             [self.X[:, i] for i in range(self.X.shape[1])],
+                            strict=False,
                         ),
                     ),
                     "real_or_synthetic": "Actual samples",
@@ -155,6 +156,7 @@ class GenerateSyntheticDataExperiment(Experiment):
                                 self.synthetic_X[:, i]
                                 for i in range(self.synthetic_X.shape[1])
                             ],
+                            strict=False,
                         ),
                     ),
                     "real_or_synthetic": "Generated samples",

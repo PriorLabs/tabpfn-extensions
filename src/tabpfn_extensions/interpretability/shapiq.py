@@ -78,7 +78,7 @@ def get_tabpfn_explainer(
         data = data.values
 
     # make labels to array if it is a pandas Series
-    if isinstance(labels, (pd.Series, pd.DataFrame)):
+    if isinstance(labels, pd.Series | pd.DataFrame):
         labels = labels.values
 
     # TabPFNExplainer is directly available in the shapiq module
