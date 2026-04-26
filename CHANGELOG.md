@@ -11,6 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [0.3.0] - 2026-04-24
+
+### Added
+- Conditional Randomization Test (CRT) based p-value / hypothesis testing extension using TabPFN (#237).
+- AutoTabPFN diagnostics and per-checkpoint AutoGluon limits (#272, PRI-269).
+
+### Changed
+- Widened `tabpfn` dependency cap from `<7` to `<8` (#259). This allows `tabpfn-extensions` to resolve against `tabpfn >= 7.x` (TabPFN v2.6). Fixes the Colab issue where `tabpfn-extensions[all]` transitively pinned `tabpfn` to `6.4.1` (v2.5 model).
+- Standardized random state handling across Random Forest extensions (#235).
+- Added license checks to CI (#238).
+
+### Removed
+- **BREAKING**: `scikit-survival` is no longer installed by the `[all]` or `[survival]` extras (#269). It is excluded due to its GPL-3.0 license. If you use `SurvivalTabPFN`, install it manually:
+
+  ```
+  pip install scikit-survival
+  ```
+
+  A clear `ImportError` with install instructions is raised when `SurvivalTabPFN` is imported without `scikit-survival` present.
+
+### Fixed
+- Hotfix in the `unsupervised` module (#249).
+- Removed flaky `test_crt_handles_irrelevant_feature` (#256).
+
 ## [0.2.1] - 2025-11-07
 
 ### Added
