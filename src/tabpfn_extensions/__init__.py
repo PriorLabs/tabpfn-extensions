@@ -13,6 +13,7 @@ from . import test_utils
 from .embedding import TabPFNEmbedding
 from .hpo import TunedTabPFNClassifier, TunedTabPFNRegressor
 from .many_class import ManyClassClassifier
+from .multioutput import TabPFNMultiOutputClassifier, TabPFNMultiOutputRegressor
 from .post_hoc_ensembles import AutoTabPFNClassifier, AutoTabPFNRegressor
 from .unsupervised import TabPFNUnsupervisedModel
 
@@ -26,6 +27,8 @@ __all__ = [
     "is_tabpfn",
     "TabPFNEmbedding",
     "ManyClassClassifier",
+    "TabPFNMultiOutputRegressor",
+    "TabPFNMultiOutputClassifier",
     "TabPFNUnsupervisedModel",
     "AutoTabPFNClassifier",
     "AutoTabPFNRegressor",
