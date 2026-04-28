@@ -133,9 +133,7 @@ def score_classification(
     if (optimize_metric in ("roc", "auroc")) and len(np.unique(y_true)) == 2:
         y_pred = y_pred[:, 1]
 
-    if (not y_pred_is_labels) and (
-        optimize_metric not in ["roc", "auroc", "log_loss"]
-    ):
+    if (not y_pred_is_labels) and (optimize_metric not in ["roc", "auroc", "log_loss"]):
         y_pred = np.argmax(y_pred, axis=1)
 
     if optimize_metric in ("roc", "auroc"):
