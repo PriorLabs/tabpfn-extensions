@@ -256,23 +256,9 @@ graph LR
 
 ```
 
-## Anonymized Telemetry
-
-This project collects fully anonymous usage telemetry with an option to opt-out of any telemetry or opt-in to extended telemetry.
-
-The data is used exclusively to help us provide stability to the relevant products and compute environments and guide future improvements.
-
-- **No personal data is collected**
-- **No code, model inputs, or outputs are ever sent**
-- **Data is strictly anonymous and cannot be linked to individuals**
+## Telemetry
 
 For details on telemetry, please see our [Telemetry Reference](https://github.com/PriorLabs/TabPFN/blob/main/TELEMETRY.md) and our [Privacy Policy](https://priorlabs.ai/privacy_policy/).
-
-**To opt out**, set the following environment variable:
-
-```bash
-export TABPFN_DISABLE_TELEMETRY=1
-```
 
 ## For Contributors
 
