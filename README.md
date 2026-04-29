@@ -44,7 +44,7 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
 - **pval_crt**: Statistical feature relevance testing (p-values)
 
-Detailed documentation for each extension is available in the respective module directories.
+See the [Documentation](#documentation) section below for guides, examples, and per-extension READMEs.
 
 ### Backend Options
 
@@ -62,7 +62,52 @@ Many TabPFN Extensions works with two TabPFN implementations:
 
 Choose the backend that fits your needs - most extensions work with either option!
 
-Exceptions to this include Post Hoc Ensembling and Embeddings.
+Exceptions to this are **post_hoc_ensembles** and **embedding**, which only work with the local `tabpfn` package.
+
+## Documentation
+
+Documentation for `tabpfn-extensions` is spread across several sources. If you are new to the project, the [examples](#examples) are usually the fastest way to get started; for deeper conceptual guides, see the [TabPFN Docs pages](#tabpfn-docs-pages).
+
+### Examples
+
+Runnable scripts and notebooks for extensions and general use cases live in the [`examples/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples) directory of this repository:
+
+- [`embedding/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding) — access TabPFN's internal dense sample embeddings
+- [`hpo/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/hpo) — automatic hyperparameter tuning
+- [`interpretability/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/interpretability) — SHAP values, partial dependence plots, feature selection
+- [`large_datasets/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/large_datasets) — working with datasets beyond TabPFN's default limits
+- [`many_class/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/many_class) — classification with more than 10 classes
+- [`phe/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/phe) — post-hoc ensembles
+- [`pval_crt/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/pval_crt) — statistical feature relevance testing
+- [`rf_pfn/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/rf_pfn) — TabPFN combined with decision trees and random forests
+- [`survival/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/survival) — survival analysis
+- [`tabebm/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/tabebm) — data augmentation via TabEBM
+- [`unsupervised/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/unsupervised) — data generation, imputation, and outlier detection
+
+### TabPFN Docs pages
+
+In-depth guides for selected extensions are available on [docs.priorlabs.ai](https://docs.priorlabs.ai):
+
+- [Post-hoc ensembles](https://docs.priorlabs.ai/extensions/post-hoc-ensembles)
+- [Many-class](https://docs.priorlabs.ai/extensions/many-class)
+- [HPO](https://docs.priorlabs.ai/extensions/hpo)
+- [RF-PFN](https://docs.priorlabs.ai/extensions/rf-pfn)
+
+### Per-extension READMEs
+
+Some extensions ship a dedicated README alongside their source code:
+
+- [`hpo/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/hpo/README.md)
+- [`interpretability/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/interpretability/README.md)
+- [`post_hoc_ensembles/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/post_hoc_ensembles/README.md)
+- [`pval_crt/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/pval_crt/README.md)
+- [`tabebm/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/tabebm/README.md)
+
+### Interactive notebook
+
+The main TabPFN demo notebook also covers several extensions — in particular the [unsupervised](https://github.com/PriorLabs/tabpfn-extensions/tree/main/src/tabpfn_extensions/unsupervised) and [interpretability](https://github.com/PriorLabs/tabpfn-extensions/tree/main/src/tabpfn_extensions/interpretability) extensions:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PriorLabs/TabPFN/blob/main/examples/notebooks/TabPFN_Demo_Local.ipynb)
 
 ## License
 
@@ -211,23 +256,9 @@ graph LR
 
 ```
 
-## Anonymized Telemetry
-
-This project collects fully anonymous usage telemetry with an option to opt-out of any telemetry or opt-in to extended telemetry.
-
-The data is used exclusively to help us provide stability to the relevant products and compute environments and guide future improvements.
-
-- **No personal data is collected**
-- **No code, model inputs, or outputs are ever sent**
-- **Data is strictly anonymous and cannot be linked to individuals**
+## Telemetry
 
 For details on telemetry, please see our [Telemetry Reference](https://github.com/PriorLabs/TabPFN/blob/main/TELEMETRY.md) and our [Privacy Policy](https://priorlabs.ai/privacy_policy/).
-
-**To opt out**, set the following environment variable:
-
-```bash
-export TABPFN_DISABLE_TELEMETRY=1
-```
 
 ## For Contributors
 
