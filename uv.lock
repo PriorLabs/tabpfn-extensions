@@ -5150,7 +5150,7 @@ requires-dist = [
     { name = "hyperopt", marker = "extra == 'post-hoc-ensembles'", specifier = ">=0.2.7" },
     { name = "llvmlite", marker = "extra == 'post-hoc-ensembles'", specifier = ">=0.43.0" },
     { name = "numba", marker = "extra == 'interpretability'", specifier = ">=0.60.0" },
-    { name = "pandas", specifier = ">=1.4.0" },
+    { name = "pandas", specifier = ">=2.2.2" },
     { name = "scikit-learn", specifier = ">=1.6.0" },
     { name = "scipy", specifier = ">=1.11.1" },
     { name = "seaborn", marker = "extra == 'interpretability'", specifier = ">=0.12.2" },
