@@ -397,6 +397,10 @@ reportUnnecessaryComparison = false
 reportConstantRedefinition = false
 reportUntypedFunctionDecorator = false
 
+[tool.changelog-bot.towncrier_changelog]
+enabled = true
+changelog_skip_label = "no changelog needed"
+
 [tool.towncrier]
 directory = "changelog"
 filename = "CHANGELOG.md"
