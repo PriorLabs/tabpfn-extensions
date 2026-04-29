@@ -37,10 +37,10 @@ jobs:
             python-version: "3.9"
             dependency-set: lowest-direct
           - os: macos-latest
-            # Use 3.10 as the minimum Python version for Macs, as that is the earliest
-            # version that supports Apple Silicon, and Apple Silicon is required by
+            # Use 3.11 as the minimum Python version for Macs. Python 3.10 doesn't
+            # install reliably on macOS ARM runners, and Apple Silicon is required by
             # TabPFN's minimum PyTorch.
-            python-version: "3.10"
+            python-version: "3.11"
             dependency-set: lowest-direct
           - os: windows-latest
             python-version: "3.9"

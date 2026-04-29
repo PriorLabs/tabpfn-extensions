@@ -60,12 +60,12 @@ interpretability = [
     "shap>=0.41.0",
     # numba is a transitive dependency from shap, but shap doesn't specify a lower
     # bound, thus we specify one so --resolution lowest-direct works.
-    "numba>=0.58.0",
+    "numba>=0.60.0",
     "shapiq>=0.4.0",
     "seaborn>=0.12.2",
 ]
 post_hoc_ensembles = [
-    "llvmlite>=0.41.1",
+    "llvmlite>=0.43.0",
     "hyperopt>=0.2.7",
     "autogluon.tabular==1.4.0"
 ]
