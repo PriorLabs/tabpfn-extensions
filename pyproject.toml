@@ -7,10 +7,10 @@ name = "tabpfn-extensions"
 version = "0.3.0"
 dependencies = [
     "torch>=2.1",
-    "pandas>=1.4.0",
+    "pandas>=2.2.2",
     "scikit-learn>=1.6.0",
     "scipy>=1.11.1",
-    "tabpfn>=6.0.5",
+    "tabpfn>=7.0.0",
     "tabpfn-common-utils[telemetry-interactive]>=0.2.0",
 ]
 
@@ -58,11 +58,14 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 [project.optional-dependencies]
 interpretability = [
     "shap>=0.41.0",
+    # numba is a transitive dependency from shap, but shap doesn't specify a lower
+    # bound, thus we specify one so --resolution lowest-direct works.
+    "numba>=0.60.0",
     "shapiq>=0.4.0",
     "seaborn>=0.12.2",
 ]
 post_hoc_ensembles = [
-    "llvmlite",
+    "llvmlite>=0.43.0",
     "hyperopt>=0.2.7",
     "autogluon.tabular==1.4.0"
 ]
@@ -81,29 +84,26 @@ unsupervised = []
 
 # Meta-package that installs all extensions
 all = [
-    "shap>=0.41.0",
-    "shapiq>=0.4.0",
-    "seaborn>=0.12.2",
-
-    "llvmlite>=0.30.0",
-    "hyperopt>=0.2.7",
-    # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
-    "setuptools>=67.0.0,<82",
-    "autogluon.tabular==1.4.0",
     # scikit-survival not included; install manually if you need SurvivalTabPFN.
+    "tabpfn-extensions[interpretability,post_hoc_ensembles,hpo,survival]",
 ]
 
 [dependency-groups]
+# The minimum subset of the dev dependencies required to run the tests on the CI.
+# The idea is to be as close to the deployment environment as possible.
+ci = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.15.1",
+    "licensecheck>=2025.1.0",
+]
 dev = [
+    {include-group = "ci"},
     "pre-commit>=3.0.0",
     "ruff==0.8.6", # This must be the same version as in .pre-commit-config.yaml
     "mypy>=1.0.0",
-    "pytest>=8.0.0",
     "pytest-xdist>=3.6.0",
-    "pytest-mock>=3.15.1",
     "build>=1.3.0",
     "twine>=6.2.0",
-    "licensecheck>=2025.1.0",
 ]
 
 [tool.pytest.ini_options]
