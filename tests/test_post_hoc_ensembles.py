@@ -258,3 +258,59 @@ class TestPHESpecificFeatures:
         # AssertionError: ag.max_rows=10000 but...
         with pytest.raises(RuntimeError):
             model_no_flag.fit(X, y)
+
+    @pytest.mark.parametrize(
+        ("model_version", "expected_class_name"),
+        [
+            (ModelVersion.V2, "RealTabPFNv2Model"),
+            (ModelVersion.V2_5, "RealTabPFNv25Model"),
+        ],
+    )
+    def test_routes_to_per_version_autogluon_class(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        model_version: ModelVersion,
+        expected_class_name: str,
+    ):
+        """``model_version`` should select the AutoGluon TabPFN model class
+        whose per-version max_rows/max_features/max_classes limits match: V2
+        -> RealTabPFNv2Model, V2_5 -> RealTabPFNv25Model. We stub
+        ``TabularPredictor`` so the test does not actually fit anything; it
+        just captures the hyperparameters dict and asserts the keying class.
+        """
+        captured: dict[str, object] = {}
+
+        class StubPredictor:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def fit(self, *args, **kwargs):
+                captured["hyperparameters"] = kwargs.get("hyperparameters")
+                return self
+
+            def features(self):
+                return ["a", "b"]
+
+        # AutoTabPFN imports `TabularPredictor` lazily inside fit(), so we
+        # patch the attribute on the source module that the import reads from.
+        import autogluon.tabular
+
+        monkeypatch.setattr(autogluon.tabular, "TabularPredictor", StubPredictor)
+
+        X = pd.DataFrame(np.random.randn(40, 2), columns=["a", "b"])
+        y = pd.Series([0, 1] * 20)
+
+        clf = AutoTabPFNClassifier(
+            model_version=model_version,
+            n_ensemble_models=1,
+            max_time=1,
+        )
+        clf.fit(X, y)
+
+        hps = captured["hyperparameters"]
+        assert (
+            hps is not None
+        ), "TabularPredictor.fit was not called with hyperparameters"
+        classes = list(hps.keys())
+        assert len(classes) == 1
+        assert classes[0].__name__ == expected_class_name
