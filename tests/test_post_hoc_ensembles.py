@@ -260,57 +260,55 @@ class TestPHESpecificFeatures:
             model_no_flag.fit(X, y)
 
     @pytest.mark.parametrize(
-        ("model_version", "expected_class_name"),
+        ("model_version", "expected_ag_name"),
         [
-            (ModelVersion.V2, "RealTabPFNv2Model"),
-            (ModelVersion.V2_5, "RealTabPFNv25Model"),
+            # `ag_name` is the per-version identifier set by each AutoGluon
+            # TabPFN model class -- AG uses it as the leaderboard prefix.
+            (ModelVersion.V2, "RealTabPFN-v2"),
+            (ModelVersion.V2_5, "RealTabPFN-v2.5"),
         ],
     )
     def test_routes_to_per_version_autogluon_class(
         self,
         monkeypatch: pytest.MonkeyPatch,
         model_version: ModelVersion,
-        expected_class_name: str,
+        expected_ag_name: str,
     ):
         """``model_version`` should select the AutoGluon TabPFN model class
         whose per-version max_rows/max_features/max_classes limits match: V2
-        -> RealTabPFNv2Model, V2_5 -> RealTabPFNv25Model. We stub
-        ``TabularPredictor`` so the test does not actually fit anything; it
-        just captures the hyperparameters dict and asserts the keying class.
+        -> RealTabPFNv2Model, V2_5 -> RealTabPFNv25Model. Mocks TabPFN at
+        the leaf so AutoGluon runs end-to-end cheaply, then asserts on the
+        leaderboard's TabPFN sub-model names (each is ``<ag_name>[_N]_BAG_L1``)
+        that all of them came from the expected AG class -- catches both
+        wrong-version routing and any leak of the other version's class
+        into the ensemble.
         """
-        captured: dict[str, object] = {}
-
-        class StubPredictor:
-            def __init__(self, *args, **kwargs):
-                pass
-
-            def fit(self, *args, **kwargs):
-                captured["hyperparameters"] = kwargs.get("hyperparameters")
-                return self
-
-            def features(self):
-                return ["a", "b"]
-
-        # AutoTabPFN imports `TabularPredictor` lazily inside fit(), so we
-        # patch the attribute on the source module that the import reads from.
-        import autogluon.tabular
-
-        monkeypatch.setattr(autogluon.tabular, "TabularPredictor", StubPredictor)
+        monkeypatch.setattr("tabpfn.TabPFNClassifier", MockTabPFNClassifier)
+        monkeypatch.setattr("tabpfn.TabPFNRegressor", MockTabPFNRegressor)
 
         X = pd.DataFrame(np.random.randn(40, 2), columns=["a", "b"])
         y = pd.Series([0, 1] * 20)
 
         clf = AutoTabPFNClassifier(
             model_version=model_version,
-            n_ensemble_models=1,
-            max_time=1,
+            n_ensemble_models=3,
+            max_time=10,
+            ignore_pretraining_limits=True,
         )
         clf.fit(X, y)
 
-        hps = captured["hyperparameters"]
-        assert (
-            hps is not None
-        ), "TabularPredictor.fit was not called with hyperparameters"
-        classes = list(hps.keys())
-        assert len(classes) == 1
-        assert classes[0].__name__ == expected_class_name
+        # Each TabPFN sub-model is named "<ag_name>[_N]_BAG_L1"; parse the
+        # ag_name back out by taking everything up to the first underscore.
+        # This works because "RealTabPFN-v2" and "RealTabPFN-v2.5" differ at
+        # position 13 (dot vs underscore) -- a v2.5 name does not split-prefix
+        # to "RealTabPFN-v2".
+        leaderboard_names = clf.predictor_.leaderboard(silent=True)["model"].tolist()
+        tabpfn_ag_names = {
+            name.split("_", 1)[0]
+            for name in leaderboard_names
+            if name.startswith("RealTabPFN-")
+        }
+        assert tabpfn_ag_names == {expected_ag_name}, (
+            f"expected only {expected_ag_name!r} in trained TabPFN sub-models, "
+            f"got {tabpfn_ag_names} (leaderboard: {leaderboard_names})"
+        )
