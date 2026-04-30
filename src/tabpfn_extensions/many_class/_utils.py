@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -15,8 +14,7 @@ EPS_WEIGHT = 1e-6
 
 def _dataclass_kwargs() -> dict[str, Any]:
     kwargs: dict[str, Any] = {}
-    if sys.version_info >= (3, 10):  # pragma: no cover - environment dependent
-        kwargs["slots"] = True
+    kwargs["slots"] = True
     return kwargs
 
 

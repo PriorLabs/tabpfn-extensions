@@ -34,14 +34,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            python-version: "3.9"
+            python-version: "3.10"
             dependency-set: minimum
-          - os: macos-15-intel # We need x86 as ARM is  python>= 3.11 only.
-            # https://github.com/actions/setup-python/issues/855
-            python-version: "3.9"
+          - os: macos-latest
+            python-version: "3.10"
             dependency-set: minimum
           - os: windows-latest
-            python-version: "3.9"
+            python-version: "3.10"
             dependency-set: minimum
           - os: ubuntu-latest
             python-version: "3.13"
@@ -64,7 +63,6 @@ jobs:
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
-          architecture: x64
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0

@@ -30,7 +30,7 @@ class WeightedAverageEnsemble(BaseEstimator, ClassifierMixin):
         # Prune classifiers with weights below the threshold
         pruned_classifiers = []
         pruned_weights = []
-        for clf, weight in zip(self.estimators, weights):
+        for clf, weight in zip(self.estimators, weights, strict=True):
             if weight >= self.weight_threshold:
                 pruned_classifiers.append(clf)
                 pruned_weights.append(weight)
@@ -40,7 +40,7 @@ class WeightedAverageEnsemble(BaseEstimator, ClassifierMixin):
             pruned_classifiers = [
                 clf
                 for _, clf in sorted(
-                    zip(pruned_weights, pruned_classifiers),
+                    zip(pruned_weights, pruned_classifiers, strict=True),
                     key=lambda pair: pair[0],
                 )
             ]
