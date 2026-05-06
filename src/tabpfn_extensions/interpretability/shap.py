@@ -203,7 +203,7 @@ def get_shap_values(
         **kwargs: Additional keyword arguments to pass to the SHAP explainer.
 
     Returns:
-        np.ndarray: The computed SHAP values with shape (n_samples, n_features).
+        shap.Explanation: The SHAP explanation object returned by the configured explainer.
     """
     if isinstance(test_x, torch.Tensor):
         test_x = test_x.cpu().numpy()
