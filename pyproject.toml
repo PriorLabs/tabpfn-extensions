@@ -10,11 +10,11 @@ dependencies = [
     "pandas>=1.4.0",
     "scikit-learn>=1.6.0",
     "scipy>=1.11.1",
-    "tabpfn>=6.0.5",
-    "tabpfn-common-utils[telemetry-interactive]>=0.2.0",
+    "tabpfn>=6.3.2",
+    "tabpfn-common-utils[telemetry-interactive]>=0.2.13",
 ]
 
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "Noah Hollmann", email = "noah.hollmann@charite.de" },
     { name = "Leo Grinsztajn" },
@@ -43,7 +43,6 @@ classifiers = [
     'Operating System :: Unix',
     'Operating System :: MacOS',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
@@ -64,7 +63,7 @@ interpretability = [
 post_hoc_ensembles = [
     "llvmlite",
     "hyperopt>=0.2.7",
-    "autogluon.tabular==1.4.0"
+    "autogluon.tabular>=1.5.0,<1.6"
 ]
 hpo = [
     "hyperopt>=0.2.7",
@@ -89,7 +88,7 @@ all = [
     "hyperopt>=0.2.7",
     # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
     "setuptools>=67.0.0,<82",
-    "autogluon.tabular==1.4.0",
+    "autogluon.tabular>=1.5.0,<1.6",
     # scikit-survival not included; install manually if you need SurvivalTabPFN.
 ]
 
@@ -117,7 +116,7 @@ addopts = "--durations=10 -vv"
 
 # https://github.com/astral-sh/ruff
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 88
 output-format = "full"
 src = ["src", "tests", "examples"]
@@ -329,7 +328,7 @@ convention = "google"
 max-args = 10 # Changed from default of 5
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 packages = ["src/tabpfn_extensions", "tests"]
 
 show_error_codes = true
@@ -368,7 +367,7 @@ ignore_missing_imports = true
 [tool.pyright]
 include = ["src", "tests"]
 
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 typeCheckingMode = "strict"
 
 strictListInference = true

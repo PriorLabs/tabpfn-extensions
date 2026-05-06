@@ -18,8 +18,9 @@ import inspect
 import platform
 import sys
 import types
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Literal
+from typing import Literal
 
 import sklearn
 from sklearn.utils.fixes import parse_version
@@ -34,8 +35,6 @@ sklearn_version = parse_version(parse_version(sklearn.__version__).base_version)
 
 # tags infrastructure
 def _dataclass_args():
-    if sys.version_info < (3, 10):
-        return {}
     return {"slots": True}
 
 
@@ -196,7 +195,7 @@ if sklearn_version < parse_version("1.4"):
             Whether the estimator is fitted.
         """
         if attributes is not None:
-            if not isinstance(attributes, (list, tuple)):
+            if not isinstance(attributes, list | tuple):
                 attributes = [attributes]
             return all_or_any([hasattr(estimator, attr) for attr in attributes])
 

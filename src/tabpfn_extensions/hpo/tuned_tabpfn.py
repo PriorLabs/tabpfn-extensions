@@ -39,8 +39,9 @@ Example usage:
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 import torch
@@ -183,7 +184,7 @@ class TunedTabPFNBase(BaseEstimator):
             for k, v_item in self.search_space.items():
                 if isinstance(v_item, list):
                     custom_space[k] = hp.choice(k, v_item)
-                elif isinstance(v_item, (int, float, bool, str)) or v_item is None:
+                elif isinstance(v_item, int | float | bool | str) or v_item is None:
                     custom_space[k] = v_item
                 else:
                     custom_space[k] = v_item

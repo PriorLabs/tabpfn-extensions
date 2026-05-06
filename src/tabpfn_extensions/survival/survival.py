@@ -1,6 +1,9 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
-
+#
+#  Concept and code developed by Robert Hatch based on his solution at the
+#  Kaggle CIBMTR - Equity in post-HCT Survival Predictions Competition.
+#
 # INFO: The survival prediction work is work-in-progress and still unoptimized,
 #  TabPFN survival may provide inconsistent improvements.
 
