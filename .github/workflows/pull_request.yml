@@ -95,7 +95,7 @@ jobs:
         run: uv run --no-sync python scripts/download_all_models.py
 
       - name: Check for forbidden licenses
-        if: runner.os == 'MacOS' && matrix.python-version == '3.9'
+        if: runner.os == 'MacOS' && matrix.dependency-set == 'lowest-direct'
         shell: bash
         run: |
           uv run --no-sync licensecheck \
