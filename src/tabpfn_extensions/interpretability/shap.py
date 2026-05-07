@@ -33,8 +33,9 @@ Example usage:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from multiprocessing import Pool
-from typing import Any, Callable
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np

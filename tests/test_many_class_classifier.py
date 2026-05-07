@@ -286,7 +286,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         for labels in fit_y_records:
             assert rest_code not in labels
 
-        for weights, labels in zip(fit_weight_records, fit_y_records):
+        for weights, labels in zip(fit_weight_records, fit_y_records, strict=True):
             if weights is not None:
                 assert weights.shape[0] == labels.shape[0]
 

@@ -67,16 +67,10 @@ def prepare_tabpfnv2_config(
     else:
         config.pop("balance_probabilities", None)
 
-    # TODO: Enable RF-PFN at some point
-    config["model_type"] = "single"
-
-    # Special case for dt_pfn
-    # TODO: This code is unused until we support RF-PFN
-    if config.get("model_type") == "dt_pfn":
-        config["n_ensemble_repeats"] = config["n_estimators"]
-        config["n_estimators"] = 1
-
-    # Remove deprecated keys
+    # Remove search-space-only keys that are not valid TabPFNClassifier kwargs.
+    # `model_type` is a placeholder for future RF-PFN routing (currently unused),
+    # and `max_depth` was for the dt_pfn variant.
+    config.pop("model_type", None)
     config.pop("max_depth", None)
 
     return config
