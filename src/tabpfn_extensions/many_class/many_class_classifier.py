@@ -118,6 +118,11 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         X_probe = np.random.default_rng(0).standard_normal((4, 2))
         y_probe = np.array([0, 0, 1, 1])
         probe = clone(self.estimator)
+        # Strip any user-provided categorical indices — they may reference
+        # columns beyond the synthetic 2-feature probe and trip TabPFN's
+        # index-bounds validation.
+        if hasattr(probe, "categorical_features_indices"):
+            probe.categorical_features_indices = None
         probe.fit(X_probe, y_probe)
         cfg = getattr(probe, "inference_config_", None)
         value = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None) if cfg is not None else None
