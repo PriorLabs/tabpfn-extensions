@@ -240,6 +240,11 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         self._row_class_mask_ = None
 
         if self.no_mapping_needed_:
+            logger.info(
+                "Base estimator supports up to %d classes; data has %d — fitting once (no codebook).",
+                self.alphabet_size_,
+                n_classes,
+            )
             estimator = self._clone_base_estimator()
             estimator.fit(X_validated, y_validated, **self.fit_params_)
             self.estimators_ = [estimator]
@@ -251,6 +256,13 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             return self
 
         n_estimators = self._get_n_estimators(n_classes, self.alphabet_size_)
+        logger.info(
+            "Base estimator supports up to %d classes; data has %d — using %d-symbol output coding over %d base fits.",
+            self.alphabet_size_,
+            n_classes,
+            self.alphabet_size_,
+            n_estimators,
+        )
         codebook, stats = self._codebook_strategy.generate(
             n_classes, n_estimators, self.alphabet_size_, rng
         )
