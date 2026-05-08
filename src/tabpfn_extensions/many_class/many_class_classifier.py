@@ -114,7 +114,8 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
     def _probe_alphabet_size(self) -> int | None:
         """Fit a clone of the base estimator on tiny synthetic data to
-        populate inference_config_, then read MAX_NUMBER_OF_CLASSES."""
+        populate inference_config_, then read MAX_NUMBER_OF_CLASSES.
+        """
         X_probe = np.random.default_rng(0).standard_normal((4, 2))
         y_probe = np.array([0, 0, 1, 1])
         probe = clone(self.estimator)
