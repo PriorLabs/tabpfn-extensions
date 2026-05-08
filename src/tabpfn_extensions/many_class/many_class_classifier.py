@@ -31,7 +31,17 @@ logger = logging.getLogger(__name__)
 
 @set_extension("many_class")
 class ManyClassClassifier(BaseEstimator, ClassifierMixin):
-    """Output-coding wrapper that enables TabPFN-style estimators to handle many classes."""
+    """Output-coding wrapper that enables TabPFN-style estimators to handle many classes.
+
+    Parameters
+    ----------
+    estimator : BaseEstimator
+        Base classifier (typically a TabPFN classifier) used as the underlying model.
+    alphabet_size : int | None, default=None
+        Maximum number of classes the base estimator handles in a single fit. When
+        ``None``, it is inferred from the base estimator's checkpoint
+        ``MAX_NUMBER_OF_CLASSES``.
+    """
 
     def __init__(
         self,
@@ -95,16 +105,23 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
     # ------------------------------------------------------------------
     # Fitting utilities
     # ------------------------------------------------------------------
-    def _get_alphabet_size(self) -> int:
+    def _get_alphabet_size(self) -> int | None:
         if self.alphabet_size is not None:
-            return self.alphabet_size
-        if hasattr(self.estimator, "max_num_classes_"):
-            inferred = self.estimator.max_num_classes_
-            if inferred is not None:
-                return int(inferred)
-        raise ValueError(
-            "alphabet_size must be specified when base estimator has no limit"
-        )
+            return int(self.alphabet_size)
+        cfg = getattr(self.estimator, "inference_config_", None)
+        val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None) if cfg is not None else None
+        return int(val) if val else None
+
+    def _probe_alphabet_size(self) -> int | None:
+        """Fit a clone of the base estimator on tiny synthetic data to
+        populate inference_config_, then read MAX_NUMBER_OF_CLASSES."""
+        X_probe = np.random.default_rng(0).standard_normal((4, 2))
+        y_probe = np.array([0, 0, 1, 1])
+        probe = clone(self.estimator)
+        probe.fit(X_probe, y_probe)
+        cfg = getattr(probe, "inference_config_", None)
+        value = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None) if cfg is not None else None
+        return int(value) if value else None
 
     def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
         if self.n_estimators is not None:
@@ -198,7 +215,11 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
         self.fit_params_ = dict(fit_params)
         self.classes_ = unique_labels(y_validated)
-        self.alphabet_size_ = self._get_alphabet_size()
+        self.alphabet_size_ = self._get_alphabet_size() or self._probe_alphabet_size()
+        if self.alphabet_size_ is None:
+            raise ValueError(
+                "alphabet_size must be specified when base estimator has no limit"
+            )
         if self.alphabet_size_ < 2:
             raise ValueError("alphabet_size must be >= 2.")
 
