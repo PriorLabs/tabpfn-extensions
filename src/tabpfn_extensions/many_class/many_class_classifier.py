@@ -123,7 +123,13 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         # index-bounds validation.
         if hasattr(probe, "categorical_features_indices"):
             probe.categorical_features_indices = None
-        probe.fit(X_probe, y_probe)
+        try:
+            probe.fit(X_probe, y_probe)
+        except (ValueError, TypeError):
+            # Base estimator rejected the synthetic shape/dtype — treat as
+            # "not a compatible model" and let the caller fall back to its
+            # explicit-alphabet error path.
+            return None
         cfg = getattr(probe, "inference_config_", None)
         value = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None) if cfg is not None else None
         return int(value) if value else None
