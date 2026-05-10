@@ -108,32 +108,12 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
     def _get_alphabet_size(self) -> int | None:
         if self.alphabet_size is not None:
             return int(self.alphabet_size)
-        cfg = getattr(self.estimator, "inference_config_", None)
-        val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None) if cfg is not None else None
-        return int(val) if val else None
-
-    def _probe_alphabet_size(self) -> int | None:
-        """Fit a clone of the base estimator on tiny synthetic data to
-        populate inference_config_, then read MAX_NUMBER_OF_CLASSES.
-        """
-        X_probe = np.random.default_rng(0).standard_normal((4, 2))
-        y_probe = np.array([0, 0, 1, 1])
-        probe = clone(self.estimator)
-        # Strip any user-provided categorical indices — they may reference
-        # columns beyond the synthetic 2-feature probe and trip TabPFN's
-        # index-bounds validation.
-        if hasattr(probe, "categorical_features_indices"):
-            probe.categorical_features_indices = None
-        try:
-            probe.fit(X_probe, y_probe)
-        except (ValueError, TypeError):
-            # Base estimator rejected the synthetic shape/dtype — treat as
-            # "not a compatible model" and let the caller fall back to its
-            # explicit-alphabet error path.
-            return None
-        cfg = getattr(probe, "inference_config_", None)
-        value = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None) if cfg is not None else None
-        return int(value) if value else None
+        if hasattr(self.estimator, "get_inference_config"):
+            cfg = self.estimator.get_inference_config()
+            val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None)
+            if val:
+                return int(val)
+        return None
 
     def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
         if self.n_estimators is not None:
@@ -227,7 +207,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
 
         self.fit_params_ = dict(fit_params)
         self.classes_ = unique_labels(y_validated)
-        self.alphabet_size_ = self._get_alphabet_size() or self._probe_alphabet_size()
+        self.alphabet_size_ = self._get_alphabet_size()
         if self.alphabet_size_ is None:
             raise ValueError(
                 "alphabet_size must be specified when base estimator has no limit"
