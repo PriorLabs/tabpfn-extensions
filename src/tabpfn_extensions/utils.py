@@ -54,7 +54,29 @@ def warn_if_no_kv_cache(model: Any, *, context: str = "This operation") -> None:
             SHAP"``, ``"Sequential feature selection"``). Defaults to a
             generic ``"This operation"``.
     """
+    # tabpfn-client doesn't expose fit_mode and doesn't (yet) support the KV
+    # cache — recommend switching to the local tabpfn package instead of
+    # firing the generic "set fit_mode='fit_with_cache'" message that would
+    # TypeError on the client.
+    if "tabpfn_client" in str(getattr(model, "__class__", type(model)).__module__):
+        warnings.warn(
+            f"{context} would benefit substantially from the KV cache, but "
+            "the tabpfn-client backend does not currently support it. "
+            "Install the local tabpfn package (`pip install tabpfn`) and "
+            "use TabPFNClassifier/TabPFNRegressor with "
+            "fit_mode='fit_with_cache' to enable it.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return
+
     fit_mode = getattr(model, "fit_mode", None)
+    if fit_mode is None:
+        # Not a TabPFN-shaped model (or some custom estimator without a
+        # fit_mode attribute). Don't fire a misleading warning; the caller
+        # is responsible for ensuring the estimator is something we can
+        # actually accelerate.
+        return
     if fit_mode != "fit_with_cache":
         warnings.warn(
             f"TabPFN model has fit_mode={fit_mode!r}, not 'fit_with_cache'. "
