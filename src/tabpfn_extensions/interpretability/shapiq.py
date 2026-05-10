@@ -121,20 +121,25 @@ def get_tabpfn_explainer(
         .. [3] Rundel, D., Kobialka, J., von Crailsheim, C., Feurer, M., Nagler, T., Rügamer, D. (2024). Interpretable Machine Learning for TabPFN. In: Longo, L., Lapuschkin, S., Seifert, C. (eds) Explainable Artificial Intelligence. xAI 2024. Communications in Computer and Information Science, vol 2154. Springer, Cham. https://doi.org/10.1007/978-3-031-63797-1_23
 
     """
+    # Defer the import to avoid circular imports
     try:
-        import shapiq
+        import shapiq  # Import the main package
+        # Current version of shapiq has TabPFNExplainer in the base module
     except ImportError:
         raise ImportError(
             "Package 'shapiq' is required for model explanation. "
             "Please install it with: pip install shapiq",
         )
 
+    # make data to array if it is a pandas DataFrame
     if isinstance(data, pd.DataFrame):
         data = data.values
 
+    # make labels to array if it is a pandas Series
     if isinstance(labels, pd.Series | pd.DataFrame):
         labels = labels.values
 
+    # TabPFNExplainer is directly available in the shapiq module
     return shapiq.TabPFNExplainer(
         model=model,
         data=data,
@@ -203,8 +208,10 @@ def get_tabpfn_imputation_explainer(
         .. [3] Lundberg, S. M., & Lee, S. I. (2017). A Unified Approach to Interpreting Model Predictions. Advances in Neural Information Processing Systems 30 (pp. 4765--4774).
 
     """
+    # Defer the import to avoid circular imports
     try:
-        import shapiq
+        import shapiq  # Import the main package
+        # Current version of shapiq has TabularExplainer in the base module
     except ImportError:
         raise ImportError(
             "Package 'shapiq' is required for model explanation. "
@@ -213,6 +220,7 @@ def get_tabpfn_imputation_explainer(
 
     _warn_if_no_kv_cache(model)
 
+    # make data to array if it is a pandas DataFrame
     if isinstance(data, pd.DataFrame):
         data = data.values
 

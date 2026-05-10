@@ -151,7 +151,3 @@ commit_messages.txt
 CLAUDE.md
 .claude/*.local.*
 .claude/worktrees/
-.claude/*.lock
-
-# experiment outputs (SLURM logs, JSON dumps, figures)
-scripts/logs/
