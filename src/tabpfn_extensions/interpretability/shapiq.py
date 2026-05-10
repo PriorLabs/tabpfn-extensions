@@ -45,7 +45,8 @@ def _warn_if_no_kv_cache(model: Any) -> None:
         warnings.warn(
             f"TabPFN model has fit_mode={fit_mode!r}, not 'fit_with_cache'. "
             "Imputation-based SHAP will be substantially slower than necessary. "
-            "Construct the model with TabPFNClassifier(fit_mode='fit_with_cache', ...) "
+            "Construct the model with TabPFNClassifier or TabPFNRegressor "
+            "(fit_mode='fit_with_cache', ...) "
             "(set BEFORE calling .fit) to enable the KV cache, then set "
             "model.executor_.keep_cache_on_device = True after .fit().",
             UserWarning,

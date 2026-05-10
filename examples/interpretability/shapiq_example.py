@@ -78,7 +78,8 @@ iv_interactions.plot_network(feature_names=feature_names)
 # Upset plot of top interactions
 iv_interactions.plot_upset(feature_names=feature_names)
 
-# Result: Pairwise Shapley interactions uncover a strong interaction between Latitude and Longitude, which are not visible at lower orders.
+# Result: Pairwise Shapley interactions uncover a strong interaction between
+# Latitude and Longitude, which are not visible at lower orders.
 
 
 # -----------------------------------------------------------------------------
