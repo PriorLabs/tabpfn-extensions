@@ -38,8 +38,7 @@ x_explain = X_test[0]
 # BEFORE .fit(); keep_cache_on_device=True is set AFTER .fit().
 reg = TabPFNRegressor(fit_mode="fit_with_cache")
 reg.fit(X_train, y_train)
-# keep_cache_on_device defaults to True post PriorLabs/TabPFN#942, but we set
-# it explicitly here as a safety net in case the user's TabPFN predates that.
+# keep_cache_on_device is usually on by default — set explicitly as a safety net.
 reg.executor_.keep_cache_on_device = True
 
 # Exact enumeration for d=8 is 2**8 = 256 coalitions.
