@@ -11,12 +11,11 @@ Two ways to plug shapiq output into shap plots:
   (b) New SHAP API: wrap shapiq output in a `shap.Explanation` and use
       `shap.plots.bar`, `shap.plots.waterfall`, `shap.plots.beeswarm`.
 
-Dataset: California housing (regression, d=8). With baseline imputation each
-coalition is one forward pass, so a full sweep at budget=2**8=256 (exact
-enumeration) takes roughly 0.1s/row on an RTX 6000 with the v3 KV cache.
+Dataset: California housing (regression, d=8).
 
 The TabPFN model is constructed with `fit_mode="fit_with_cache"` to engage the
-v3 KV cache; the `get_tabpfn_imputation_explainer` wrapper warns if the cache
+KV cache, which speeds up the computation of Shapley values by one to two orders of magnitude; 
+the `get_tabpfn_imputation_explainer` wrapper emits a warning if the cache
 isn't enabled.
 """
 
@@ -39,7 +38,7 @@ X_train, X_test, y_train, _ = train_test_split(
 n_explain = 30
 X_explain = X_test[:n_explain]
 
-# Engage the v3 KV cache: fit_mode is a constructor arg (set BEFORE fit),
+# Engage the KV cache: fit_mode is a constructor arg (set BEFORE fit),
 # keep_cache_on_device is set AFTER fit. The shapiq wrapper warns if either
 # is missing.
 reg = TabPFNRegressor(fit_mode="fit_with_cache")
@@ -55,8 +54,7 @@ explainer = tabpfn_shapiq.get_tabpfn_imputation_explainer(
 
 # Compute Shapley values for n_explain rows. Each call produces an
 # `InteractionValues` object; we extract the (d,) 1st-order array per row and
-# stack into the (n, d) matrix that SHAP's plotters expect. Budget=256 (=2**d)
-# means exact enumeration — no sampling noise.
+# stack into the (n, d) matrix that SHAP's plotters expect.
 print(f"Computing Shapley values for {n_explain} rows...")
 ivs = [explainer.explain(x=X_explain[i], budget=256) for i in range(n_explain)]
 shap_values = np.stack([iv.get_n_order_values(1) for iv in ivs])

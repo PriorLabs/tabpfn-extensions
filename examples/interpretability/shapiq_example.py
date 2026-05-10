@@ -34,15 +34,13 @@ X_train, X_test, y_train, _ = train_test_split(
 )
 x_explain = X_test[0]
 
-# Construct the regressor with the v3 KV-cache fast path. fit_mode must be set
+# Construct the regressor with the KV cache fast path. fit_mode must be set
 # BEFORE .fit(); keep_cache_on_device=True is set AFTER .fit().
 reg = TabPFNRegressor(fit_mode="fit_with_cache")
 reg.fit(X_train, y_train)
 reg.executor_.keep_cache_on_device = True
 
-# Exact enumeration for d=8 is 2**8 = 256 coalitions. shapiq silently caps
-# anything larger; we ask for it explicitly to keep the example
-# self-documenting.
+# Exact enumeration for d=8 is 2**8 = 256 coalitions.
 budget = 256
 
 
@@ -86,7 +84,7 @@ iv_interactions.plot_upset(feature_names=feature_names)
 # 3. Remove-and-recontextualize (Rundel) — slower (no KV cache)
 # -----------------------------------------------------------------------------
 # Commented out because this path is much slower than the imputation explainer
-# above, as it doesn't benefit from the v3 KV cache: each coalition
+# above, as it doesn't benefit from the KV cache: each coalition
 # triggers a fresh TabPFN fit on a different column subset, then does exactly
 # one predict against that fit.
 #
