@@ -20,54 +20,17 @@ Two explanation paradigms are exposed:
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pandas as pd
 from tabpfn_common_utils.telemetry import set_extension
+
+from tabpfn_extensions.utils import warn_if_no_kv_cache
 
 if TYPE_CHECKING:
     import numpy as np
 
     import tabpfn
-
-
-def _warn_if_no_kv_cache(model: Any) -> None:
-    """Warn if the TabPFN model isn't configured to use the KV cache.
-
-    For imputation-style explainers, hundreds-to-thousands of forward passes are made
-    per explanation against a fixed training set. Without the KV cache, the encoder
-    pass over the training set runs on every forward pass, which can be 10-100x slower
-    than necessary. We warn if either condition for the cache fast path is missing,
-    but do not raise — users may have intentional reasons (e.g., memory).
-    """
-    fit_mode = getattr(model, "fit_mode", None)
-    if fit_mode != "fit_with_cache":
-        warnings.warn(
-            f"TabPFN model has fit_mode={fit_mode!r}, not 'fit_with_cache'. "
-            "Imputation-based SHAP will be substantially slower than necessary. "
-            "Construct the model with TabPFNClassifier or TabPFNRegressor "
-            "(fit_mode='fit_with_cache', ...) "
-            "(set BEFORE calling .fit) to enable the KV cache, then set "
-            "model.executor_.keep_cache_on_device = True after .fit().",
-            UserWarning,
-            stacklevel=3,
-        )
-        return  # if fit_mode is wrong, the second check is moot
-
-    executor = getattr(model, "executor_", None)
-    if executor is None:
-        # model not fitted yet — we can't check; ImpExplainer will fail downstream anyway
-        return
-    if not getattr(executor, "keep_cache_on_device", False):
-        warnings.warn(
-            "TabPFN model has fit_mode='fit_with_cache' but "
-            "executor_.keep_cache_on_device is False. Imputation-based SHAP will "
-            "be slower than necessary because the cache is shuttled to/from CPU "
-            "on every predict call. Set "
-            "`model.executor_.keep_cache_on_device = True` after .fit().",
-            UserWarning,
-            stacklevel=3,
-        )
 
 
 @set_extension("interpretability")
@@ -219,7 +182,7 @@ def get_tabpfn_imputation_explainer(
             "Please install it with: pip install shapiq",
         )
 
-    _warn_if_no_kv_cache(model)
+    warn_if_no_kv_cache(model, context="Imputation-based SHAP")
 
     # make data to array if it is a pandas DataFrame
     if isinstance(data, pd.DataFrame):
