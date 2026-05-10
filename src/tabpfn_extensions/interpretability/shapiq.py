@@ -7,11 +7,11 @@ both basic Shapley values and interaction indices for more detailed model explan
 Two explanation paradigms are exposed:
 
 * :func:`get_tabpfn_explainer` — *remove-and-recontextualize* (Rundel et al. 2024).
-  Re-fits TabPFN on each feature subset; cannot benefit from the v3 KV cache
+  Re-fits TabPFN on each feature subset; cannot benefit from the KV cache
   because the training set changes per coalition.
 
 * :func:`get_tabpfn_imputation_explainer` — *imputation-based* removal (marginal /
-  conditional / baseline). The training set is fixed across coalitions, so the v3
+  conditional / baseline). The training set is fixed across coalitions, so the
   KV cache (``fit_mode="fit_with_cache"`` + ``executor_.keep_cache_on_device=True``)
   drastically reduces wall time. A runtime warning is emitted if the cache isn't
   enabled when this explainer is constructed.
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 
 def _warn_if_no_kv_cache(model: Any) -> None:
-    """Warn if the TabPFN model isn't configured to use the v3 KV cache.
+    """Warn if the TabPFN model isn't configured to use the KV cache.
 
     For imputation-style explainers, hundreds-to-thousands of forward passes are made
     per explanation against a fixed training set. Without the KV cache, the encoder
@@ -46,7 +46,7 @@ def _warn_if_no_kv_cache(model: Any) -> None:
             f"TabPFN model has fit_mode={fit_mode!r}, not 'fit_with_cache'. "
             "Imputation-based SHAP will be substantially slower than necessary. "
             "Construct the model with TabPFNClassifier(fit_mode='fit_with_cache', ...) "
-            "(set BEFORE calling .fit) to enable the v3 KV cache, then set "
+            "(set BEFORE calling .fit) to enable the KV cache, then set "
             "model.executor_.keep_cache_on_device = True after .fit().",
             UserWarning,
             stacklevel=3,
@@ -86,7 +86,7 @@ def get_tabpfn_explainer(
     columns in `S` and predictions are made with that re-fitted model. This
     is expensive because every coalition triggers a fresh fit.
 
-    NOTE: This path **does not benefit from the v3 KV cache** even when the
+    NOTE: This path **does not benefit from the KV cache** even when the
     underlying model is configured with ``fit_mode="fit_with_cache"``. Each
     coalition does exactly one fit + one predict, so there are no repeated
     predicts to amortize the cache over. If you want the cache to actually
@@ -161,7 +161,7 @@ def get_tabpfn_imputation_explainer(
     The explainer uses an imputation-based paradigm of feature removal [3]_:
     for each coalition, masked features are filled by an imputer and TabPFN
     is queried for a prediction. The training set is fixed across coalitions,
-    so the v3 KV cache makes this dramatically faster than the
+    so the KV cache makes this dramatically faster than the
     remove-and-recontextualize path (cf. :func:`get_tabpfn_explainer`). A
     warning is emitted if the model is not configured for the cache.
 
@@ -175,7 +175,7 @@ def get_tabpfn_imputation_explainer(
         model (tabpfn.TabPFNRegressor or tabpfn.TabPFNClassifier): The TabPFN model to explain.
             Should be constructed with ``fit_mode="fit_with_cache"`` and have
             ``executor_.keep_cache_on_device = True`` set after fit() to engage
-            the v3 KV-cache fast path.
+            the KV-cache fast path.
 
         data (pd.DataFrame or np.ndarray): The background data to use for the explainer.
 
@@ -219,7 +219,7 @@ def get_tabpfn_imputation_explainer(
     # shapiq emits a UserWarning when ``TabularExplainer`` is constructed with a
     # TabPFN model, recommending ``TabPFNExplainer`` (Rundel) instead. In this
     # wrapper the user has explicitly chosen the imputation path — precisely
-    # because Rundel cannot benefit from the v3 KV cache (one predict per
+    # because Rundel cannot benefit from the KV cache (one predict per
     # coalition fit) while imputation-based removal can. The warning is
     # misleading here, so silence just that specific message.
     with warnings.catch_warnings():

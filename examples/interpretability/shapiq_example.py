@@ -7,7 +7,7 @@ Two paradigms for "feature removal" are illustrated:
      filled by an imputer (default: baseline). The baseline imputer models
      missing values by the mean of the training set for numeric features 
      and the mode for categorical features. The training set is fixed
-     across coalitions, so the v3 KV-cache fast path applies — make sure
+     across coalitions, so the KV-cache fast path applies — make sure
      to construct the model with `fit_mode="fit_with_cache"` and set
      `executor_.keep_cache_on_device = True` after fit().
 
@@ -46,7 +46,7 @@ budget = 256
 
 
 # -----------------------------------------------------------------------------
-# 1. Imputation-based explainer (uses the v3 KV cache)
+# 1. Imputation-based explainer (uses the KV cache)
 # -----------------------------------------------------------------------------
 imputation_explainer = tabpfn_shapiq.get_tabpfn_imputation_explainer(
     model=reg,

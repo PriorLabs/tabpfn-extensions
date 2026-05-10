@@ -20,18 +20,19 @@ in-context models.
 We expose two adapters:
 
 * ``get_tabpfn_explainer`` — *remove-and-recontextualize* (Rundel et al. 2024).
-  TabPFN is re-fit for every coalition, so the v3 KV cache cannot be reused
+  TabPFN is re-fit for every coalition, so the KV cache cannot be reused
   across coalitions — expect this path to be substantially slower than the
   imputation-based one below.
 
 * ``get_tabpfn_imputation_explainer`` — *imputation-based* removal (marginal / conditional /
-  baseline). The training set is fixed across coalitions, so the v3 KV-cache fast path
+  baseline). The training set is fixed across coalitions, so the KV-cache fast path
   applies. Construct your TabPFN model with ``fit_mode="fit_with_cache"`` (set BEFORE
   ``.fit()``) and set ``model.executor_.keep_cache_on_device = True`` after fitting:
 
   ```python
   clf = TabPFNClassifier(fit_mode="fit_with_cache")
   clf.fit(X_train, y_train)
+  # keep_cache_on_device is usually on by default — set explicitly as a safety net.
   clf.executor_.keep_cache_on_device = True
   explainer = get_tabpfn_imputation_explainer(model=clf, data=X_train)
   ```
@@ -70,5 +71,18 @@ and
   pages     = {465--476},
   url       = {https://link.springer.com/chapter/10.1007/978-3-031-63797-1_23}
 }
+```
 
+The original ``shap`` library — still used here for plotting via ``shap.Explanation`` —
+can be cited as:
+
+```bibtext
+@inproceedings{DBLP:conf/nips/LundbergL17,
+  author       = {Scott M. Lundberg and Su{-}In Lee},
+  title        = {A Unified Approach to Interpreting Model Predictions},
+  booktitle    = {Advances in Neural Information Processing Systems 30},
+  pages        = {4765--4774},
+  year         = {2017},
+  url          = {https://proceedings.neurips.cc/paper/2017/hash/8a20a8621978632d76c43dfd28b67767-Abstract.html},
+}
 ```
