@@ -113,6 +113,14 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None)
             if val:
                 return int(val)
+        # Older TabPFN versions (pre PriorLabs/TabPFN#890) don't expose
+        # get_inference_config; their MAX_NUMBER_OF_CLASSES was always 10.
+        if type(self.estimator).__module__.startswith("tabpfn"):
+            logger.info(
+                "Base estimator has no get_inference_config(); assuming "
+                "alphabet_size=10 (older TabPFN default).",
+            )
+            return 10
         return None
 
     def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
