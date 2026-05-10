@@ -1,3 +1,5 @@
+import warnings
+
 import matplotlib.pyplot as plt
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import train_test_split
@@ -21,6 +23,16 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5)
 try:
     clf = TabPFNClassifier(fit_mode="fit_with_cache")
 except TypeError:
+    warnings.warn(
+        "PDP would benefit substantially from the KV cache, but the "
+        "current TabPFN backend does not support fit_mode='fit_with_cache' "
+        "(this is typical of the tabpfn-client backend). Install the local "
+        "tabpfn package (`pip install tabpfn`, requires TabPFN-3 for the "
+        "KV cache) for a substantial speedup on this example. Falling "
+        "back to the default constructor.",
+        UserWarning,
+        stacklevel=2,
+    )
     clf = TabPFNClassifier()
 clf.fit(X_train, y_train)
 if hasattr(clf, "executor_"):
