@@ -27,9 +27,8 @@ except TypeError:
         "PDP would benefit substantially from the KV cache, but the "
         "current TabPFN backend does not support fit_mode='fit_with_cache' "
         "(this is typical of the tabpfn-client backend). Install the local "
-        "tabpfn package (`pip install tabpfn`, requires TabPFN-3 for the "
-        "KV cache) for a substantial speedup on this example. Falling "
-        "back to the default constructor.",
+        "tabpfn package (`pip install tabpfn`) for a substantial speedup "
+        "on this example. Falling back to the default constructor.",
         UserWarning,
         stacklevel=2,
     )
