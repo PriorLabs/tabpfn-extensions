@@ -1,33 +1,96 @@
-"""WARNING: This example may run slowly on CPU-only systems.
-For better performance, we recommend running with GPU acceleration.
-SHAP value computation involves multiple TabPFN model evaluations, which is computationally intensive.
+"""Compute SHAP values for a TabPFN model with ShapIQ, then visualize them
+using the SHAP library's plotting functions.
+
+We use shapiq for the actual Shapley-value computation (it's faster and
+extension-friendly for TabPFN) but the SHAP library's plotting ecosystem is
+mature and widely used. This example shows how to bridge the two.
+
+Two ways to plug shapiq output into shap plots:
+  (a) Old SHAP API: pass the (n_test, d) numpy array straight to
+      `shap.summary_plot`, `shap.dependence_plot`, etc.
+  (b) New SHAP API: wrap shapiq output in a `shap.Explanation` and use
+      `shap.plots.bar`, `shap.plots.waterfall`, `shap.plots.beeswarm`.
+
+Dataset: California housing (regression, d=8). With baseline imputation each
+coalition is one forward pass, so a full sweep at budget=2**8=256 (exact
+enumeration) takes roughly 0.1s/row on an RTX 6000 with the v3 KV cache.
+
+The TabPFN model is constructed with `fit_mode="fit_with_cache"` to engage the
+v3 KV cache; the `get_tabpfn_imputation_explainer` wrapper warns if the cache
+isn't enabled.
 """
 
-from sklearn.datasets import load_breast_cancer
+from __future__ import annotations
+
+import numpy as np
+import shap
+from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import train_test_split
 
-from tabpfn_extensions import TabPFNClassifier, interpretability
+from tabpfn_extensions import TabPFNRegressor
+from tabpfn_extensions.interpretability import shapiq as tabpfn_shapiq
 
-# Load example dataset
-data = load_breast_cancer()
-X, y = data.data, data.target
-feature_names = data.feature_names
-n_samples = 50
+housing = fetch_california_housing(as_frame=False)
+X, y, feature_names = housing.data, housing.target, list(housing.feature_names)
 
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5)
+X_train, X_test, y_train, _ = train_test_split(
+    X, y, train_size=1000, test_size=200, random_state=0,
+)
+n_explain = 30
+X_explain = X_test[:n_explain]
 
-# Initialize and train model
-clf = TabPFNClassifier()
-clf.fit(X_train, y_train)
+# Engage the v3 KV cache: fit_mode is a constructor arg (set BEFORE fit),
+# keep_cache_on_device is set AFTER fit. The shapiq wrapper warns if either
+# is missing.
+reg = TabPFNRegressor(fit_mode="fit_with_cache")
+reg.fit(X_train, y_train)
+reg.executor_.keep_cache_on_device = True
 
-# Calculate SHAP values
-shap_values = interpretability.shap.get_shap_values(
-    estimator=clf,
-    test_x=X_test[:n_samples],
-    attribute_names=feature_names,
-    algorithm="permutation",
+explainer = tabpfn_shapiq.get_tabpfn_imputation_explainer(
+    model=reg,
+    data=X_train,
+    index="SV",
+    max_order=1,
 )
 
-# Create visualization
-fig = interpretability.shap.plot_shap(shap_values)
+# Compute Shapley values for n_explain rows. Each call produces an
+# `InteractionValues` object; we extract the (d,) 1st-order array per row and
+# stack into the (n, d) matrix that SHAP's plotters expect. Budget=256 (=2**d)
+# means exact enumeration — no sampling noise.
+print(f"Computing Shapley values for {n_explain} rows...")
+ivs = [explainer.explain(x=X_explain[i], budget=256) for i in range(n_explain)]
+shap_values = np.stack([iv.get_n_order_values(1) for iv in ivs])
+
+# baseline_value is shapiq's v(empty); average across rows for a single scalar.
+base_value = float(np.mean([iv.baseline_value for iv in ivs]))
+
+
+# -----------------------------------------------------------------------------
+# (a) Old SHAP API — pass numpy arrays directly
+# -----------------------------------------------------------------------------
+# 1. Summary plot — beeswarm of feature attributions across all explained rows
+shap.summary_plot(shap_values, X_explain, feature_names=feature_names)
+
+# 2. Dependence plot — SHAP value of feature 0 vs. its raw value, colored by
+# the feature shapiq picks as its strongest interaction partner
+shap.dependence_plot(0, shap_values, X_explain, feature_names=feature_names)
+
+
+# -----------------------------------------------------------------------------
+# (b) New SHAP API — wrap into a shap.Explanation, then use shap.plots.*
+# -----------------------------------------------------------------------------
+explanation = shap.Explanation(
+    values=shap_values,
+    base_values=np.full(n_explain, base_value),
+    data=X_explain,
+    feature_names=feature_names,
+)
+
+# 3. Bar plot — mean(|SHAP|) ranking of features
+shap.plots.bar(explanation)
+
+# 4. Beeswarm plot — same data as summary, new-API styling
+shap.plots.beeswarm(explanation)
+
+# 5. Waterfall plot — explain a single row (E[f(X)] -> f(x) breakdown)
+shap.plots.waterfall(explanation[0])

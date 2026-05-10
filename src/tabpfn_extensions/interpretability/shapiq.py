@@ -3,11 +3,24 @@
 
 This module provides functions to create shapiq explainers for TabPFN models that support
 both basic Shapley values and interaction indices for more detailed model explanations.
+
+Two explanation paradigms are exposed:
+
+* :func:`get_tabpfn_explainer` — *remove-and-recontextualize* (Rundel et al. 2024).
+  Re-fits TabPFN on each feature subset; cannot benefit from the v3 KV cache
+  because the training set changes per coalition.
+
+* :func:`get_tabpfn_imputation_explainer` — *imputation-based* removal (marginal /
+  conditional / baseline). The training set is fixed across coalitions, so the v3
+  KV cache (``fit_mode="fit_with_cache"`` + ``executor_.keep_cache_on_device=True``)
+  drastically reduces wall time. A runtime warning is emitted if the cache isn't
+  enabled when this explainer is constructed.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import warnings
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 from tabpfn_common_utils.telemetry import set_extension
@@ -16,6 +29,44 @@ if TYPE_CHECKING:
     import numpy as np
 
     import tabpfn
+
+
+def _warn_if_no_kv_cache(model: Any) -> None:
+    """Warn if the TabPFN model isn't configured to use the v3 KV cache.
+
+    For imputation-style explainers, hundreds-to-thousands of forward passes are made
+    per explanation against a fixed training set. Without the KV cache, the encoder
+    pass over the training set runs on every forward pass, which can be 10-100x slower
+    than necessary. We warn if either condition for the cache fast path is missing,
+    but do not raise — users may have intentional reasons (e.g., memory).
+    """
+    fit_mode = getattr(model, "fit_mode", None)
+    if fit_mode != "fit_with_cache":
+        warnings.warn(
+            f"TabPFN model has fit_mode={fit_mode!r}, not 'fit_with_cache'. "
+            "Imputation-based SHAP will be substantially slower than necessary. "
+            "Construct the model with TabPFNClassifier(fit_mode='fit_with_cache', ...) "
+            "(set BEFORE calling .fit) to enable the v3 KV cache, then set "
+            "model.executor_.keep_cache_on_device = True after .fit().",
+            UserWarning,
+            stacklevel=3,
+        )
+        return  # if fit_mode is wrong, the second check is moot
+
+    executor = getattr(model, "executor_", None)
+    if executor is None:
+        # model not fitted yet — we can't check; ImpExplainer will fail downstream anyway
+        return
+    if not getattr(executor, "keep_cache_on_device", False):
+        warnings.warn(
+            "TabPFN model has fit_mode='fit_with_cache' but "
+            "executor_.keep_cache_on_device is False. Imputation-based SHAP will "
+            "be slower than necessary because the cache is shuttled to/from CPU "
+            "on every predict call. Set "
+            "`model.executor_.keep_cache_on_device = True` after .fit().",
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 @set_extension("interpretability")
@@ -28,12 +79,19 @@ def get_tabpfn_explainer(
     class_index: int | None = None,
     **kwargs,
 ):
-    """Get a TabPFNExplainer from shapiq.
+    """Get a TabPFNExplainer (remove-and-recontextualize) from shapiq.
 
-    This function returns the TabPFN explainer from the shapiq[1]_ library. The explainer uses
-    a remove-and-recontextualize paradigm of model explanation[2]_[3]_ to explain the predictions
-    of a TabPFN model. See ``shapiq.TabPFNExplainer`` documentation for more information regarding
-    the explainer object.
+    The explainer uses the remove-and-recontextualize paradigm of model
+    explanation [2]_ [3]_: for each coalition `S`, TabPFN is re-fit on the
+    columns in `S` and predictions are made with that re-fitted model. This
+    is expensive because every coalition triggers a fresh fit.
+
+    NOTE: This path **does not benefit from the v3 KV cache** even when the
+    underlying model is configured with ``fit_mode="fit_with_cache"``. Each
+    coalition does exactly one fit + one predict, so there are no repeated
+    predicts to amortize the cache over. If you want the cache to actually
+    speed things up, prefer :func:`get_tabpfn_imputation_explainer` (which
+    runs ``budget`` predicts against a single fit).
 
     Args:
         model (tabpfn.TabPFNRegressor or tabpfn.TabPFNClassifier): The TabPFN model to explain.
@@ -63,25 +121,20 @@ def get_tabpfn_explainer(
         .. [3] Rundel, D., Kobialka, J., von Crailsheim, C., Feurer, M., Nagler, T., Rügamer, D. (2024). Interpretable Machine Learning for TabPFN. In: Longo, L., Lapuschkin, S., Seifert, C. (eds) Explainable Artificial Intelligence. xAI 2024. Communications in Computer and Information Science, vol 2154. Springer, Cham. https://doi.org/10.1007/978-3-031-63797-1_23
 
     """
-    # Defer the import to avoid circular imports
     try:
-        import shapiq  # Import the main package
-        # Current version of shapiq has TabPFNExplainer in the base module
+        import shapiq
     except ImportError:
         raise ImportError(
             "Package 'shapiq' is required for model explanation. "
             "Please install it with: pip install shapiq",
         )
 
-    # make data to array if it is a pandas DataFrame
     if isinstance(data, pd.DataFrame):
         data = data.values
 
-    # make labels to array if it is a pandas Series
     if isinstance(labels, pd.Series | pd.DataFrame):
         labels = labels.values
 
-    # TabPFNExplainer is directly available in the shapiq module
     return shapiq.TabPFNExplainer(
         model=model,
         data=data,
@@ -99,18 +152,30 @@ def get_tabpfn_imputation_explainer(
     data: pd.DataFrame | np.ndarray,
     index: str = "k-SII",
     max_order: int = 2,
-    imputer: str = "marginal",
+    imputer: str = "baseline",
     class_index: int | None = None,
     **kwargs,
 ):
-    """Gets a TabularExplainer from shapiq with using imputation.
+    """Gets a TabularExplainer from shapiq with imputation-based feature removal.
 
-    This function returns the TabularExplainer from the shapiq[1]_[2]_ library. The explainer uses an
-    imputation-based paradigm of feature removal for the explanations similar to SHAP[3]_. See
-    ``shapiq.TabularExplainer`` documentation for more information regarding the explainer object.
+    The explainer uses an imputation-based paradigm of feature removal [3]_:
+    for each coalition, masked features are filled by an imputer and TabPFN
+    is queried for a prediction. The training set is fixed across coalitions,
+    so the v3 KV cache makes this dramatically faster than the
+    remove-and-recontextualize path (cf. :func:`get_tabpfn_explainer`). A
+    warning is emitted if the model is not configured for the cache.
+
+    The default imputer is ``"baseline"`` (one fixed fill value per feature,
+    so each coalition costs exactly one forward pass). Marginal/conditional
+    imputers draw multiple samples per coalition and are 50-100x slower in
+    practice without commensurate gains for in-context models — switch to
+    them only if you have a specific reason.
 
     Args:
         model (tabpfn.TabPFNRegressor or tabpfn.TabPFNClassifier): The TabPFN model to explain.
+            Should be constructed with ``fit_mode="fit_with_cache"`` and have
+            ``executor_.keep_cache_on_device = True`` set after fit() to engage
+            the v3 KV-cache fast path.
 
         data (pd.DataFrame or np.ndarray): The background data to use for the explainer.
 
@@ -138,27 +203,37 @@ def get_tabpfn_imputation_explainer(
         .. [3] Lundberg, S. M., & Lee, S. I. (2017). A Unified Approach to Interpreting Model Predictions. Advances in Neural Information Processing Systems 30 (pp. 4765--4774).
 
     """
-    # Defer the import to avoid circular imports
     try:
-        import shapiq  # Import the main package
-        # Current version of shapiq has TabularExplainer in the base module
+        import shapiq
     except ImportError:
         raise ImportError(
             "Package 'shapiq' is required for model explanation. "
             "Please install it with: pip install shapiq",
         )
 
-    # make data to array if it is a pandas DataFrame
+    _warn_if_no_kv_cache(model)
+
     if isinstance(data, pd.DataFrame):
         data = data.values
 
-    # TabularExplainer is directly available in the shapiq module
-    return shapiq.TabularExplainer(
-        model=model,
-        data=data,
-        index=index,
-        max_order=max_order,
-        imputer=imputer,
-        class_index=class_index,
-        **kwargs,
-    )
+    # shapiq emits a UserWarning when ``TabularExplainer`` is constructed with a
+    # TabPFN model, recommending ``TabPFNExplainer`` (Rundel) instead. In this
+    # wrapper the user has explicitly chosen the imputation path — precisely
+    # because Rundel cannot benefit from the v3 KV cache (one predict per
+    # coalition fit) while imputation-based removal can. The warning is
+    # misleading here, so silence just that specific message.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r".*TabPFN model with the.*shapiq\.TabularExplainer.*",
+            category=UserWarning,
+        )
+        return shapiq.TabularExplainer(
+            model=model,
+            data=data,
+            index=index,
+            max_order=max_order,
+            imputer=imputer,
+            class_index=class_index,
+            **kwargs,
+        )

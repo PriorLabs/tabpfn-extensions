@@ -56,10 +56,6 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 
 [project.optional-dependencies]
 interpretability = [
-    "shap>=0.41.0",
-    # numba is a transitive dependency from shap, but shap doesn't specify a lower
-    # bound, thus we specify one so --resolution lowest-direct works.
-    "numba>=0.60.0",
     "shapiq>=0.4.0",
     "seaborn>=0.12.2",
 ]
