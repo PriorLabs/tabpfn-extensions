@@ -13,7 +13,7 @@ feature_names = list(data.feature_names)
 # Split data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5)
 
-# Initialize and train model. Enable the v3 KV cache: PDP issues many
+# Initialize and train model. Enable the KV cache (improved with TabPFN-3): PDP issues many
 # predicts (grid_resolution per feature * #features) against the same
 # fitted model, so caching the encoder pass over X_train avoids redoing
 # it on every grid point.

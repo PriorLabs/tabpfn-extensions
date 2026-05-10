@@ -151,4 +151,3 @@ commit_messages.txt
 CLAUDE.md
 .claude/*.local.*
 .claude/worktrees/
-.local/

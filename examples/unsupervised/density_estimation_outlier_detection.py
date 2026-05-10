@@ -20,13 +20,8 @@ df = load_breast_cancer(return_X_y=False)
 X, y = df["data"], df["target"]
 attribute_names = df["feature_names"]
 
-# Enable the v3 KV cache: outlier detection runs n_permutations * n_features
-# predicts against the same fitted model, so caching the encoder pass over
-# the training set avoids redoing it for each (permutation, feature) pair.
-# TabPFNUnsupervisedModel sets keep_cache_on_device=True automatically after
-# fit when the estimator was constructed with fit_mode="fit_with_cache".
-clf = TabPFNClassifier(n_estimators=3, fit_mode="fit_with_cache")
-reg = TabPFNRegressor(n_estimators=3, fit_mode="fit_with_cache")
+clf = TabPFNClassifier(n_estimators=3)
+reg = TabPFNRegressor(n_estimators=3)
 model_unsupervised = TabPFNUnsupervisedModel(
     tabpfn_clf=clf,
     tabpfn_reg=reg,

@@ -30,7 +30,7 @@ class TabPFNEstimator(Protocol):
 def warn_if_no_kv_cache(model: Any, *, context: str = "This operation") -> None:
     """Warn if a TabPFN model isn't configured to use the KV cache.
 
-    The v3 KV cache caches the encoder pass over the training set so that
+    The KV cache (improved with TabPFN-3) caches the encoder pass over the training set so that
     repeated predicts against the same fitted model don't re-encode the
     training data each time. Extensions that issue many predicts per fit
     (e.g. imputation-based SHAP, certain feature-selection or HPO routines)

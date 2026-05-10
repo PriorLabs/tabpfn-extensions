@@ -61,7 +61,7 @@ Many TabPFN Extensions works with two TabPFN implementations:
 
 Choose the backend that fits your needs - most extensions work with either option!
 
-An exception is **embedding**, which only works with the local `tabpfn` package.
+Exceptions to this are **post_hoc_ensembles** *(deprecated)* and **embedding**, which only work with the local `tabpfn` package.
 
 ## Documentation
 

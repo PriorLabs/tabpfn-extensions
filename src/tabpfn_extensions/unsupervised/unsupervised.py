@@ -57,8 +57,6 @@ from tabpfn_extensions.utils import (  # type: ignore
     TabPFNClassifier,
     TabPFNRegressor,
     infer_categorical_features,
-    is_tabpfn,
-    warn_if_no_kv_cache,
 )
 
 
@@ -536,12 +534,6 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             y_predict = y_predict.long()
 
         model.fit(X_fit_np, y_fit_np)
-        # If the user opted into the v3 KV cache via fit_mode="fit_with_cache",
-        # keep it resident on-device for the many predicts that follow.
-        if getattr(model, "fit_mode", None) == "fit_with_cache" and hasattr(
-            model, "executor_"
-        ):
-            model.executor_.keep_cache_on_device = True
 
         return model, X_predict, y_predict
 
@@ -754,12 +746,6 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         # Initialize model if needed
         self.init_model_and_get_model_config()
-
-        # Outlier detection issues many predicts per fitted model
-        # (n_permutations * n_features), so the KV cache materially helps.
-        for est in (self.tabpfn_clf, self.tabpfn_reg):
-            if est is not None and is_tabpfn(est):
-                warn_if_no_kv_cache(est, context="Outlier detection")
 
         n_features = X.shape[1]
         all_features = list(range(n_features))
