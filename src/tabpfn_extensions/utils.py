@@ -27,6 +27,63 @@ class TabPFNEstimator(Protocol):
     def predict(self, X: Any) -> Any: ...
 
 
+def warn_if_no_kv_cache(model: Any, *, context: str = "This operation") -> None:
+    """Warn if a TabPFN model isn't configured to use the KV cache.
+
+    The v3 KV cache caches the encoder pass over the training set so that
+    repeated predicts against the same fitted model don't re-encode the
+    training data each time. Extensions that issue many predicts per fit
+    (e.g. imputation-based SHAP, certain feature-selection or HPO routines)
+    benefit from it — without the cache, the encoder pass over the training
+    set runs on every predict and these extensions can be 10-100x slower
+    than necessary.
+
+    Two conditions need to hold for the cache fast path:
+        1. ``model`` was constructed with ``fit_mode="fit_with_cache"``
+           (a constructor argument, must be set BEFORE ``.fit()``).
+        2. ``model.executor_.keep_cache_on_device`` is ``True`` (set AFTER
+           ``.fit()``; usually the default but worth setting explicitly).
+
+    This helper warns if either is missing, but does not raise — users may
+    have intentional reasons (e.g. memory).
+
+    Args:
+        model: The TabPFN model (classifier or regressor) to inspect.
+        context: Short noun phrase describing the caller's operation, used
+            to make the warning message specific (e.g. ``"Imputation-based
+            SHAP"``, ``"Sequential feature selection"``). Defaults to a
+            generic ``"This operation"``.
+    """
+    fit_mode = getattr(model, "fit_mode", None)
+    if fit_mode != "fit_with_cache":
+        warnings.warn(
+            f"TabPFN model has fit_mode={fit_mode!r}, not 'fit_with_cache'. "
+            f"{context} will be substantially slower than necessary. "
+            "Construct the model with TabPFNClassifier or TabPFNRegressor "
+            "(fit_mode='fit_with_cache', ...) "
+            "(set BEFORE calling .fit) to enable the KV cache, then set "
+            "model.executor_.keep_cache_on_device = True after .fit().",
+            UserWarning,
+            stacklevel=3,
+        )
+        return  # if fit_mode is wrong, the second check is moot
+
+    executor = getattr(model, "executor_", None)
+    if executor is None:
+        # model not fitted yet — we can't check; downstream code will fail anyway
+        return
+    if not getattr(executor, "keep_cache_on_device", False):
+        warnings.warn(
+            "TabPFN model has fit_mode='fit_with_cache' but "
+            f"executor_.keep_cache_on_device is False. {context} will "
+            "be slower than necessary because the cache is shuttled to/from CPU "
+            "on every predict call. Set "
+            "`model.executor_.keep_cache_on_device = True` after .fit().",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def is_tabpfn(estimator: Any) -> bool:
     """Check if an estimator is a TabPFN model."""
     try:

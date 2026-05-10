@@ -39,6 +39,7 @@ def tabpfn_crt(
     K: int = 100,
     max_unique_cat: int = 10,
     model_version: ModelVersion = ModelVersion.V2,
+    use_kv_cache: bool = True,
 ) -> dict[str, Any] | dict[int | str, dict[str, Any]]:
     """Conditional Randomization Test (CRT) using TabPFN.
 
@@ -105,8 +106,16 @@ def tabpfn_crt(
         model_version,
         device=device,
     )
+    # Enable KV cache by default: fit predicts B+1 times against the same
+    # training set (one baseline + B permutations), so the encoder output
+    # for X_tr is reused across every predict_proba / predict call. Users
+    # can opt out via use_kv_cache=False (e.g., to save memory).
+    if use_kv_cache:
+        model_y.fit_mode = "fit_with_cache"
 
     model_y.fit(X_tr, y_tr)
+    if use_kv_cache and hasattr(model_y, "executor_"):
+        model_y.executor_.keep_cache_on_device = True
 
     # Pre-compute baseline log predictive density
     if y_is_cat:

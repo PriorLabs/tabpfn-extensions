@@ -13,9 +13,13 @@ feature_names = list(data.feature_names)
 # Split data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5)
 
-# Initialize and train model
-clf = TabPFNClassifier()
+# Initialize and train model. Enable the v3 KV cache: PDP issues many
+# predicts (grid_resolution per feature * #features) against the same
+# fitted model, so caching the encoder pass over X_train avoids redoing
+# it on every grid point.
+clf = TabPFNClassifier(fit_mode="fit_with_cache")
 clf.fit(X_train, y_train)
+clf.executor_.keep_cache_on_device = True
 
 # 1D PD for the first 3 features + a 2D interaction plot
 disp = partial_dependence_plots(
