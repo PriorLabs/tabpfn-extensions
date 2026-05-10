@@ -94,12 +94,8 @@ def get_param_grid_hyperopt(
     """
     search_space = {
         # Custom HPs
-        "model_type": hp.choice(
-            "model_type",
-            ["single", "dt_pfn"],
-        ),
+        "model_type": hp.choice("model_type", ["single"]),
         "n_estimators": hp.choice("n_estimators", [4]),
-        "max_depth": hp.choice("max_depth", [2, 3, 4, 5]),  # For Decision Tree TabPFN
         # -- Model HPs
         "average_before_softmax": hp.choice("average_before_softmax", [True, False]),
         "softmax_temperature": hp.choice(
