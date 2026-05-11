@@ -56,7 +56,10 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 
 [project.optional-dependencies]
 interpretability = [
-    "shapiq>=0.4.0",
+    # 1.1.0 is the lowest release where `imputer="baseline"` + `index="SV"` +
+    # `max_order=1` (the default config used by get_tabpfn_imputation_explainer)
+    # works without raising.
+    "shapiq>=1.1.0",
     "seaborn>=0.12.2",
 ]
 post_hoc_ensembles = [

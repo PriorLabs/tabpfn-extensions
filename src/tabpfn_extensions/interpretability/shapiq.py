@@ -12,9 +12,9 @@ Two explanation paradigms are exposed:
 
 * :func:`get_tabpfn_imputation_explainer` — *imputation-based* removal (marginal /
   conditional / baseline). The training set is fixed across coalitions, so the
-  KV cache (``fit_mode="fit_with_cache"`` + ``executor_.keep_cache_on_device=True``)
-  drastically reduces wall time. A runtime warning is emitted if the cache isn't
-  enabled when this explainer is constructed.
+  KV cache (``fit_mode="fit_with_cache"``) drastically reduces wall time. A
+  runtime warning is emitted if the cache isn't enabled when this explainer
+  is constructed.
 """
 
 from __future__ import annotations
@@ -142,8 +142,7 @@ def get_tabpfn_imputation_explainer(
 
     Args:
         model (tabpfn.TabPFNRegressor or tabpfn.TabPFNClassifier): The TabPFN model to explain.
-            Should be constructed with ``fit_mode="fit_with_cache"`` and have
-            ``executor_.keep_cache_on_device = True`` set after fit() to engage
+            Should be constructed with ``fit_mode="fit_with_cache"`` to engage
             the KV-cache fast path.
 
         data (pd.DataFrame or np.ndarray): The background data to use for the explainer.

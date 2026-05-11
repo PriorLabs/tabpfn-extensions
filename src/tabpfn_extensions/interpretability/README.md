@@ -27,13 +27,11 @@ We expose two adapters:
 * ``get_tabpfn_imputation_explainer`` — *imputation-based* removal (marginal / conditional /
   baseline). The training set is fixed across coalitions, so the KV-cache fast path
   applies. Construct your TabPFN model with ``fit_mode="fit_with_cache"`` (set BEFORE
-  ``.fit()``) and set ``model.executor_.keep_cache_on_device = True`` after fitting:
+  ``.fit()``):
 
   ```python
   clf = TabPFNClassifier(fit_mode="fit_with_cache")
   clf.fit(X_train, y_train)
-  # keep_cache_on_device is usually on by default — set explicitly as a safety net.
-  clf.executor_.keep_cache_on_device = True
   explainer = get_tabpfn_imputation_explainer(model=clf, data=X_train)
   ```
 

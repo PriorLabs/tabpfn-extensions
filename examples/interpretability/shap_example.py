@@ -6,6 +6,11 @@ extension-friendly for TabPFN) but the SHAP library's plotting ecosystem is
 mature and widely used. This example shows how to bridge the two: wrap shapiq
 output in a `shap.Explanation` and call `shap.plots.*` / `shap.summary_plot`.
 
+The `shap` package is not part of the `interpretability` extra (we depend on
+shapiq for compute). Install it separately to run this example:
+
+    pip install shap
+
 Dataset: California housing (regression, d=8).
 
 The TabPFN model is constructed with `fit_mode="fit_with_cache"` to engage the
@@ -33,13 +38,10 @@ X_train, X_test, y_train, _ = train_test_split(
 n_explain = 30
 X_explain = X_test[:n_explain]
 
-# Engage the KV cache: fit_mode is a constructor arg (set BEFORE fit),
-# keep_cache_on_device is set AFTER fit. The shapiq wrapper warns if either
-# is missing.
+# Engage the KV cache: fit_mode='fit_with_cache' is set BEFORE fit(). The
+# shapiq wrapper warns if the cache isn't enabled.
 reg = TabPFNRegressor(fit_mode="fit_with_cache")
 reg.fit(X_train, y_train)
-# keep_cache_on_device is usually on by default — set explicitly as a safety net.
-reg.executor_.keep_cache_on_device = True
 
 explainer = tabpfn_shapiq.get_tabpfn_imputation_explainer(
     model=reg,
@@ -55,7 +57,9 @@ print(f"Computing Shapley values for {n_explain} rows...")
 ivs = [explainer.explain(x=X_explain[i], budget=256) for i in range(n_explain)]
 shap_values = np.stack([iv.get_n_order_values(1) for iv in ivs])
 
-# baseline_value is shapiq's v(empty); average across rows for a single scalar.
+# baseline_value is the model's expected output when *every* feature is masked
+# — i.e. the prediction on the empty coalition. We average across rows to get
+# the scalar E[f(X)] that shap.Explanation wants for base_values.
 base_value = float(np.mean([iv.baseline_value for iv in ivs]))
 
 # Wrap shapiq's output in a shap.Explanation so the full shap.plots.* family

@@ -5,11 +5,10 @@ Two paradigms for "feature removal" are illustrated:
 
   1. Imputation-based (`get_tabpfn_imputation_explainer`): masked features are
      filled by an imputer (default: baseline). The baseline imputer models
-     missing values by the mean of the training set for numeric features 
+     missing values by the mean of the training set for numeric features
      and the mode for categorical features. The training set is fixed
      across coalitions, so the KV-cache fast path applies — make sure
-     to construct the model with `fit_mode="fit_with_cache"` and set
-     `executor_.keep_cache_on_device = True` after fit().
+     to construct the model with `fit_mode="fit_with_cache"`.
 
   2. Remove-and-recontextualize (`get_tabpfn_explainer`): TabPFN is re-fit on
      each coalition's column subset. Does not benefit from the KV cache
@@ -35,11 +34,9 @@ X_train, X_test, y_train, _ = train_test_split(
 x_explain = X_test[0]
 
 # Construct the regressor with the KV cache fast path. fit_mode must be set
-# BEFORE .fit(); keep_cache_on_device=True is set AFTER .fit().
+# BEFORE .fit().
 reg = TabPFNRegressor(fit_mode="fit_with_cache")
 reg.fit(X_train, y_train)
-# keep_cache_on_device is usually on by default — set explicitly as a safety net.
-reg.executor_.keep_cache_on_device = True
 
 # Exact enumeration for d=8 is 2**8 = 256 coalitions.
 budget = 256
