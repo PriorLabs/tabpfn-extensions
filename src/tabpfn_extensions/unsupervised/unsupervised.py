@@ -593,6 +593,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X: torch.tensor,
         feature_permutation: list[int] | tuple[int],
     ) -> torch.tensor:
+        """Compute the chain-rule log-density / log-probability of each row under one permutation."""
         log_p = torch.zeros_like(
             X[:, 0],
         )  # Start with a log probability of 0 (log(1) = 0)
@@ -629,46 +630,33 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                         ):  # Check bounds again per sample
                             # Proper tensor construction to avoid warning
                             pred[idx] = torch.as_tensor(prob_row[y_idx])
+                log_pred = torch.log(pred)
             else:
                 pred = model.predict(X_predict, output_type="full")
-
-                # Get logits tensor properly
                 logits = pred["logits"]
                 logits_tensor = logits.clone().detach()
-
                 y_tensor = y_predict.clone().detach().to(logits.device)
-
-                # TODO: We use 1/pdf here because pdf() returns probability densities that
-                # can be >> 1, causing exp(sum(log(p))) to overflow. Using 1/p keeps values
-                # small and numerically stable. Ideally, refactor to work in log space
-                # throughout and avoid exponentiating altogether.
-                pred = (1.0 / pred["criterion"].pdf(logits_tensor, y_tensor)).to(
+                # criterion.forward returns the NLL, so -forward is log p_θ directly.
+                log_pred = -pred["criterion"].forward(logits_tensor, y_tensor).to(
                     log_p.device
                 )
 
-            # Handle zero or negative probabilities (avoid log(0))
-            pred = torch.clamp(pred, min=1e-10)
-
-            # Convert probabilities to log probabilities
-            log_pred = torch.log(pred)
-
-            # Add log probabilities instead of multiplying probabilities
             log_p = log_p + log_pred
 
-        return log_p, torch.exp(log_p)
+        return log_p
 
     def outliers_pdf(self, X: torch.Tensor, n_permutations: int = 10) -> torch.Tensor:
-        """Calculate outlier scores based on probability density functions for continuous features.
+        """Calculate outlier scores from numerical features only.
 
         This method filters out categorical features and only considers numerical features
-        for outlier detection using probability density functions.
+        for outlier detection.
 
         Args:
             X: Input data tensor
             n_permutations: Number of permutations to use for the outlier calculation
 
         Returns:
-            Tensor of outlier scores (lower values indicate more likely outliers)
+            Outlier scores (lower values indicate more likely outliers).
         """
         X_store = copy.deepcopy(self.X_)
         mask = torch.ones_like(X_store).bool()
@@ -678,15 +666,15 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         mask[self.categorical_features] = False
         X = X[mask]
 
-        pdf = self.outliers(X, n_permutations=n_permutations)
+        scores_pdf = self.outliers(X, n_permutations=n_permutations)
         self.X_ = X_store
-        return pdf
+        return scores_pdf
 
     def outliers_pmf(self, X: torch.Tensor, n_permutations: int = 10) -> torch.Tensor:
-        """Calculate outlier scores based on probability mass functions for categorical features.
+        """Calculate outlier scores from categorical features only.
 
         This method filters out numerical features and only considers categorical features
-        for outlier detection using probability mass functions.
+        for outlier detection.
 
         Args:
             X: Input data tensor
@@ -703,9 +691,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         mask[self.categorical_features] = True
         X = X[mask]
 
-        pmf = self.outliers(X, n_permutations=n_permutations)
+        scores_pmf = self.outliers(X, n_permutations=n_permutations)
         self.X_ = X_store
-        return pmf
+        return scores_pmf
 
     @set_extension("unsupervised:outliers")
     def outliers(
@@ -713,12 +701,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X: torch.Tensor | np.ndarray | pd.DataFrame,
         n_permutations: int = 10,
     ) -> torch.Tensor:
-        """Calculate outlier scores for each sample in the input data.
+        """Calculate outlier scores as the log of the arithmetic mean (AM) of the densities across the permutations used to approximate the chain rule.
 
-        This is the preferred implementation for outlier detection, which calculates
-        sample probability for each sample in X by multiplying the probabilities of
-        each feature according to chain rule of probability. Lower probabilities
-        indicate samples that are more likely to be outliers.
+        The logsumexp trick is used to compute the log of the AM to address the risk of over- or underflow.
 
         Parameters:
             X: Union[torch.Tensor, np.ndarray, pd.DataFrame]
@@ -729,8 +714,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         Returns:
             torch.Tensor:
-                Tensor of outlier scores (lower values indicate more likely outliers),
-                shape (n_samples,)
+                Tensor of outlier scores as log(AM(densities)), (lower values indicate more likely outliers), shape (n_samples,).
 
         Raises:
             RuntimeError: If the model initialization fails
@@ -754,31 +738,18 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         # Use fewer permutations in fast mode
         actual_n_permutations = 1 if fast_mode else n_permutations
 
-        densities: list[torch.Tensor | np.ndarray] = []
+        log_densities: list[torch.Tensor] = []
         for perm in efficient_random_permutation(all_features, actual_n_permutations):
-            perm_density_log, perm_density = self.outliers_single_permutation_(
+            log_p = self.outliers_single_permutation_(
                 X,
                 feature_permutation=perm,
             )
-            densities.append(perm_density)
+            log_densities.append(log_p)
 
-        # Average the densities across all permutations
-        # Handle potential infinite values by replacing them with large finite values
-        densities_clean: list[torch.Tensor] = [
-            torch.nan_to_num(d, nan=0.0, posinf=1e30, neginf=1e-30)
-            if torch.is_tensor(d)
-            else torch.nan_to_num(
-                torch.tensor(d, dtype=torch.float32),
-                nan=0.0,
-                posinf=1e30,
-                neginf=1e-30,
-            )
-            for d in densities
-        ]
-
-        # Stack the clean tensors and compute mean
-        densities_tensor = torch.stack(densities_clean)
-        return densities_tensor.mean(dim=0)
+        # AM combiner via the log-sum-exp identity.
+        return torch.logsumexp(torch.stack(log_densities), dim=0) - np.log(
+            actual_n_permutations
+        )
 
     @set_extension("unsupervised:synthetic")
     def generate_synthetic_data(
