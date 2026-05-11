@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.1] - 2026-05-11
 
 ### Fixed
-- `misc/sklearn_compat.py` import failure on `scikit-learn` 1.8+. Upstream renamed `sklearn.utils.validation._is_pandas_df` to `is_pandas_df` (no underscore prefix), which made every `from tabpfn_extensions import ...` immediately `ImportError` on a fresh install resolving sklearn 1.8. The shim now tries the old name, falls back to the new name, and finally to a pure-Python implementation. Caught by a TestPyPI smoke install of 0.4.0 before publishing to real PyPI — 0.4.0 was never published.
+- `misc/sklearn_compat.py` import failure on `scikit-learn` 1.8+. Upstream renamed `sklearn.utils.validation._is_pandas_df` to `is_pandas_df` (no underscore prefix), which made every `from tabpfn_extensions import ...` immediately `ImportError` on a fresh install resolving sklearn 1.8. Re-vendored `misc/sklearn_compat.py` from the upstream [sklearn-compat](https://github.com/sklearn-compat/sklearn-compat) 0.1.5 release (was 0.1.3, March 2025); the new version has a proper `# Upgrading for scikit-learn 1.8` block plus general cleanups. Only `validate_data` is consumed downstream and its signature hasn't changed. Caught by a TestPyPI smoke install of 0.4.0 before publishing to real PyPI — 0.4.0 was never published.
 
 ## [0.4.0] - 2026-05-11
 
