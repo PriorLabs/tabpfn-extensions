@@ -257,10 +257,26 @@ else:
         _raise_for_params,  # noqa: F401
         process_routing,  # noqa: F401
     )
-    from sklearn.utils.validation import (
-        _is_fitted,  # noqa: F401
-        _is_pandas_df,  # noqa: F401
-    )
+    from sklearn.utils.validation import _is_fitted  # noqa: F401
+
+    try:
+        # Available on sklearn >= 1.4, < 1.8.
+        from sklearn.utils.validation import _is_pandas_df
+    except ImportError:
+        try:
+            # sklearn 1.8 renamed it to is_pandas_df (no underscore).
+            from sklearn.utils.validation import (
+                is_pandas_df as _is_pandas_df,
+            )
+        except ImportError:
+            # Last-resort pure-Python fallback if upstream changes again.
+            def _is_pandas_df(X):
+                """Return True if X is a pandas DataFrame."""
+                try:
+                    pd = sys.modules["pandas"]
+                except KeyError:
+                    return False
+                return isinstance(X, pd.DataFrame)
 
 
 ########################################################################################

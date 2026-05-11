@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [0.4.1] - 2026-05-11
+
+### Fixed
+- `misc/sklearn_compat.py` import failure on `scikit-learn` 1.8+. Upstream renamed `sklearn.utils.validation._is_pandas_df` to `is_pandas_df` (no underscore prefix), which made every `from tabpfn_extensions import ...` immediately `ImportError` on a fresh install resolving sklearn 1.8. The shim now tries the old name, falls back to the new name, and finally to a pure-Python implementation. Caught by a TestPyPI smoke install of 0.4.0 before publishing to real PyPI — 0.4.0 was never published.
+
 ## [0.4.0] - 2026-05-11
 
 ### Added
