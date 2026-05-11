@@ -118,6 +118,10 @@ target-version = "py310"
 line-length = 88
 output-format = "full"
 src = ["src", "tests", "examples"]
+# misc/sklearn_compat.py is vendored verbatim from sklearn-compat upstream;
+# excluding it from both lint and format keeps it byte-identical to upstream
+# so future re-vendors are clean diffs.
+extend-exclude = ["src/tabpfn_extensions/misc/sklearn_compat.py"]
 
 [tool.ruff.lint]
 # Allow unused variables when underscore-prefixed.

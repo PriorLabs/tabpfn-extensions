@@ -19,9 +19,8 @@ import inspect
 import platform
 import sys
 import types
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Callable, Literal
 
 import sklearn
 from sklearn.utils.fixes import parse_version
@@ -54,7 +53,7 @@ def get_tags(estimator):
     estimator : estimator object
         A scikit-learn estimator instance.
 
-    Returns:
+    Returns
     -------
     tags : Tags
         An object containing metadata about the estimator's requirements and
@@ -191,7 +190,7 @@ if sklearn_version < parse_version("1.4"):
         all_or_any : callable, {all, any}, default=all
             Specify whether all or any of the given attributes must exist.
 
-        Returns:
+        Returns
         -------
         fitted : bool
             Whether the estimator is fitted.
@@ -267,15 +266,15 @@ if sklearn_version < parse_version("1.5"):
     # extmath
     # fixes
     from sklearn.utils import (
-        _IS_32BIT,
-        _approximate_mode,
-        _chunk_generator as chunk_generator,
-        _in_unstable_openblas_configuration,
-        gen_batches,
-        gen_even_slices,
-        get_chunk_n_rows,
-        safe_sqr,
+        _IS_32BIT,  # noqa: F401
+        _approximate_mode,  # noqa: F401
+        _in_unstable_openblas_configuration,  # noqa: F401
+        gen_batches,  # noqa: F401
+        gen_even_slices,  # noqa: F401
+        get_chunk_n_rows,  # noqa: F401
+        safe_sqr,  # noqa: F401
     )
+    from sklearn.utils import _chunk_generator as chunk_generator  # noqa: F401
 
     _IS_WASM = platform.machine() in ["wasm32", "wasm64"]
     # indexing
@@ -285,22 +284,22 @@ if sklearn_version < parse_version("1.5"):
     # user interface
     # validation
     from sklearn.utils import (
-        _determine_key_type,
-        _get_column_indices,
-        _is_pandas_na as is_pandas_na,
-        _print_elapsed_time,
-        _safe_assign,
-        _safe_indexing,
-        _to_object_array,
-        axis0_safe_slice,
-        check_matplotlib_support,
-        check_pandas_support,
-        indices_to_mask,
-        is_scalar_nan,
-        resample,
-        safe_mask,
-        shuffle,
+        _determine_key_type,  # noqa: F401
+        _get_column_indices,  # noqa: F401
+        _print_elapsed_time,  # noqa: F401
+        _safe_assign,  # noqa: F401
+        _safe_indexing,  # noqa: F401
+        _to_object_array,  # noqa: F401
+        axis0_safe_slice,  # noqa: F401
+        check_matplotlib_support,  # noqa: F401
+        check_pandas_support,  # noqa: F401
+        indices_to_mask,  # noqa: F401
+        is_scalar_nan,  # noqa: F401
+        resample,  # noqa: F401
+        safe_mask,  # noqa: F401
+        shuffle,  # noqa: F401
     )
+    from sklearn.utils import _is_pandas_na as is_pandas_na  # noqa: F401
 else:
     # chunking
     from sklearn.utils._chunking import (
@@ -336,7 +335,7 @@ else:
     # optional dependencies
     from sklearn.utils._optional_dependencies import (  # noqa: F401
         check_matplotlib_support,
-        check_pandas_support,
+        check_pandas_support,  # noqa: F401
     )
 
     # user interface
@@ -383,7 +382,8 @@ if sklearn_version < parse_version("1.6"):
             if raise_unknown and target_type == "unknown":
                 input = input_name if input_name else "data"
                 raise ValueError(f"Unknown label type for {input}: {y!r}")
-            return target_type
+            else:
+                return target_type
 
         target_type = type_of_target(y, input_name=input_name)
         return _raise_or_return(target_type)
@@ -412,7 +412,7 @@ if sklearn_version < parse_version("1.6"):
             _check_feature_names(_estimator, X, reset=reset)
 
             no_val_X = isinstance(X, str) and X == "no_validation"
-            no_val_y = y is None or (isinstance(y, str) and y == "no_validation")
+            no_val_y = y is None or isinstance(y, str) and y == "no_validation"
             if not no_val_X and no_val_y:
                 out = X
             elif no_val_X and not no_val_y:
@@ -851,8 +851,8 @@ else:
 
     # validation
     from sklearn.utils.validation import (
-        _check_feature_names,
-        _check_n_features,
+        _check_feature_names,  # noqa: F401
+        _check_n_features,  # noqa: F401
         check_array,  # noqa: F401
         check_X_y,  # noqa: F401
         validate_data,  # noqa: F401
@@ -890,11 +890,11 @@ if sklearn_version < parse_version("1.8"):
             return isinstance(X, pl.DataFrame)
 
     else:
+        from sklearn.utils.validation import _is_pandas_df as is_pandas_df  # noqa: F401
         from sklearn.utils.validation import (
-            _is_pandas_df as is_pandas_df,
             _is_pandas_df_or_series as is_pandas_df_or_series,
-            _is_polars_df as is_polars_df,
-        )
+        )  # noqa: F401
+        from sklearn.utils.validation import _is_polars_df as is_polars_df  # noqa: F401
 
     if sklearn_version < parse_version("1.5"):
 
@@ -909,14 +909,13 @@ if sklearn_version < parse_version("1.8"):
     else:
         from sklearn.utils.validation import (
             _is_polars_df_or_series as is_polars_df_or_series,
-        )
+        )  # noqa: F401
 
     if sklearn_version < parse_version("1.7"):
 
         def is_pyarrow_data(X):
             """Return True if the X is a pyarrow Table, RecordBatch, Array or
-            ChunkedArray.
-            """
+            ChunkedArray."""
             try:
                 pa = sys.modules["pyarrow"]
             except KeyError:
@@ -926,7 +925,7 @@ if sklearn_version < parse_version("1.8"):
     else:
         from sklearn.utils.validation import (
             _is_pyarrow_data as is_pyarrow_data,
-        )
+        )  # noqa: F401
 
     def is_df_or_series(X):
         """Return True if the X is a dataframe or series.
@@ -936,7 +935,7 @@ if sklearn_version < parse_version("1.8"):
         X : {array-like, dataframe}
             The array-like or dataframe object to check.
 
-        Returns:
+        Returns
         -------
         bool
             True if the X is a dataframe or series, False otherwise.
@@ -968,7 +967,7 @@ if sklearn_version < parse_version("1.8"):
 
         sample_weight : array-like, default=None
 
-        Returns:
+        Returns
         -------
         type_true : one of {'multilabel-indicator', 'multiclass', 'binary'}
             The type of the true target data, as output by
@@ -981,8 +980,8 @@ if sklearn_version < parse_version("1.8"):
         sample_weight : array or None
         """
         from sklearn.utils.validation import (
-            _check_sample_weight,
             check_consistent_length,
+            _check_sample_weight,
         )
 
         y_type, y_true, y_pred = _check_targets_without_weights(y_true, y_pred)
@@ -993,12 +992,12 @@ if sklearn_version < parse_version("1.8"):
         return y_type, y_true, y_pred, sample_weight
 
 else:
-    from sklearn.metrics._classification import _check_targets  # noqa: F401
     from sklearn.utils._dataframe import (
         is_df_or_series,  # noqa: F401
+        is_pandas_df_or_series,  # noqa: F401
         is_pandas_df,  # noqa: F401
-        is_pandas_df_or_series,
+        is_pyarrow_data,  # noqa: F401
+        is_polars_df_or_series,  # noqa: F401
         is_polars_df,  # noqa: F401
-        is_polars_df_or_series,
-        is_pyarrow_data,
     )
+    from sklearn.metrics._classification import _check_targets  # noqa: F401
