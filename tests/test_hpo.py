@@ -153,9 +153,8 @@ class TestSearchSpaceCompatibility:
                 else:
                     model_params[k] = v
 
-            # Handle model_type and max_depth which are specific to TunedTabPFN and not core TabPFN
+            # model_type is specific to TunedTabPFN and not core TabPFN
             model_type = model_params.pop("model_type", "single")
-            max_depth = model_params.pop("max_depth", None)
 
             if "model_path" not in model_params:
                 model_params["model_path"] = "auto"
@@ -168,19 +167,6 @@ class TestSearchSpaceCompatibility:
                             inference_config=inference_config_params,
                             device="cpu",
                         )
-                    elif model_type == "dt_pfn":
-                        from tabpfn_extensions.rf_pfn import (
-                            DecisionTreeTabPFNClassifier,
-                        )
-
-                        base_clf = TabPFNClassifier(
-                            **model_params,
-                            inference_config=inference_config_params,
-                            device="cpu",
-                        )
-                        model_instance = DecisionTreeTabPFNClassifier(
-                            tabpfn=base_clf, max_depth=max_depth
-                        )
                     else:
                         pytest.fail(
                             f"Unsupported model_type for multiclass: {model_type}"
@@ -192,17 +178,6 @@ class TestSearchSpaceCompatibility:
                             **model_params,
                             inference_config=inference_config_params,
                             device="cpu",
-                        )
-                    elif model_type == "dt_pfn":
-                        from tabpfn_extensions.rf_pfn import DecisionTreeTabPFNRegressor
-
-                        base_reg = TabPFNRegressor(
-                            **model_params,
-                            inference_config=inference_config_params,
-                            device="cpu",
-                        )
-                        model_instance = DecisionTreeTabPFNRegressor(
-                            tabpfn=base_reg, max_depth=max_depth
                         )
                     else:
                         pytest.fail(

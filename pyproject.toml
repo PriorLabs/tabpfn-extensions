@@ -78,7 +78,6 @@ hpo = [
 survival = []
 many_class = []
 classifier_as_regressor = []
-rf_pfn = []
 unsupervised = []
 
 # Meta-package that installs all extensions
