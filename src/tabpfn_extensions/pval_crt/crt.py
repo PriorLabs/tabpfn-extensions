@@ -125,8 +125,8 @@ def tabpfn_crt(
         warnings.warn(
             "Falling back from fit_mode='fit_with_cache' — the installed "
             "tabpfn version doesn't support it. CRT will run but without "
-            "the KV cache speedup. Upgrade to TabPFN-3 (or pass "
-            "use_kv_cache=False to suppress this warning).",
+            "the KV cache speedup. Upgrade to the latest version of tabpfn "
+            "(or pass use_kv_cache=False to suppress this warning).",
             UserWarning,
             stacklevel=2,
         )
