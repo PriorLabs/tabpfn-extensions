@@ -5,7 +5,7 @@
 # DEPRECATED MODULE
 # -----------------------------------------------------------------------------
 # TunedTabPFNClassifier / TunedTabPFNRegressor are deprecated and will be
-# removed in a future release. They emit a DeprecationWarning on construction.
+# removed in a future release.
 # =============================================================================
 
 """Hyperparameter Optimization (HPO) for TabPFN models.

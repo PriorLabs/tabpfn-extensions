@@ -4,8 +4,8 @@
 # =============================================================================
 # DEPRECATED MODULE
 # -----------------------------------------------------------------------------
-# AutoTabPFNClassifier / AutoTabPFNRegressor are deprecated and will be removed
-# in a future release. They emit a DeprecationWarning on construction.
+# AutoTabPFNClassifier / AutoTabPFNRegressor are deprecated and will be
+# removed in a future release.
 # =============================================================================
 
 """TabPFN implementation in AutoGluon taken from TabArena: A Living Benchmark for Machine Learning on Tabular Data,
