@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `examples/interpretability/{shap,shapiq}_example.py` rewritten around California housing (regression, d=8, exact budget 2^8 = 256) and both engage the KV cache (#283).
 
 ### Changed
-- `ManyClassClassifier(estimator=TabPFNClassifier(), ...).fit(X, y)` no longer requires an explicit `alphabet_size`. The wrapper now reads the base estimator's `MAX_NUMBER_OF_CLASSES` directly from the checkpoint (v2.5 / v2.6 → 10, v3 → 160), then falls back to a probe fit only when the value isn't already available. The previous `estimator.max_num_classes_` fallback has been dead since this repo's initial commit — removed (#282).
+- `ManyClassClassifier(estimator=TabPFNClassifier(), ...).fit(X, y)` no longer requires an explicit `alphabet_size`. The wrapper now reads `MAX_NUMBER_OF_CLASSES` via the base estimator's `get_inference_config()` when available (v3 → 160). For older `tabpfn` releases that don't have `get_inference_config()`, it falls back to the historical hardcoded default of 10 if the base estimator's class lives in a `tabpfn`-prefixed module; non-TabPFN estimators still get the explicit-alphabet `ValueError`. The previous `estimator.max_num_classes_` fallback has been dead since this repo's initial commit — removed (#282).
 - `README.md` overhauled: dropped the workflow mermaid graph, removed RF-PFN / large-datasets references, retagged deprecated extensions, and reworded the many-class entry so it no longer hardcodes "10 classes" (#284).
 - `examples/README.md` refreshed to match the on-disk tree; `hpo/` and `phe/` example directories explicitly tagged as deprecated (#284).
 - `interpretability/README.md` updated to drop the SHAP section and document the KV-cache + baseline-imputer expectations (#283).
@@ -39,7 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `dt_pfn` `model_type` branch from `hpo/search_space.py` / `hpo/tuned_tabpfn.py` and the matching test arm; depended on the removed `rf_pfn` package (#284).
 
 ### Fixed
-- KV-cache wiring degrades gracefully on older local `tabpfn` (≤ v2.x, which raises `ValueError` / `NotImplementedError` at fit time) and on the `tabpfn-client` backend (which raises `TypeError` on the constructor kwarg). Both the PDP example and `pval_crt.tabpfn_crt` now catch and fall back with a clear `UserWarning` (#284).
+- KV-cache wiring degrades gracefully when the installed `tabpfn` doesn't support it:
+  - The PDP example (`examples/interpretability/pdp_example.py`) wraps construct + fit in a `try/except (TypeError, ValueError, NotImplementedError)`, so it works on both older local `tabpfn` (which raises `ValueError` / `NotImplementedError` at fit time) and the `tabpfn-client` backend (which raises `TypeError` on the constructor kwarg). The fallback emits a `UserWarning` recommending an upgrade (#284).
+  - `pval_crt.tabpfn_crt` is local-only by design (it raises `ImportError` at import time if `tabpfn` isn't installed). Its fallback catches `ValueError` / `NotImplementedError` from older local `tabpfn`; it doesn't need to catch `TypeError` because the client backend can't reach this code path (#284).
 
 ### Notes
 - `tabpfn` dependency pin remains `>=7.0.0` for this release. KV-cache examples need TabPFN-3 to actually engage the cache; on earlier `tabpfn` they emit a `UserWarning` and run without the speedup.

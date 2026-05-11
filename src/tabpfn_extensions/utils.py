@@ -57,8 +57,11 @@ def warn_if_no_kv_cache(model: Any, *, context: str = "This operation") -> None:
     # tabpfn-client doesn't expose fit_mode and doesn't (yet) support the KV
     # cache — recommend switching to the local tabpfn package instead of
     # firing the generic "set fit_mode='fit_with_cache'" message that would
-    # TypeError on the client.
-    if "tabpfn_client" in str(getattr(model, "__class__", type(model)).__module__):
+    # TypeError on the client. Walk the MRO because tabpfn-extensions wraps
+    # the client base classes in tabpfn_extensions.utils, so the *immediate*
+    # class' __module__ is "tabpfn_extensions.utils" and won't match.
+    mro_modules = (getattr(cls, "__module__", "") for cls in type(model).__mro__)
+    if any("tabpfn_client" in m for m in mro_modules):
         warnings.warn(
             f"{context} would benefit substantially from the KV cache, but "
             "the tabpfn-client backend does not currently support it. "
