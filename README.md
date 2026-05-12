@@ -1,12 +1,12 @@
 # TabPFN Extensions
 
 [![PyPI version](https://badge.fury.io/py/tabpfn-extensions.svg)](https://badge.fury.io/py/tabpfn-extensions)
-[![Downloads](https://pepy.tech/badge/tabpfn)](https://pepy.tech/project/tabpfn)
+[![Downloads](https://pepy.tech/badge/tabpfn-extensions)](https://pepy.tech/project/tabpfn-extensions)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Discord](https://img.shields.io/discord/1285598202732482621?color=7289da&label=Discord&logo=discord&logoColor=ffffff)](https://discord.gg/BHnX2Ptf4j)
 [![Twitter Follow](https://img.shields.io/twitter/follow/Prior_Labs?style=social)](https://twitter.com/Prior_Labs)
 ![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen)
-![Last Commit](https://img.shields.io/github/last-commit/automl/tabpfn-client)
+![Last Commit](https://img.shields.io/github/last-commit/PriorLabs/tabpfn-extensions)
 [![colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PriorLabs/TabPFN/blob/main/examples/notebooks/TabPFN_Demo_Local.ipynb)
 
 > [!WARNING]
@@ -49,12 +49,12 @@ See the [Documentation](#documentation) section below for guides, examples, and 
 
 Many TabPFN Extensions works with two TabPFN implementations:
 
-1. ** TabPFN Package** - Full PyTorch implementation for local inference:
+1. **TabPFN Package** — Full PyTorch implementation for local inference:
    ```bash
    pip install tabpfn
    ```
 
-2. ** TabPFN Client** - Lightweight API client for cloud-based inference:
+2. **TabPFN Client** — Lightweight API client for cloud-based inference:
    ```bash
    pip install tabpfn-client
    ```
@@ -105,7 +105,7 @@ The main TabPFN demo notebook also covers several extensions — in particular t
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
 
 
 ## Telemetry
