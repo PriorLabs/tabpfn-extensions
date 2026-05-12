@@ -648,7 +648,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         return log_p
 
     def outliers_pdf(self, X: torch.Tensor, n_permutations: int = 10) -> torch.Tensor:
-        """Calculate outlier scores from numerical features only.
+        """Calculate the log_pdf from numerical features only.
 
         This method filters out categorical features and only considers numerical features
         for outlier detection.
@@ -658,7 +658,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             n_permutations: Number of permutations to use for the outlier calculation
 
         Returns:
-            Outlier scores (lower values indicate more likely outliers).
+            log_pdf (lower values indicate more likely outliers).
         """
         X_store = copy.deepcopy(self.X_)
         mask = torch.ones_like(X_store).bool()
@@ -668,12 +668,12 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         mask[self.categorical_features] = False
         X = X[mask]
 
-        scores_pdf = self.outliers(X, n_permutations=n_permutations)
+        log_pdf = self.outliers(X, n_permutations=n_permutations)
         self.X_ = X_store
-        return scores_pdf
+        return log_pdf
 
     def outliers_pmf(self, X: torch.Tensor, n_permutations: int = 10) -> torch.Tensor:
-        """Calculate outlier scores from categorical features only.
+        """Calculate log_pmf from categorical features only.
 
         This method filters out numerical features and only considers categorical features
         for outlier detection.
@@ -693,9 +693,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         mask[self.categorical_features] = True
         X = X[mask]
 
-        scores_pmf = self.outliers(X, n_permutations=n_permutations)
+        log_pmf = self.outliers(X, n_permutations=n_permutations)
         self.X_ = X_store
-        return scores_pmf
+        return log_pmf
 
     @set_extension("unsupervised:outliers")
     def outliers(

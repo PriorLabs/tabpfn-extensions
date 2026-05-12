@@ -187,8 +187,8 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
     def plot(self):
         # Create a grid of jointplots using PairGrid
         g = sns.PairGrid(self.data, vars=self.feature_names)
-        g.map_upper(sns.scatterplot, s=5, alpha=0.5, hue=self.data["scores"])
-        g.map_lower(sns.scatterplot, s=5, alpha=0.5, hue=self.data["score_rank"])
+        g.map_upper(sns.scatterplot, s=5, alpha=0.5, hue=self.data["log_p"])
+        g.map_lower(sns.scatterplot, s=5, alpha=0.5, hue=self.data["log_p_rank"])
         g.add_legend()
 
     def plot_two(self, **kwargs):
@@ -198,18 +198,18 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
         # np.quantile returns NaN if any rank position falls on -inf (since
         # interpolation across -inf yields -inf - -inf = NaN). Clamp -inf to
         # the finite minimum just for the quantile computation; the original
-        # scores series is preserved for bucketing, where x < thresh keeps
+        # log_p series is preserved for bucketing, where x < thresh keeps
         # -inf rows correctly classified as Low.
-        scores_series = self.data["scores"]
-        finite_mask = np.isfinite(scores_series)
+        log_p_series = self.data["log_p"]
+        finite_mask = np.isfinite(log_p_series)
         if finite_mask.any() and not finite_mask.all():
-            finite_floor = float(scores_series[finite_mask].min())
-            scores_for_quantile = scores_series.where(finite_mask, finite_floor)
+            finite_floor = float(log_p_series[finite_mask].min())
+            log_p_for_quantile = log_p_series.where(finite_mask, finite_floor)
         else:
-            scores_for_quantile = scores_series
+            log_p_for_quantile = log_p_series
 
-        outlier_thresh = np.quantile(scores_for_quantile, outlier_thresh_p)
-        outlier_thresh_1 = np.quantile(scores_for_quantile, outlier_thresh_p_1)
+        outlier_thresh = np.quantile(log_p_for_quantile, outlier_thresh_p)
+        outlier_thresh_1 = np.quantile(log_p_for_quantile, outlier_thresh_p_1)
 
         def outlier_f(x, thresh_0, thresh_1):
             if np.isnan(x):
@@ -220,7 +220,7 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
                 return f"Medium ({round(100 * (outlier_thresh_p_1), 2)} Percentile)"
             return "High"
 
-        self.data["outlier"] = self.data["scores"].map(
+        self.data["outlier"] = self.data["log_p"].map(
             partial(outlier_f, thresh_0=outlier_thresh, thresh_1=outlier_thresh_1),
         )
         # Oversample the data with outlier = True
@@ -298,16 +298,16 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
             tabpfn.set_categorical_features(categorical_features)
 
             tabpfn.fit(self.X)
-            self.scores = tabpfn.outliers(self.X, n_permutations=n_permutations)
+            self.log_p = tabpfn.outliers(self.X, n_permutations=n_permutations)
 
-            score_rank = self.scores.argsort().argsort()
+            log_p_rank = self.log_p.argsort().argsort()
 
             self.data = pd.DataFrame(
                 torch.cat(
-                    [self.scores[:, np.newaxis], score_rank[:, np.newaxis], self.X],
+                    [self.log_p[:, np.newaxis], log_p_rank[:, np.newaxis], self.X],
                     dim=1,
                 ).numpy(),
-                columns=["scores", "score_rank", *self.feature_names],
+                columns=["log_p", "log_p_rank", *self.feature_names],
             )
 
             if kwargs.get("should_plot", True):
@@ -319,4 +319,4 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
                     # Skip plotting if matplotlib is not available
                     pass
 
-            return {"outlier_scores": self.scores.numpy()}
+            return {"log_p": self.log_p.numpy()}
