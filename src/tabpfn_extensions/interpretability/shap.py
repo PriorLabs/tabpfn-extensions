@@ -67,10 +67,14 @@ def shapiq_to_shap_explanation(
     n = len(X_arr)
     ivs = [explainer.explain(x=X_arr[i], budget=budget) for i in range(n)]
     values = np.stack([iv.get_n_order_values(1) for iv in ivs])
-    base_value = float(np.mean([iv.baseline_value for iv in ivs]))
+    # Pass per-row baselines through unchanged. For the imputation path the
+    # background is fixed and these are all the same value; for the Rundel
+    # remove-and-recontextualize path baselines genuinely vary per row.
+    # shap.Explanation accepts a 1-d (n,) array natively.
+    base_values = np.array([iv.baseline_value for iv in ivs])
     return shap.Explanation(
         values=values,
-        base_values=np.full(n, base_value),
+        base_values=base_values,
         data=X_arr,
         feature_names=feature_names,
     )
