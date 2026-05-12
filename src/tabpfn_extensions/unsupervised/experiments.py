@@ -187,42 +187,49 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
     def plot(self):
         # Create a grid of jointplots using PairGrid
         g = sns.PairGrid(self.data, vars=self.feature_names)
-        g.map_upper(sns.scatterplot, s=5, alpha=0.5, hue=self.data["p"])
-        g.map_lower(sns.scatterplot, s=5, alpha=0.5, hue=self.data["p_rank"])
+        g.map_upper(sns.scatterplot, s=5, alpha=0.5, hue=self.data["scores"])
+        g.map_lower(sns.scatterplot, s=5, alpha=0.5, hue=self.data["score_rank"])
         g.add_legend()
 
     def plot_two(self, **kwargs):
-        outlier_thresh_p = kwargs.get("outlier_thresh_p", 0.98)
-        outlier_thresh = np.quantile(
-            self.data["p"][self.data["p"] > 0],
-            outlier_thresh_p,
-        )
+        outlier_thresh_p = kwargs.get("outlier_thresh_p", 0.02)
+        outlier_thresh_p_1 = kwargs.get("outlier_thresh_p_1", 0.1)
 
-        outlier_thresh_p_1 = kwargs.get("outlier_thresh_p_1", 0.9)
-        outlier_thresh_1 = np.quantile(
-            self.data["p"][self.data["p"] > 0],
-            outlier_thresh_p_1,
-        )
+        # np.quantile returns NaN if any rank position falls on -inf (since
+        # interpolation across -inf yields -inf - -inf = NaN). Clamp -inf to
+        # the finite minimum just for the quantile computation; the original
+        # scores series is preserved for bucketing, where x < thresh keeps
+        # -inf rows correctly classified as Low.
+        scores_series = self.data["scores"]
+        finite_mask = np.isfinite(scores_series)
+        if finite_mask.any() and not finite_mask.all():
+            finite_floor = float(scores_series[finite_mask].min())
+            scores_for_quantile = scores_series.where(finite_mask, finite_floor)
+        else:
+            scores_for_quantile = scores_series
+
+        outlier_thresh = np.quantile(scores_for_quantile, outlier_thresh_p)
+        outlier_thresh_1 = np.quantile(scores_for_quantile, outlier_thresh_p_1)
 
         def outlier_f(x, thresh_0, thresh_1):
             if np.isnan(x):
                 return np.nan
-            if x > thresh_0:
-                return f"Low ({round(100 * (1 - outlier_thresh_p), 2)} Percentile)"
-            if x > thresh_1:
-                return f"Medium ({round(100 * (1 - outlier_thresh_p_1), 2)} Percentile)"
+            if x < thresh_0:
+                return f"Low ({round(100 * (outlier_thresh_p), 2)} Percentile)"
+            if x < thresh_1:
+                return f"Medium ({round(100 * (outlier_thresh_p_1), 2)} Percentile)"
             return "High"
 
-        self.data["outlier"] = self.data["p"].map(
+        self.data["outlier"] = self.data["scores"].map(
             partial(outlier_f, thresh_0=outlier_thresh, thresh_1=outlier_thresh_1),
         )
         # Oversample the data with outlier = True
         oversample_low = self.data[
             self.data["outlier"].map(lambda x: "Low" in x)
-        ].sample(frac=1 / (1 - outlier_thresh_p), replace=True)
+        ].sample(frac=1 / (outlier_thresh_p), replace=True)
         oversample_med = self.data[
             self.data["outlier"].map(lambda x: "Medium" in x)
-        ].sample(frac=1 / (1 - outlier_thresh_p_1), replace=True)
+        ].sample(frac=1 / (outlier_thresh_p_1), replace=True)
         data_ = pd.concat(
             [
                 self.data[self.data["outlier"].map(lambda x: "High" in x)],
@@ -230,37 +237,37 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
                 oversample_med,
             ],
         )
-        g = sns.JointGrid(
+        fig, ax = plt.subplots(figsize=(DEFAULT_HEIGHT, DEFAULT_HEIGHT))
+        sns.scatterplot(
             data=data_,
-            hue="outlier",
             x=self.feature_names[0],
             y=self.feature_names[1],
-            height=DEFAULT_HEIGHT,
+            hue="outlier",
+            s=50,
+            alpha=0.5,
+            ax=ax,
         )
 
-        g.fig.suptitle("Data Density Estimation")
-        g.fig.tight_layout()
-        g.fig.subplots_adjust(top=0.95)  # Reduce plot to make room
+        ax.set_title("outlier detection")
 
-        g.plot_joint(sns.scatterplot, s=50, alpha=0.5)
-        g.plot_marginals(sns.histplot, kde=True, stat="density")
-
-        # Remove the original legend created by plot_joint
-        g.ax_joint.get_legend().remove()
-
-        # Create a new legend on the joint plot axis with no frame and no title
-        handles, labels = g.ax_joint.get_legend_handles_labels()
-        leg = g.ax_joint.legend(
+        ax.get_legend().remove()
+        handles, labels = ax.get_legend_handles_labels()
+        leg = ax.legend(
             handles=handles,
             labels=labels,
-            loc="upper right",
-            title="Estimated density (percentile)",
+            loc="upper left",
+            title="Estimated data log(density)",
+            fontsize="small",
+            title_fontsize="small",
+            borderpad=0.6,
+            handletextpad=0.5,
         )
         leg.get_frame().set_facecolor("white")
         leg.get_frame().set_edgecolor("none")
-        leg.get_frame().set_alpha(1)  # Make the legend background completely opaque
+        leg.get_frame().set_alpha(1)
+        fig.tight_layout()
 
-        return g
+        return ax
 
     def run(
         self,
@@ -291,16 +298,16 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
             tabpfn.set_categorical_features(categorical_features)
 
             tabpfn.fit(self.X)
-            self.p = tabpfn.outliers(self.X, n_permutations=n_permutations)
+            self.scores = tabpfn.outliers(self.X, n_permutations=n_permutations)
 
-            p_rank = self.p.argsort().argsort()
+            score_rank = self.scores.argsort().argsort()
 
             self.data = pd.DataFrame(
                 torch.cat(
-                    [self.p[:, np.newaxis], p_rank[:, np.newaxis], self.X],
+                    [self.scores[:, np.newaxis], score_rank[:, np.newaxis], self.X],
                     dim=1,
                 ).numpy(),
-                columns=["p", "p_rank", *self.feature_names],
+                columns=["scores", "score_rank", *self.feature_names],
             )
 
             if kwargs.get("should_plot", True):
@@ -312,4 +319,4 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
                     # Skip plotting if matplotlib is not available
                     pass
 
-            return {"outlier_scores": self.p.numpy()}
+            return {"outlier_scores": self.scores.numpy()}
