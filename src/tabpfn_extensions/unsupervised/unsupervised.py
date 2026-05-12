@@ -624,7 +624,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 # Only index with valid indices
                 if valid_indices.any():
                     # Get probabilities for each sample based on its class in y_predict
-                    for idx, (prob_row, y_idx) in enumerate(zip(pred_np, y_indices)):
+                    for idx, (prob_row, y_idx) in enumerate(
+                        zip(pred_np, y_indices, strict=True)
+                    ):
                         if (
                             0 <= y_idx < pred_np.shape[1]
                         ):  # Check bounds again per sample

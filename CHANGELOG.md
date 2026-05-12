@@ -11,6 +11,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [0.4.1] - 2026-05-11
+
+### Fixed
+- `misc/sklearn_compat.py` import failure on `scikit-learn` 1.8+. Upstream renamed `sklearn.utils.validation._is_pandas_df` to `is_pandas_df` (no underscore prefix), which made every `from tabpfn_extensions import ...` immediately `ImportError` on a fresh install resolving sklearn 1.8. Re-vendored `misc/sklearn_compat.py` from the upstream [sklearn-compat](https://github.com/sklearn-compat/sklearn-compat) 0.1.5 release (was 0.1.3, March 2025); the new version has a proper `# Upgrading for scikit-learn 1.8` block plus general cleanups. Only `validate_data` is consumed downstream and its signature hasn't changed. Caught by a TestPyPI smoke install of 0.4.0 before publishing to real PyPI — 0.4.0 was never published.
+
+## [0.4.0] - 2026-05-11
+
+### Added
+- KV-cache support across extensions where it materially helps (improved with TabPFN-3 — earlier `tabpfn` versions degrade gracefully with a `UserWarning`):
+  - New `tabpfn_extensions.utils.warn_if_no_kv_cache(model, *, context)` helper that warns when a TabPFN model isn't configured with `fit_mode="fit_with_cache"` or when `executor_.keep_cache_on_device` is `False` post-fit. Recognises the `tabpfn-client` backend and emits an alternative recommendation instead of misleading guidance (#284).
+  - `pval_crt.tabpfn_crt`: new `use_kv_cache: bool = True` keyword argument. Enabling it sets `fit_mode="fit_with_cache"` on the internal predictive model and `keep_cache_on_device=True` after fit, with a graceful fallback when the installed `tabpfn` doesn't support the cache (#284).
+  - `interpretability/pdp.partial_dependence_plots`: warns via `warn_if_no_kv_cache` when handed a TabPFN estimator (#284).
+  - `interpretability/get_tabpfn_imputation_explainer`: same warn helper applied; defaults `imputer="baseline"` (one forward pass per coalition, ~50× faster than the previous `marginal` imputer with no faithfulness loss in practice) (#283).
+- `examples/interpretability/{shap,shapiq}_example.py` rewritten around California housing (regression, d=8, exact budget 2^8 = 256) and both engage the KV cache (#283).
+
+### Changed
+- `ManyClassClassifier(estimator=TabPFNClassifier(), ...).fit(X, y)` no longer requires an explicit `alphabet_size`. The wrapper now reads `MAX_NUMBER_OF_CLASSES` via the base estimator's `get_inference_config()` when available (v3 → 160). For older `tabpfn` releases that don't have `get_inference_config()`, it falls back to the historical hardcoded default of 10 if the base estimator's class lives in a `tabpfn`-prefixed module; non-TabPFN estimators still get the explicit-alphabet `ValueError`. The previous `estimator.max_num_classes_` fallback has been dead since this repo's initial commit — removed (#282).
+- `README.md` overhauled: dropped the workflow mermaid graph, removed RF-PFN / large-datasets references, retagged deprecated extensions, and reworded the many-class entry so it no longer hardcodes "10 classes" (#284).
+- `examples/README.md` refreshed to match the on-disk tree; `hpo/` and `phe/` example directories explicitly tagged as deprecated (#284).
+- `interpretability/README.md` updated to drop the SHAP section and document the KV-cache + baseline-imputer expectations (#283).
+
+### Deprecated
+- `AutoTabPFNClassifier` and `AutoTabPFNRegressor` (`post_hoc_ensembles/sklearn_interface.py`). Construction now emits a `DeprecationWarning`; a banner comment marks the module deprecated. Scheduled for removal in a future release (#284).
+- `TunedTabPFNClassifier` and `TunedTabPFNRegressor` (`hpo/tuned_tabpfn.py`). Same treatment (#284).
+
+### Removed
+- The `rf_pfn` package (`RandomForestTabPFN*` / `DecisionTreeTabPFN*`), its tests (`tests/test_rf_pfn.py`, `tests/test_dt_pfn.py`), the `rf_pfn = []` optional-dependency extra, and the `examples/rf_pfn/` and `examples/large_datasets/` example directories (#284).
+- The `sklearn_ensembles` package (`tabpfn_extensions.sklearn_ensembles`) and its module-level imports. No external callers in the repo (#284).
+- The legacy `interpretability/shap.py` adapter and the `shap` runtime dependency. The `shapiq`-based path supersedes it, including for plotting (`shap.Explanation` wrappers still work with `shap.plots.*`) (#283).
+- `interpretability/experiments.py` — dead code. No callers anywhere in the repo, and internally referenced a `tabpfn.scripts.estimator.interpretability` path that no longer exists in current `tabpfn` (#284).
+- The `dt_pfn` `model_type` branch from `hpo/search_space.py` / `hpo/tuned_tabpfn.py` and the matching test arm; depended on the removed `rf_pfn` package (#284).
+
+### Fixed
+- KV-cache wiring degrades gracefully when the installed `tabpfn` doesn't support it:
+  - The PDP example (`examples/interpretability/pdp_example.py`) wraps construct + fit in a `try/except (TypeError, ValueError, NotImplementedError)`, so it works on both older local `tabpfn` (which raises `ValueError` / `NotImplementedError` at fit time) and the `tabpfn-client` backend (which raises `TypeError` on the constructor kwarg). The fallback emits a `UserWarning` recommending an upgrade (#284).
+  - `pval_crt.tabpfn_crt` is local-only by design (it raises `ImportError` at import time if `tabpfn` isn't installed). Its fallback catches `ValueError` / `NotImplementedError` from older local `tabpfn`; it doesn't need to catch `TypeError` because the client backend can't reach this code path (#284).
+
+### Notes
+- `tabpfn` dependency pin remains `>=7.0.0` for this release. KV-cache examples need TabPFN-3 to actually engage the cache; on earlier `tabpfn` they emit a `UserWarning` and run without the speedup.
+- TabEBM remains broken against any released `tabpfn` ≥ 7.x because `tabpfn.config` was removed upstream. This is a pre-existing latent bug, tracked separately ([RES-1541](https://linear.app/priorlabs/issue/RES-1541)).
+
+## [0.3.0] - 2026-04-24
+
+### Added
+- Conditional Randomization Test (CRT) based p-value / hypothesis testing extension using TabPFN (#237).
+- AutoTabPFN diagnostics and per-checkpoint AutoGluon limits (#272, PRI-269).
+
+### Changed
+- Widened `tabpfn` dependency cap from `<7` to `<8` (#259). This allows `tabpfn-extensions` to resolve against `tabpfn >= 7.x` (TabPFN v2.6). Fixes the Colab issue where `tabpfn-extensions[all]` transitively pinned `tabpfn` to `6.4.1` (v2.5 model).
+- Standardized random state handling across Random Forest extensions (#235).
+- Added license checks to CI (#238).
+
+### Removed
+- **BREAKING**: `scikit-survival` is no longer installed by the `[all]` or `[survival]` extras (#269). It is excluded due to its GPL-3.0 license. If you use `SurvivalTabPFN`, install it manually:
+
+  ```
+  pip install scikit-survival
+  ```
+
+  A clear `ImportError` with install instructions is raised when `SurvivalTabPFN` is imported without `scikit-survival` present.
+
+### Fixed
+- Hotfix in the `unsupervised` module (#249).
+- Removed flaky `test_crt_handles_irrelevant_feature` (#256).
+
 ## [0.2.1] - 2025-11-07
 
 ### Added

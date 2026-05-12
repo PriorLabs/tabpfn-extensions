@@ -286,7 +286,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         for labels in fit_y_records:
             assert rest_code not in labels
 
-        for weights, labels in zip(fit_weight_records, fit_y_records):
+        for weights, labels in zip(fit_weight_records, fit_y_records, strict=True):
             if weights is not None:
                 assert weights.shape[0] == labels.shape[0]
 
@@ -318,12 +318,12 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         assert probas.shape == (7, len(wrapper.classes_))
         np.testing.assert_allclose(probas.sum(axis=1), 1.0, atol=1e-9)
 
-    @pytest.mark.skip(reason="DecisionTreeTabPFN doesn't fully support text features")
+    @pytest.mark.skip(reason="Estimator under test doesn't fully support text features")
     def test_with_text_features(self, estimator, dataset_generator):
         pass
 
     @pytest.mark.skip(
-        reason="DecisionTreeTabPFN needs additional work to pass all sklearn estimator checks",
+        reason="Estimator under test needs additional work to pass all sklearn estimator checks",
     )
     def test_passes_estimator_checks(self, estimator):
         pass
@@ -356,7 +356,7 @@ class TestManyClassClassifier(BaseClassifierTests):  # Inherit from BaseClassifi
         assert np.allclose(proba.sum(axis=1), 1.0)
 
     @pytest.mark.skip(
-        reason="Disabled due to DecisionTreeTabPFN not supporting missing values."
+        reason="Disabled due to estimator under test not supporting missing values."
     )
     def test_with_missing_values(self, estimator, dataset_generator):
         pass

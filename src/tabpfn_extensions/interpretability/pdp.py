@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from sklearn.inspection import PartialDependenceDisplay
 from tabpfn_common_utils.telemetry import set_extension
 
+from tabpfn_extensions.utils import is_tabpfn, warn_if_no_kv_cache
+
 if TYPE_CHECKING:
     import numpy as np
     from matplotlib.axes import Axes
@@ -40,6 +42,9 @@ def partial_dependence_plots(
     Returns:
         PartialDependenceDisplay
     """
+    if is_tabpfn(estimator):
+        warn_if_no_kv_cache(estimator, context="Partial dependence plots")
+
     # Decide response method
     response_method = "predict_proba" if hasattr(estimator, "predict_proba") else "auto"
 
