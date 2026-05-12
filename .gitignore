@@ -151,3 +151,6 @@ commit_messages.txt
 CLAUDE.md
 .claude/*.local.*
 .claude/worktrees/
+
+# ad-hoc local artifacts (test plots, scratch dirs, etc.)
+.local/
