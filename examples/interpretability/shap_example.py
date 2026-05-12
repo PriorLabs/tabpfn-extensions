@@ -21,19 +21,25 @@ warning if the cache isn't enabled.
 
 from __future__ import annotations
 
-import numpy as np
 import shap
 from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import train_test_split
 
 from tabpfn_extensions import TabPFNRegressor
-from tabpfn_extensions.interpretability import shapiq as tabpfn_shapiq
+from tabpfn_extensions.interpretability import (
+    shapiq as tabpfn_shapiq,
+    shapiq_to_shap_explanation,
+)
 
 housing = fetch_california_housing(as_frame=False)
 X, y, feature_names = housing.data, housing.target, list(housing.feature_names)
 
 X_train, X_test, y_train, _ = train_test_split(
-    X, y, train_size=1000, test_size=200, random_state=0,
+    X,
+    y,
+    train_size=1000,
+    test_size=200,
+    random_state=0,
 )
 n_explain = 30
 X_explain = X_test[:n_explain]
@@ -50,24 +56,16 @@ explainer = tabpfn_shapiq.get_tabpfn_imputation_explainer(
     max_order=1,
 )
 
-# Compute Shapley values for n_explain rows. Each call produces an
-# `InteractionValues` object; we extract the (d,) 1st-order array per row and
-# stack into the (n, d) matrix that shap.Explanation expects.
+# Compute first-order Shapley values for n_explain rows and wrap them in a
+# shap.Explanation. `shapiq_to_shap_explanation` runs one .explain() call per
+# row, stacks the (d,) arrays, averages baseline values, and packages
+# everything for the SHAP plotting API. budget=256 = 2^8 is the exact-Shapley
+# budget for d=8 features.
 print(f"Computing Shapley values for {n_explain} rows...")
-ivs = [explainer.explain(x=X_explain[i], budget=256) for i in range(n_explain)]
-shap_values = np.stack([iv.get_n_order_values(1) for iv in ivs])
-
-# baseline_value is the model's expected output when *every* feature is masked
-# — i.e. the prediction on the empty coalition. We average across rows to get
-# the scalar E[f(X)] that shap.Explanation wants for base_values.
-base_value = float(np.mean([iv.baseline_value for iv in ivs]))
-
-# Wrap shapiq's output in a shap.Explanation so the full shap.plots.* family
-# accepts it directly.
-explanation = shap.Explanation(
-    values=shap_values,
-    base_values=np.full(n_explain, base_value),
-    data=X_explain,
+explanation = shapiq_to_shap_explanation(
+    explainer,
+    X_explain,
+    budget=256,
     feature_names=feature_names,
 )
 
