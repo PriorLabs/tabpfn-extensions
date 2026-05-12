@@ -37,11 +37,32 @@ We expose two adapters:
 
   The wrapper warns at construction time if the model isn't configured this way.
 
-For SHAP-style plots (waterfall, beeswarm, summary, dependence) you can use shapiq's
-own visualizations on the returned ``InteractionValues`` object (``iv.plot_force()``,
-``iv.plot_waterfall()``, ``iv.plot_network()``, ``iv.plot_si_graph()``, etc.), or convert
-the values to ``shap.Explanation`` and use ``shap.plots.*``. See
-``examples/interpretability/shapiq_example.py`` and ``shap_example.py`` for both.
+For SHAP-style plots (waterfall, beeswarm, summary, dependence) you have two options:
+
+1. **Use shapiq's own visualizations** on the returned ``InteractionValues`` object:
+   ``iv.plot_force()``, ``iv.plot_waterfall()``, ``iv.plot_network()``,
+   ``iv.plot_si_graph()``, etc.
+
+2. **Use the SHAP library's plotting** via the bridge helper. Run shapiq's
+   ``.explain()`` over a batch of rows and wrap the result in a
+   ``shap.Explanation`` in one call:
+
+   ```python
+   from tabpfn_extensions.interpretability import shapiq_to_shap_explanation
+
+   explanation = shapiq_to_shap_explanation(
+       explainer, X_explain, budget=256, feature_names=feature_names,
+   )
+   shap.plots.waterfall(explanation[0])
+   ```
+
+   ``shapiq_to_shap_explanation`` extracts first-order Shapley values from
+   shapiq's output and wraps them in a ``shap.Explanation``. Requires
+   ``pip install shap`` — kept out of the ``interpretability`` extra by
+   design (shapiq is the runtime dependency; shap is opt-in for plotting).
+
+See ``examples/interpretability/shapiq_example.py`` and ``shap_example.py``
+for both paths.
 
 The ``shapiq`` library and the paper introducing the improved Shapley value computation
 for TabPFN can be cited as follows:
