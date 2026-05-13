@@ -639,8 +639,8 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 logits_tensor = logits.clone().detach()
                 y_tensor = y_predict.clone().detach().to(logits.device)
                 # criterion.forward returns the NLL, so -forward is log p_θ directly.
-                log_pred = -pred["criterion"].forward(logits_tensor, y_tensor).to(
-                    log_p.device
+                log_pred = (
+                    -pred["criterion"].forward(logits_tensor, y_tensor).to(log_p.device)
                 )
 
             log_p = log_p + log_pred
