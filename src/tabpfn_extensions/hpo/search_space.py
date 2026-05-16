@@ -94,12 +94,8 @@ def get_param_grid_hyperopt(
     """
     search_space = {
         # Custom HPs
-        "model_type": hp.choice(
-            "model_type",
-            ["single", "dt_pfn"],
-        ),
+        "model_type": hp.choice("model_type", ["single"]),
         "n_estimators": hp.choice("n_estimators", [4]),
-        "max_depth": hp.choice("max_depth", [2, 3, 4, 5]),  # For Decision Tree TabPFN
         # -- Model HPs
         "average_before_softmax": hp.choice("average_before_softmax", [True, False]),
         "softmax_temperature": hp.choice(
@@ -143,15 +139,24 @@ def get_param_grid_hyperopt(
     if model_dir is None:
         model_dir = get_cache_dir()
 
-    if task_type == "multiclass" and model_version == ModelVersion.V2:
-        model_source = ModelSource.get_classifier_v2()
-    elif task_type == "multiclass" and model_version == ModelVersion.V2_5:
-        model_source = ModelSource.get_classifier_v2_5()
-    elif task_type == "regression":
-        if model_version == ModelVersion.V2:
-            model_source = ModelSource.get_regressor_v2()
-        elif model_version == ModelVersion.V2_5:
-            model_source = ModelSource.get_regressor_v2_5()
+    # Resolve the model source for the (task_type, model_version) pair. Any
+    # combination we don't explicitly support below raises before we try to
+    # use `model_source`.
+    model_source_lookup = {
+        ("multiclass", ModelVersion.V2): ModelSource.get_classifier_v2,
+        ("multiclass", ModelVersion.V2_5): ModelSource.get_classifier_v2_5,
+        ("regression", ModelVersion.V2): ModelSource.get_regressor_v2,
+        ("regression", ModelVersion.V2_5): ModelSource.get_regressor_v2_5,
+    }
+    try:
+        model_source = model_source_lookup[(task_type, model_version)]()
+    except KeyError as err:
+        raise NotImplementedError(
+            f"No hpo search space is defined for task type {task_type!r} and "
+            f"model version {model_version!r}."
+        ) from err
+
+    if task_type == "regression":
         search_space["inference_config/REGRESSION_Y_PREPROCESS_TRANSFORMS"] = hp.choice(
             "REGRESSION_Y_PREPROCESS_TRANSFORMS",
             [
@@ -160,12 +165,6 @@ def get_param_grid_hyperopt(
                 ("safepower",),
                 # ("quantile_uni",),
             ],
-        )
-
-    else:
-        raise ValueError(
-            f"Unknown combination of task type {task_type} and "
-            "model version {model_version}!"
         )
 
     # Make sure models are downloaded.

@@ -1,6 +1,9 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
-
+#
+#  Concept and code developed by Robert Hatch based on his solution at the
+#  Kaggle CIBMTR - Equity in post-HCT Survival Predictions Competition.
+#
 # INFO: The survival prediction work is work-in-progress and still unoptimized,
 #  TabPFN survival may provide inconsistent improvements.
 
@@ -12,8 +15,18 @@ from typing import Literal
 import numpy as np
 import torch
 from sklearn.base import BaseEstimator
-from sksurv.base import SurvivalAnalysisMixin
-from sksurv.util import check_y_survival
+
+# scikit-survival is an optional dependency; install with
+# `pip install scikit-survival` if you need SurvivalTabPFN.
+try:
+    from sksurv.base import SurvivalAnalysisMixin
+    from sksurv.util import check_y_survival
+except ImportError as _err:  # pragma: no cover
+    raise ImportError(
+        "SurvivalTabPFN requires scikit-survival. Install it with:\n\n"
+        "    pip install scikit-survival. Excluded due to GPL."
+    ) from _err
+
 from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor

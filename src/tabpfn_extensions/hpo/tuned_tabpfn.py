@@ -1,6 +1,13 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
 
+# =============================================================================
+# DEPRECATED MODULE
+# -----------------------------------------------------------------------------
+# TunedTabPFNClassifier / TunedTabPFNRegressor are deprecated and will be
+# removed in a future release.
+# =============================================================================
+
 """Hyperparameter Optimization (HPO) for TabPFN models.
 
 This module provides automatic tuning capabilities for TabPFN models using
@@ -39,8 +46,10 @@ Example usage:
 from __future__ import annotations
 
 import logging
+import warnings
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 import torch
@@ -115,6 +124,12 @@ class TunedTabPFNBase(BaseEstimator):
         existing_trials: Trials | None = None,
         model_version: ModelVersion = ModelVersion.V2_5,
     ):
+        warnings.warn(
+            f"{type(self).__name__} is deprecated and will be removed in a "
+            "future release of tabpfn-extensions.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.n_trials = n_trials
         self.n_validation_size = n_validation_size
         self.shuffle_data = shuffle_data
@@ -183,7 +198,7 @@ class TunedTabPFNBase(BaseEstimator):
             for k, v_item in self.search_space.items():
                 if isinstance(v_item, list):
                     custom_space[k] = hp.choice(k, v_item)
-                elif isinstance(v_item, (int, float, bool, str)) or v_item is None:
+                elif isinstance(v_item, int | float | bool | str) or v_item is None:
                     custom_space[k] = v_item
                 else:
                     custom_space[k] = v_item
@@ -223,44 +238,10 @@ class TunedTabPFNBase(BaseEstimator):
             model_params["random_state"] = rng.randint(0, 2**31 - 1)
 
             # Handle model type selection
-            model_type = model_params.pop("model_type", "single")
-
-            # Import model implementations based on type
-            if model_type == "dt_pfn":
-                # Import DecisionTreeTabPFN models
-                try:
-                    from tabpfn_extensions.rf_pfn import (
-                        DecisionTreeTabPFNClassifier,
-                        DecisionTreeTabPFNRegressor,
-                    )
-                except ImportError:
-                    # If import fails, skip this trial
-                    return {"loss": float("inf"), "status": STATUS_OK}
+            model_params.pop("model_type", "single")
 
             try:
-                # Extract decision tree specific parameters
-                # and remove them from model_params so that
-                # instances of TabPFNClassifier or
-                # TabPFNRegressor can be initialized properly
-                max_depth = model_params.pop("max_depth", 3)
-                # Create and fit model based on model type
-                if model_type == "dt_pfn":
-                    if task_type in ["binary", "multiclass"]:
-                        # Use TabPFNClassifier as the base model for DT
-                        base_model = TabPFNClassifier(**model_params)
-                        model = DecisionTreeTabPFNClassifier(
-                            tabpfn=base_model,
-                            max_depth=max_depth,
-                        )
-                    else:
-                        # Use TabPFNRegressor as the base model for DT
-                        base_model = TabPFNRegressor(**model_params)
-                        model = DecisionTreeTabPFNRegressor(
-                            tabpfn=base_model,
-                            max_depth=max_depth,
-                        )
-                # Standard single model
-                elif task_type in ["binary", "multiclass"]:
+                if task_type in ["binary", "multiclass"]:
                     model = TabPFNClassifier(**model_params)
                 else:
                     model = TabPFNRegressor(**model_params)

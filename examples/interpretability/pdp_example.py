@@ -1,3 +1,5 @@
+import warnings
+
 import matplotlib.pyplot as plt
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import train_test_split
@@ -13,9 +15,31 @@ feature_names = list(data.feature_names)
 # Split data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5)
 
-# Initialize and train model
-clf = TabPFNClassifier()
-clf.fit(X_train, y_train)
+# Initialize and train model. Enable the KV cache (improved with TabPFN-3):
+# PDP issues many predicts (grid_resolution per feature * #features) against
+# the same fitted model, so caching the encoder pass over X_train avoids
+# redoing it on every grid point. Falls back to a default constructor for
+# backends/versions that don't support fit_mode="fit_with_cache" — that's
+# tabpfn-client (TypeError on the kwarg) and older local tabpfn (accepts
+# the kwarg but raises ValueError/NotImplementedError at fit time).
+try:
+    clf = TabPFNClassifier(fit_mode="fit_with_cache")
+    clf.fit(X_train, y_train)
+    if hasattr(clf, "executor_"):
+        clf.executor_.keep_cache_on_device = True
+except (TypeError, ValueError, NotImplementedError):
+    warnings.warn(
+        "PDP would benefit substantially from the KV cache, but the "
+        "current TabPFN install doesn't support fit_mode='fit_with_cache' "
+        "(typical of older tabpfn versions or the tabpfn-client backend). "
+        "Upgrade to the latest version of tabpfn (`pip install -U tabpfn`) "
+        "for a substantial speedup on this example. Falling back to the "
+        "default constructor.",
+        UserWarning,
+        stacklevel=2,
+    )
+    clf = TabPFNClassifier()
+    clf.fit(X_train, y_train)
 
 # 1D PD for the first 3 features + a 2D interaction plot
 disp = partial_dependence_plots(

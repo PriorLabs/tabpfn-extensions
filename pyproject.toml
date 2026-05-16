@@ -4,17 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tabpfn-extensions"
-version = "0.2.2"
+version = "0.4.1"
 dependencies = [
-    "torch>=2.1,<3",
-    "pandas>=1.4.0,<3",
-    "scikit-learn>=1.6.0,<1.7",
-    "scipy>=1.11.1,<2",
-    "tabpfn>=6.0.5,<7",
-    "tabpfn-common-utils[telemetry-interactive]>=0.2.0",
+    "torch>=2.1",
+    "pandas>=2.2.2",
+    "scikit-learn>=1.6.0",
+    "scipy>=1.11.1",
+    "tabpfn>=7.0.0",
+    "tabpfn-common-utils[telemetry-interactive]>=0.2.13",
 ]
 
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "Noah Hollmann", email = "noah.hollmann@charite.de" },
     { name = "Leo Grinsztajn" },
@@ -43,7 +43,6 @@ classifiers = [
     'Operating System :: Unix',
     'Operating System :: MacOS',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
@@ -57,54 +56,51 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 
 [project.optional-dependencies]
 interpretability = [
-    "shap>=0.41.0",
-    "shapiq>=0.4.0",
+    # 1.1.0 is the lowest release where `imputer="baseline"` + `index="SV"` +
+    # `max_order=1` (the default config used by get_tabpfn_imputation_explainer)
+    # works without raising.
+    "shapiq>=1.1.0",
     "seaborn>=0.12.2",
 ]
 post_hoc_ensembles = [
-    "llvmlite",
+    "llvmlite>=0.43.0",
     "hyperopt>=0.2.7",
-    "autogluon.tabular==1.4.0"
+    "autogluon.tabular>=1.5.0,<1.6"
 ]
 hpo = [
     "hyperopt>=0.2.7",
     # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
     "setuptools>=67.0.0,<82",
 ]
-survival = [
-    "scikit-survival>=0.25.0; python_version >= '3.10'",
-]
+# Install scikit-survival manually if you need SurvivalTabPFN
+# `pip install scikit-survival`. Excluded due to GPL.
+survival = []
 many_class = []
 classifier_as_regressor = []
-rf_pfn = []
 unsupervised = []
 
 # Meta-package that installs all extensions
 all = [
-    "shap>=0.41.0",
-    "shapiq>=0.4.0",
-    "seaborn>=0.12.2",
-
-    "llvmlite>=0.30.0",
-    "hyperopt>=0.2.7",
-    # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
-    "setuptools>=67.0.0,<82",
-    "autogluon.tabular==1.4.0",
-
-    "scikit-survival>=0.25.0; python_version >= '3.10'",
+    # scikit-survival not included; install manually if you need SurvivalTabPFN.
+    "tabpfn-extensions[interpretability,post_hoc_ensembles,hpo,survival]",
 ]
 
 [dependency-groups]
+# The minimum subset of the dev dependencies required to run the tests on the CI.
+# The idea is to be as close to the deployment environment as possible.
+ci = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.15.1",
+    "licensecheck>=2025.1.0",
+]
 dev = [
+    {include-group = "ci"},
     "pre-commit>=3.0.0",
     "ruff==0.8.6", # This must be the same version as in .pre-commit-config.yaml
     "mypy>=1.0.0",
-    "pytest>=8.0.0",
     "pytest-xdist>=3.6.0",
-    "pytest-mock>=3.15.1",
     "build>=1.3.0",
     "twine>=6.2.0",
-    "licensecheck>=2025.1.0",
 ]
 
 [tool.pytest.ini_options]
@@ -118,10 +114,14 @@ addopts = "--durations=10 -vv"
 
 # https://github.com/astral-sh/ruff
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 88
 output-format = "full"
 src = ["src", "tests", "examples"]
+# misc/sklearn_compat.py is vendored verbatim from sklearn-compat upstream;
+# excluding it from both lint and format keeps it byte-identical to upstream
+# so future re-vendors are clean diffs.
+extend-exclude = ["src/tabpfn_extensions/misc/sklearn_compat.py"]
 
 [tool.ruff.lint]
 # Allow unused variables when underscore-prefixed.
@@ -330,7 +330,7 @@ convention = "google"
 max-args = 10 # Changed from default of 5
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 packages = ["src/tabpfn_extensions", "tests"]
 
 show_error_codes = true
@@ -369,7 +369,7 @@ ignore_missing_imports = true
 [tool.pyright]
 include = ["src", "tests"]
 
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 typeCheckingMode = "strict"
 
 strictListInference = true
