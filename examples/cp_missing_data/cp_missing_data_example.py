@@ -3,23 +3,22 @@
 This script demonstrates the complete workflow for obtaining conformal prediction intervals
 for the TabPFNRegressor when these are missing values in the dataset. The process is shown
 in two steps. Using the training data to train the model and obtain correction terms for
-each mask, and appying the corrcetion terms with the trained model to a new dataset.
+each mask, and applying the correction terms with the trained model to a new dataset.
 
 Note: This algorithm works well when the missing pattern is small.
 """
 
 import numpy as np
 import pandas as pd
-import warnings
 
-from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
+from tabpfn_extensions.utils import TabPFNRegressor
 
 from tabpfn_extensions.cp_missing_data import CPMDATabPFNRegressor, CPMDATabPFNRegressorNewData
 
 # generate some data
 np.random.seed(42)  # For reproducibility
 X = np.random.rand(100, 2)
-Y = np.random.rand(100)
+y = X @ np.array([5, 5]) + np.random.rand(100)
 
 # add missing values in X under MCAR
 X[np.random.randint(0, 100, 40), np.random.randint(0, 2, 40)] = np.nan
@@ -30,9 +29,10 @@ print(f"Number of unique missing data patterns: {len(unique_patterns)}")
 print("\nUnique patterns:")
 print(unique_patterns)
 
-# Use TabPFN+CP-MDA
-model = CPMDATabPFNRegressor(quantiles=[0.05, 0.5, 0.95], val_size=0.5, seed = 123)
-calibration_results, model_fit = model.fit(X, Y)
+# Use TabPFN+CP-MDA, the interval 
+# Note the interval needs to be symmetric
+model = CPMDATabPFNRegressor(quantiles=[0.05, 0.5, 0.95], val_size=0.5, seed=123)
+calibration_results, model_fit = model.fit(X, y)
 print(calibration_results)
 
 # Apply the model to new cases 

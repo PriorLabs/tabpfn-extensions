@@ -25,7 +25,7 @@ class CPMDATabPFNRegressor:
     Parameters:
         quantiles : array with three arguments denoting the quantiles of interest.
             The default is [0.05, 0.5, 0.95], where the first indicates the lower bound,
-            the second the median, and the third the upper bound.
+            the second the median, and the third the upper bound. The intervals needs to be symmetric. 
         val_size : float between 0 and 1, indicating the size of the validation set
             as a fraction of the training data.
 
@@ -49,17 +49,17 @@ class CPMDATabPFNRegressor:
         alpha: float,
     ) -> float:
         """Calculate the correction term for conformal prediction."""
-        # obtain the lowerbound, median, and upperbound
+        # obtain the lower bound, median, and upper bound
         lb, pred, ub = predictions
         # calculate difference between bounds and observed values
         error_lb = lb - y_val
         error_ub = y_val - ub
         s = np.maximum(error_lb, error_ub)
 
-        # obtain the emperical quantile
+        # obtain the empirical quantile
         Q_use = (1 - alpha) * (1 + 1 / len(s))
 
-        # Check is Q_use if not larger then 1
+        # Check if Q_use is not larger than 1
         if Q_use > 1:
             Q_use = 1
             warnings.warn("Some masks have very small calibration sets", stacklevel=2)
@@ -158,8 +158,8 @@ class CPMDATabPFNRegressor:
             ]
 
             # select the validation data based on the indices
-            x_val_nested = x_val.loc[indexes]
-            y_val_nested = y_val.loc[indexes]
+            x_val_nested = x_val.loc[indexes].copy()
+            y_val_nested = y_val.loc[indexes].copy()
 
             # SET ENTIRE COLUMNS TO NaN WHERE THE MASK HAS MISSING VALUES
             current_mask = mask_unique[mask_unique["mask_id"] == i][mask_cols].iloc[0]
@@ -202,9 +202,9 @@ class CPMDATabPFNRegressor:
         x = pd.DataFrame(x_train)
         y = y_train
 
-        # Run trough all the functions
-        x_train, x_val, y_train, y_val, mask_train, mask_val = self.split_data(x, y)
-        model = self.run_TABPFN(x_train, y_train)
+        # Run through all the functions
+        x_train_split, x_val, y_train_split, y_val, mask_train_split, mask_val = self.split_data(x, y)
+        model = self.run_TABPFN(x_train_split, y_train_split)
         mask_unique, mask_nested = self.mask_preprocess(mask_val)
         mask_unique, model = self.create_calibration_sets(
             x_val, y_val, mask_val, mask_unique, mask_nested, model
@@ -214,7 +214,7 @@ class CPMDATabPFNRegressor:
 
 
 class CPMDATabPFNRegressorNewData:
-    """Compute the correction terms for missing data masks using conformal prediction.
+    """Apply the correction terms for missing data masks to new data.
 
     Parameters:
         tabpfn : Fitted TabPFNRegressor model.
