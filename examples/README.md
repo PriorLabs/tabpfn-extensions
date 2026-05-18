@@ -6,13 +6,15 @@ This directory contains examples for using TabPFN extensions. Each extension has
 
 ```
 examples/
-├── classifier_as_regressor/   # Using TabPFN classifiers for regression
-├── hpo/                      # Hyperparameter optimization
-├── interpretability/         # SHAP and feature selection
-├── many_class/               # Handling many classes
-├── post_hoc_ensembles/       # Post-hoc ensembles
-├── rf_pfn/                   # Random Forest + TabPFN combinations
-└── unsupervised/             # Unsupervised learning
+├── embedding/         # Access TabPFN's internal dense sample embeddings
+├── interpretability/  # SHAP, partial dependence, feature selection
+├── many_class/        # More classes than the checkpoint supports
+├── pval_crt/          # Statistical feature relevance testing
+├── survival/          # Survival analysis
+├── tabebm/            # Data augmentation via TabEBM
+├── unsupervised/      # Data generation, imputation, outlier detection
+├── hpo/               # (deprecated) TunedTabPFN* hyperparameter tuning
+└── phe/               # (deprecated) AutoTabPFN* post-hoc ensembles
 ```
 
 ## Running Examples

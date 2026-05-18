@@ -27,6 +27,88 @@ class TabPFNEstimator(Protocol):
     def predict(self, X: Any) -> Any: ...
 
 
+def warn_if_no_kv_cache(model: Any, *, context: str = "This operation") -> None:
+    """Warn if a TabPFN model isn't configured to use the KV cache.
+
+    The KV cache (improved with TabPFN-3) caches the encoder pass over the training set so that
+    repeated predicts against the same fitted model don't re-encode the
+    training data each time. Extensions that issue many predicts per fit
+    (e.g. imputation-based SHAP, certain feature-selection or HPO routines)
+    benefit from it — without the cache, the encoder pass over the training
+    set runs on every predict and these extensions can be 10-100x slower
+    than necessary.
+
+    Two conditions need to hold for the cache fast path:
+        1. ``model`` was constructed with ``fit_mode="fit_with_cache"``
+           (a constructor argument, must be set BEFORE ``.fit()``).
+        2. ``model.executor_.keep_cache_on_device`` is ``True`` (set AFTER
+           ``.fit()``; usually the default but worth setting explicitly).
+
+    This helper warns if either is missing, but does not raise — users may
+    have intentional reasons (e.g. memory).
+
+    Args:
+        model: The TabPFN model (classifier or regressor) to inspect.
+        context: Short noun phrase describing the caller's operation, used
+            to make the warning message specific (e.g. ``"Imputation-based
+            SHAP"``, ``"Sequential feature selection"``). Defaults to a
+            generic ``"This operation"``.
+    """
+    # tabpfn-client doesn't expose fit_mode and doesn't (yet) support the KV
+    # cache — recommend switching to the local tabpfn package instead of
+    # firing the generic "set fit_mode='fit_with_cache'" message that would
+    # TypeError on the client. Walk the MRO because tabpfn-extensions wraps
+    # the client base classes in tabpfn_extensions.utils, so the *immediate*
+    # class' __module__ is "tabpfn_extensions.utils" and won't match.
+    mro_modules = (getattr(cls, "__module__", "") for cls in type(model).__mro__)
+    if any("tabpfn_client" in m for m in mro_modules):
+        warnings.warn(
+            f"{context} would benefit substantially from the KV cache, but "
+            "the tabpfn-client backend does not currently support it. "
+            "Install the local tabpfn package (`pip install tabpfn`) and "
+            "use TabPFNClassifier/TabPFNRegressor with "
+            "fit_mode='fit_with_cache' to enable it.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return
+
+    fit_mode = getattr(model, "fit_mode", None)
+    if fit_mode is None:
+        # Not a TabPFN-shaped model (or some custom estimator without a
+        # fit_mode attribute). Don't fire a misleading warning; the caller
+        # is responsible for ensuring the estimator is something we can
+        # actually accelerate.
+        return
+    if fit_mode != "fit_with_cache":
+        warnings.warn(
+            f"TabPFN model has fit_mode={fit_mode!r}, not 'fit_with_cache'. "
+            f"{context} will be substantially slower than necessary. "
+            "Construct the model with TabPFNClassifier or TabPFNRegressor "
+            "(fit_mode='fit_with_cache', ...) "
+            "(set BEFORE calling .fit) to enable the KV cache, then set "
+            "model.executor_.keep_cache_on_device = True after .fit().",
+            UserWarning,
+            stacklevel=3,
+        )
+        return  # if fit_mode is wrong, the second check is moot
+
+    executor = getattr(model, "executor_", None)
+    if executor is None:
+        # model not fitted yet — we can't check; downstream code will fail anyway
+        return
+    if not getattr(executor, "keep_cache_on_device", False):
+        warnings.warn(
+            "TabPFN model has fit_mode='fit_with_cache' but "
+            f"executor_.keep_cache_on_device is False. {context} will "
+            "be slower than necessary because the cache is shuttled to/from CPU "
+            "on every predict call. Set "
+            "`model.executor_.keep_cache_on_device = True` after .fit().",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def is_tabpfn(estimator: Any) -> bool:
     """Check if an estimator is a TabPFN model."""
     try:
@@ -444,7 +526,7 @@ def product_dict(d: dict[str, list[T]]) -> Iterator[dict[str, T]]:
     keys = d.keys()
     values = [d[key] for key in keys]
     for combination in itertools.product(*values):
-        yield dict(zip(keys, combination))
+        yield dict(zip(keys, combination, strict=True))
 
 
 # Get the TabPFN models with our wrappers applied
