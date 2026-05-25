@@ -9,6 +9,7 @@ examples/
 ├── embedding/         # Access TabPFN's internal dense sample embeddings
 ├── interpretability/  # SHAP, partial dependence, feature selection
 ├── many_class/        # More classes than the checkpoint supports
+├── multioutput/       # Multi-output regression + multi-label classification (sklearn wrapper)
 ├── pval_crt/          # Statistical feature relevance testing
 ├── survival/          # Survival analysis
 ├── tabebm/            # Data augmentation via TabEBM
