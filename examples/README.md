@@ -9,6 +9,7 @@ examples/
 ├── embedding/         # Access TabPFN's internal dense sample embeddings
 ├── interpretability/  # SHAP, partial dependence, feature selection
 ├── many_class/        # More classes than the checkpoint supports
+├── multioutput/       # Multi-output regression + multi-label classification (sklearn wrapper)
 ├── pval_crt/          # Statistical feature relevance testing
 ├── survival/          # Survival analysis
 ├── tabebm/            # Data augmentation via TabEBM
@@ -33,15 +34,13 @@ python examples/many_class/many_class_classifier_example.py
    - TabPFN Package - Full PyTorch implementation for local inference
    - TabPFN Client - Lightweight API client for cloud-based inference
 
-3. **Flexible Imports**: Use this pattern for imports to support both backends:
+3. **Imports**: Always import TabPFN classes from `tabpfn_extensions`, which
+   automatically selects the right backend (local `tabpfn` package when
+   available, falling back to `tabpfn_client`):
    ```python
-   try:
-       # Try standard TabPFN package first
-       from tabpfn import TabPFNClassifier, TabPFNRegressor
-   except ImportError:
-       # Fall back to TabPFN client
-       from tabpfn_client import TabPFNClassifier, TabPFNRegressor
+   from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor
    ```
+   No `try/except` boilerplate needed in example files.
 
 4. **Example Datasets**: Use small built-in datasets from scikit-learn. No external data downloads required.
 
