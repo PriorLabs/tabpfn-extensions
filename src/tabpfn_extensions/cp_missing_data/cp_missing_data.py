@@ -25,7 +25,7 @@ class CPMDATabPFNRegressor:
     Parameters:
         quantiles : array with three arguments denoting the quantiles of interest.
             The default is [0.05, 0.5, 0.95], where the first indicates the lower bound,
-            the second the median, and the third the upper bound. The intervals needs to be symmetric. 
+            the second the median, and the third the upper bound. The intervals needs to be symmetric.
         val_size : float between 0 and 1, indicating the size of the validation set
             as a fraction of the training data.
 
