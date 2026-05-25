@@ -14,7 +14,12 @@ from sklearn.metrics import r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputClassifier, MultiOutputRegressor
 
-from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor
+# Flexible imports per examples/README.md — support both the local tabpfn
+# package and the tabpfn-client backend.
+try:
+    from tabpfn import TabPFNClassifier, TabPFNRegressor
+except ImportError:
+    from tabpfn_client import TabPFNClassifier, TabPFNRegressor
 
 
 # ─────────────────────────── multi-output regression ─────────────────────────
@@ -34,7 +39,7 @@ reg.fit(X_tr, y_tr)
 y_pred = reg.predict(X_te)
 
 print("Regression predictions shape:", y_pred.shape)
-print("R^2 per target:", [r2_score(y_te[:, i], y_pred[:, i]) for i in range(y_pred.shape[1])])
+print("R^2 per target:", r2_score(y_te, y_pred, multioutput="raw_values"))
 print("R^2 (uniform avg):", r2_score(y_te, y_pred, multioutput="uniform_average"))
 
 
