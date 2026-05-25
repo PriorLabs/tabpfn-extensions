@@ -14,12 +14,7 @@ from sklearn.metrics import r2_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputClassifier, MultiOutputRegressor
 
-# Flexible imports per examples/README.md — support both the local tabpfn
-# package and the tabpfn-client backend.
-try:
-    from tabpfn import TabPFNClassifier, TabPFNRegressor
-except ImportError:
-    from tabpfn_client import TabPFNClassifier, TabPFNRegressor
+from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor
 
 
 # ─────────────────────────── multi-output regression ─────────────────────────
