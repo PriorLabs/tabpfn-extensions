@@ -85,7 +85,7 @@ class CPMDATabPFNRegressor:
 
         return x_train, x_val, y_train, y_val, mask_train, mask_val
 
-    def run_TABPFN(self, x_train: pd.DataFrame, y_train: pd.Series) -> TabPFNRegressor:
+    def run_tabpfn(self, x_train: pd.DataFrame, y_train: pd.Series) -> TabPFNRegressor:
         """Fit the TabPFN model."""
         # fit model
         model = TabPFNRegressor()
