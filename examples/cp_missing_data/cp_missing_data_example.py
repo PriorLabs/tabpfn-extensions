@@ -1,46 +1,48 @@
-"""Provides a detailed example of obtaining conformalised prediction intervals when there is missing data.
+"""Example of conformal prediction intervals for TabPFN with missing data.
 
-This script demonstrates the complete workflow for obtaining conformal prediction intervals
-for the TabPFNRegressor when these are missing values in the dataset. The process is shown
-in two steps. Using the training data to train the model and obtain correction terms for
-each mask, and applying the correction terms with the trained model to a new dataset.
+Demonstrates how to obtain valid prediction intervals when the dataset
+contains missing values, using split conformal prediction calibrated
+per missing-data mask pattern.
 
-Note: This algorithm works well when the missing pattern is small.
+Note: This algorithm works well when the number of unique missing patterns is small.
 """
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
-from tabpfn_extensions.utils import TabPFNRegressor
-
-from tabpfn_extensions.cp_missing_data import CPMDATabPFNRegressor, CPMDATabPFNRegressorNewData
+from tabpfn_extensions.cp_missing_data import CPMDATabPFNRegressor
 
 # generate some data
 np.random.seed(42)  # For reproducibility
-X = np.random.rand(100, 2)
-y = X @ np.array([5, 5]) + np.random.rand(100)
+X = np.random.rand(500, 2)
+y = X @ np.array([5, 5]) + np.random.rand(500)
 
 # add missing values in X under MCAR
-X[np.random.randint(0, 100, 40), np.random.randint(0, 2, 40)] = np.nan
+X[np.random.randint(0, 500, 200), np.random.randint(0, 2, 200)] = np.nan
 
-# Check how many unique patterns there are 
-unique_patterns = pd.DataFrame(X).isnull().astype(int).drop_duplicates()
+# Train/test split
+X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Check how many unique patterns there are
+unique_patterns = pd.DataFrame(X_train).isnull().astype(int).drop_duplicates()
 print(f"Number of unique missing data patterns: {len(unique_patterns)}")
 print("\nUnique patterns:")
 print(unique_patterns)
 
-# Use TabPFN+CP-MDA, the interval 
+# Use TabPFN+CP-MDA, the interval
 # Note the interval needs to be symmetric
 model = CPMDATabPFNRegressor(quantiles=[0.05, 0.5, 0.95], val_size=0.5, seed=123)
-calibration_results, model_fit = model.fit(X, y)
-print(calibration_results)
+model.fit(X_train, y_train)
+print("\nCalibration results:")
+print(model.calibration_results_)
 
-# Apply the model to new cases 
-cp_apply = CPMDATabPFNRegressorNewData(model_fit, quantiles=[0.05, 0.5, 0.95], calibration_results=calibration_results)
-CP_results = cp_apply.predict(X)
+# Apply the model to new cases
+CP_results = model.predict(X_test)
 
+# Show first 5
 print("\nConformal prediction results:")
-print(f"Lower bound (corrected): {CP_results[0][:5]}")  # Show first 5
+print(f"Lower bound (corrected): {CP_results[0][:5]}")
 print(f"Predictions: {CP_results[1][:5]}")
 print(f"Upper bound (corrected): {CP_results[2][:5]}")
 print(f"Lower bound (uncorrected): {CP_results[3][:5]}")

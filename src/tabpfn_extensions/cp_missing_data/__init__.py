@@ -2,10 +2,6 @@
 
 from .cp_missing_data import (
     CPMDATabPFNRegressor,
-    CPMDATabPFNRegressorNewData,
 )
 
-__all__ = [
-    "CPMDATabPFNRegressor",
-    "CPMDATabPFNRegressorNewData",
-]
+__all__ = ["CPMDATabPFNRegressor"]
