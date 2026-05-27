@@ -190,7 +190,7 @@ def plot_bar_distribution(
 
     # Convert probability mass to probability density (per unit of y).
     predictions = predictions[order] / (bar_borders[1:] - bar_borders[:-1])
-    predictions[torch.isinf(predictions)] = 0.0
+    predictions[~torch.isfinite(predictions)] = 0.0
     predictions[:, (bar_borders[1:] - bar_borders[:-1]) < 1e-10] = 0.0
 
     if plot_log_probs:
