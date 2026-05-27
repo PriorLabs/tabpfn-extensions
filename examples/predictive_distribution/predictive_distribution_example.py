@@ -258,8 +258,9 @@ bar_centers = 0.5 * (borders[1:] + borders[:-1])
 bin_idx = np.digitize(bar_centers.numpy(), y_edges) - 1
 valid = (bin_idx >= 0) & (bin_idx < n_coarse)
 
-fig2, axes = plt.subplots(1, len(slice_indices), figsize=(19, 5.5), sharey=True)
-for ax_i, idx in zip(axes, slice_indices, strict=False):
+fig2, axes = plt.subplots(1, len(slice_indices), figsize=(19, 5.5), sharey=True, squeeze=False)
+axes = axes.flatten()
+for ax_i, idx in zip(axes, slice_indices):
     mass = np.bincount(bin_idx[valid], weights=probs_np[idx, valid], minlength=n_coarse)
     density_slice = mass / y_widths_c
     x_val = X_test[idx, 0]
