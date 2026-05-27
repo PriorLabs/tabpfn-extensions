@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from typing import Any
 
@@ -39,6 +40,7 @@ def tabpfn_crt(
     K: int = 100,
     max_unique_cat: int = 10,
     model_version: ModelVersion = ModelVersion.V2,
+    use_kv_cache: bool = True,
 ) -> dict[str, Any] | dict[int | str, dict[str, Any]]:
     """Conditional Randomization Test (CRT) using TabPFN.
 
@@ -105,8 +107,34 @@ def tabpfn_crt(
         model_version,
         device=device,
     )
+    # Enable KV cache by default: fit predicts B+1 times against the same
+    # training set (one baseline + B permutations), so the encoder output
+    # for X_tr is reused across every predict_proba / predict call. Users
+    # can opt out via use_kv_cache=False (e.g., to save memory). Older
+    # tabpfn versions accept the fit_mode kwarg but raise at fit time
+    # ("fit_with_cache is not supported for TabPFN v2.x yet") — fall back
+    # to the default fit mode in that case.
+    if use_kv_cache:
+        model_y.fit_mode = "fit_with_cache"
 
-    model_y.fit(X_tr, y_tr)
+    try:
+        model_y.fit(X_tr, y_tr)
+    except (ValueError, NotImplementedError) as err:
+        if not use_kv_cache or "fit_with_cache" not in str(err):
+            raise
+        warnings.warn(
+            "Falling back from fit_mode='fit_with_cache' — the installed "
+            "tabpfn version doesn't support it. CRT will run but without "
+            "the KV cache speedup. Upgrade to the latest version of tabpfn "
+            "(or pass use_kv_cache=False to suppress this warning).",
+            UserWarning,
+            stacklevel=2,
+        )
+        model_y = ModelY.create_default_for_version(model_version, device=device)
+        model_y.fit(X_tr, y_tr)
+    else:
+        if use_kv_cache and hasattr(model_y, "executor_"):
+            model_y.executor_.keep_cache_on_device = True
 
     # Pre-compute baseline log predictive density
     if y_is_cat:
@@ -124,7 +152,7 @@ def tabpfn_crt(
     # ---------------------------
     # Multi-feature support
     # ---------------------------
-    if isinstance(j, Sequence) and not isinstance(j, (str, bytes)):
+    if isinstance(j, Sequence) and not isinstance(j, str | bytes):
         results = {}
 
         for feat in j:

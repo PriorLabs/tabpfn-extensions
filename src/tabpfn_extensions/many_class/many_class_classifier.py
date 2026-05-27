@@ -31,7 +31,17 @@ logger = logging.getLogger(__name__)
 
 @set_extension("many_class")
 class ManyClassClassifier(BaseEstimator, ClassifierMixin):
-    """Output-coding wrapper that enables TabPFN-style estimators to handle many classes."""
+    """Output-coding wrapper that enables TabPFN-style estimators to handle many classes.
+
+    Parameters
+    ----------
+    estimator : BaseEstimator
+        Base classifier (typically a TabPFN classifier) used as the underlying model.
+    alphabet_size : int | None, default=None
+        Maximum number of classes the base estimator handles in a single fit. When
+        ``None``, it is inferred from the base estimator's checkpoint
+        ``MAX_NUMBER_OF_CLASSES``.
+    """
 
     def __init__(
         self,
@@ -95,16 +105,23 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
     # ------------------------------------------------------------------
     # Fitting utilities
     # ------------------------------------------------------------------
-    def _get_alphabet_size(self) -> int:
+    def _get_alphabet_size(self) -> int | None:
         if self.alphabet_size is not None:
-            return self.alphabet_size
-        if hasattr(self.estimator, "max_num_classes_"):
-            inferred = self.estimator.max_num_classes_
-            if inferred is not None:
-                return int(inferred)
-        raise ValueError(
-            "alphabet_size must be specified when base estimator has no limit"
-        )
+            return int(self.alphabet_size)
+        if hasattr(self.estimator, "get_inference_config"):
+            cfg = self.estimator.get_inference_config()
+            val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None)
+            if val:
+                return int(val)
+        # Older TabPFN versions (pre PriorLabs/TabPFN#890) don't expose
+        # get_inference_config; their MAX_NUMBER_OF_CLASSES was always 10.
+        if type(self.estimator).__module__.startswith("tabpfn"):
+            logger.info(
+                "Base estimator has no get_inference_config(); assuming "
+                "alphabet_size=10 (older TabPFN default).",
+            )
+            return 10
+        return None
 
     def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
         if self.n_estimators is not None:
@@ -199,6 +216,10 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         self.fit_params_ = dict(fit_params)
         self.classes_ = unique_labels(y_validated)
         self.alphabet_size_ = self._get_alphabet_size()
+        if self.alphabet_size_ is None:
+            raise ValueError(
+                "alphabet_size must be specified when base estimator has no limit"
+            )
         if self.alphabet_size_ < 2:
             raise ValueError("alphabet_size must be >= 2.")
 
@@ -219,6 +240,11 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
         self._row_class_mask_ = None
 
         if self.no_mapping_needed_:
+            logger.info(
+                "Base estimator supports up to %d classes; data has %d — fitting once (no codebook).",
+                self.alphabet_size_,
+                n_classes,
+            )
             estimator = self._clone_base_estimator()
             estimator.fit(X_validated, y_validated, **self.fit_params_)
             self.estimators_ = [estimator]
@@ -230,6 +256,13 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
             return self
 
         n_estimators = self._get_n_estimators(n_classes, self.alphabet_size_)
+        logger.info(
+            "Base estimator supports up to %d classes; data has %d — using %d-symbol output coding over %d base fits.",
+            self.alphabet_size_,
+            n_classes,
+            self.alphabet_size_,
+            n_estimators,
+        )
         codebook, stats = self._codebook_strategy.generate(
             n_classes, n_estimators, self.alphabet_size_, rng
         )

@@ -1,6 +1,13 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
 
+# =============================================================================
+# DEPRECATED MODULE
+# -----------------------------------------------------------------------------
+# AutoTabPFNClassifier / AutoTabPFNRegressor are deprecated and will be
+# removed in a future release.
+# =============================================================================
+
 """TabPFN implementation in AutoGluon taken from TabArena: A Living Benchmark for Machine Learning on Tabular Data,
 Nick Erickson, Lennart Purucker, Andrej Tschalzev, David Holzmüller, Prateek Mutalik Desai, David Salinas,
 Frank Hutter, Preprint., 2025.
@@ -9,7 +16,9 @@ Frank Hutter, Preprint., 2025.
 from __future__ import annotations
 
 import datetime
+import warnings
 from enum import Enum
+from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
@@ -198,9 +207,24 @@ class AutoTabPFNBase(BaseEstimator):
         This method should be called from the child class's fit method after validation.
         """
         from autogluon.tabular import TabularPredictor
-        from autogluon.tabular.models import TabPFNV2Model
+        from autogluon.tabular.models import RealTabPFNv2Model, RealTabPFNv25Model
 
         from tabpfn_extensions.post_hoc_ensembles.utils import search_space_func
+
+        # Route to the AutoGluon TabPFN model class that matches the requested
+        # TabPFN model version. Each class ships with the correct per-version
+        # max_rows/max_features/max_classes limits, so we no longer need to
+        # override them via ag_args_fit.
+        if self.model_version == ModelVersion.V2:
+            ag_model_class = RealTabPFNv2Model
+        elif self.model_version == ModelVersion.V2_5:
+            ag_model_class = RealTabPFNv25Model
+        else:
+            raise NotImplementedError(
+                f"AutoTabPFN does not support TabPFN model version "
+                f"{self.model_version.value!r} yet. Supported versions: "
+                f"{ModelVersion.V2.value!r}, {ModelVersion.V2_5.value!r}.",
+            )
 
         if isinstance(X, pd.DataFrame):
             training_df = X.copy()
@@ -247,30 +271,33 @@ class AutoTabPFNBase(BaseEstimator):
                 **self.get_task_args_(),
             }
 
-        def _patch_ag_args_fit_inplace(config: dict[str, Any]) -> None:
-            """Patch AutoGluon's per-model params_aux for TabPFN sub-models.
+        def _adapt_config_for_autogluon_inplace(config: dict[str, Any]) -> None:
+            """Forward `ignore_pretraining_limits` and translate `model_path`.
 
-            - Disable AutoGluon's static max_rows / max_features / max_classes
-              asserts so TabPFN's own per-checkpoint validation is the single
-              authority. TODO: Fix upstream in AutoGluon's `TabPFNV2Model`. A
-              single class handles all v2.x checkpoints with v2-era limits
-              hardcoded in `_get_default_auxiliary_params`, which is wrong for
-              v2.5+. Until that lands, we override per sub-model here.
-            - Forward the user's `ignore_pretraining_limits` flag to TabPFN.
+            - AutoGluon 1.5 expects the checkpoint to be passed as
+              ``zip_model_path=[classification_ckpt, regression_ckpt]`` (just
+              the filenames; AG joins with its own resolved cache dir). The
+              search space produces a TabPFN-compatible ``model_path=<abs path>``
+              so that it can also be consumed directly by core TabPFN; here we
+              translate it to the form AG expects and drop the original key.
+            - Forward the user's ``ignore_pretraining_limits`` flag into AG's
+              ``ag_args_fit.ignore_constraints``.
             """
             ag_args_fit = config.setdefault("ag_args_fit", {})
-            ag_args_fit["max_rows"] = None
-            ag_args_fit["max_features"] = None
-            ag_args_fit["max_classes"] = None
             ag_args_fit["ignore_constraints"] = self.ignore_pretraining_limits
+
+            full_path = config.pop("model_path", None)
+            if full_path is not None:
+                ckpt_name = Path(full_path).name
+                config["zip_model_path"] = [ckpt_name, ckpt_name]
 
         if isinstance(tabpfn_configs, list):
             for cfg in tabpfn_configs:
-                _patch_ag_args_fit_inplace(cfg)
+                _adapt_config_for_autogluon_inplace(cfg)
         else:
-            _patch_ag_args_fit_inplace(tabpfn_configs)
+            _adapt_config_for_autogluon_inplace(tabpfn_configs)
 
-        hyperparameters = {TabPFNV2Model: tabpfn_configs}
+        hyperparameters = {ag_model_class: tabpfn_configs}
         if isinstance(self.presets, str) and self.presets == "extreme_quality":
             raise ValueError(
                 "Extreme quality preset is not supported at the moment, as it does not "
@@ -373,6 +400,12 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         ignore_pretraining_limits: bool = False,
         model_version: ModelVersion = ModelVersion.V2_5,
     ):
+        warnings.warn(
+            "AutoTabPFNClassifier is deprecated and will be removed in a future "
+            "release of tabpfn-extensions.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             max_time=max_time,
             eval_metric=eval_metric,
@@ -523,6 +556,12 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         ignore_pretraining_limits: bool = False,
         model_version: ModelVersion = ModelVersion.V2_5,
     ):
+        warnings.warn(
+            "AutoTabPFNRegressor is deprecated and will be removed in a future "
+            "release of tabpfn-extensions.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             max_time=max_time,
             eval_metric=eval_metric,
