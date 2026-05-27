@@ -80,7 +80,7 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
     tabpfn_reg : TabPFNRegressor, optional
         DEPRECATED. Use ``model=`` instead.
 
-    Attributes
+    Attributes:
     ----------
     model_ : TabPFNClassifier or TabPFNRegressor
         The fitted TabPFN model (cloned from ``model`` or auto-constructed).
@@ -91,7 +91,7 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
         embeddings aligned to the original sample order; for ``n_fold == 0``
         they are produced by the single full-data model.
 
-    Examples
+    Examples:
     --------
     >>> from tabpfn_extensions.embedding import TabPFNEmbedding
     >>> embedding = TabPFNEmbedding(n_fold=5)
@@ -166,7 +166,9 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
         rs = random_state if shuffle else None
         if stratify:
             return StratifiedKFold(
-                n_splits=self.n_fold, shuffle=shuffle, random_state=rs,
+                n_splits=self.n_fold,
+                shuffle=shuffle,
+                random_state=rs,
             )
         return KFold(n_splits=self.n_fold, shuffle=shuffle, random_state=rs)
 
@@ -181,13 +183,13 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
     ) -> np.ndarray:
         """Run K-fold and return OOF embeddings aligned to original order."""
         cv = self._make_cv(
-            stratify=stratify, shuffle=shuffle, random_state=random_state,
+            stratify=stratify,
+            shuffle=shuffle,
+            random_state=random_state,
         )
         n = _n_samples(X)
         splits = (
-            cv.split(np.zeros(n), np.asarray(y))
-            if stratify
-            else cv.split(np.zeros(n))
+            cv.split(np.zeros(n), np.asarray(y)) if stratify else cv.split(np.zeros(n))
         )
 
         chunks: list[np.ndarray] = []
@@ -216,12 +218,14 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
         if self.n_fold == 0:
             self.model_.fit(X, y)
             self.train_embeddings_ = self.model_.get_embeddings(
-                X, data_source="train",
+                X,
+                data_source="train",
             )
             return self
 
         self.train_embeddings_ = self._compute_oof(
-            X, y,
+            X,
+            y,
             stratify=self._is_classifier_,
             shuffle=self.shuffle,
             random_state=self.random_state,
@@ -290,8 +294,11 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
                 self.model_.fit(X_train, y_train)
                 return self.model_.get_embeddings(X, data_source=data_source)
             return self._compute_oof(
-                X_train, y_train,
-                stratify=False, shuffle=False, random_state=None,
+                X_train,
+                y_train,
+                stratify=False,
+                shuffle=False,
+                random_state=None,
             )
         raise ValueError("n_fold must be greater than 1.")
 

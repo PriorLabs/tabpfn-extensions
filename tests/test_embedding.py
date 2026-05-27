@@ -369,7 +369,8 @@ class TestTabPFNEmbedding:
         return train_test_split(X, y, test_size=0.3, random_state=42)
 
     def test_vanilla_classifier(
-        self, classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         """n_fold=0 path with an explicit classifier."""
         X_train, X_test, y_train, _ = classification_data
@@ -387,7 +388,8 @@ class TestTabPFNEmbedding:
         assert train_embeds.shape[-1] == test_embeds.shape[-1]
 
     def test_kfold_classifier_oof_shape(
-        self, classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         """K-fold path: train_embeddings_ covers every training sample once."""
         X_train, X_test, y_train, _ = classification_data
@@ -403,7 +405,8 @@ class TestTabPFNEmbedding:
         assert train_embeds.shape[-1] == test_embeds.shape[-1]
 
     def test_vanilla_regressor(
-        self, regression_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        regression_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         X_train, X_test, y_train, _ = regression_data
         reg = TabPFNRegressor(n_estimators=1, random_state=42)
@@ -414,7 +417,8 @@ class TestTabPFNEmbedding:
         assert transformer.transform(X_test).shape[1] == X_test.shape[0]
 
     def test_kfold_regressor(
-        self, regression_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        regression_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         X_train, X_test, y_train, _ = regression_data
         reg = TabPFNRegressor(n_estimators=1, random_state=42)
@@ -425,11 +429,13 @@ class TestTabPFNEmbedding:
         assert transformer.transform(X_test).shape[1] == X_test.shape[0]
 
     def test_transform_always_uses_final_model(
-        self, classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         """transform(X_train) goes through the final full-data model — it does
         NOT return cached OOF embeddings, and should therefore differ from
-        train_embeddings_ when CV is on."""
+        train_embeddings_ when CV is on.
+        """
         X_train, _X_test, y_train, _ = classification_data
         clf = TabPFNClassifier(n_estimators=1, random_state=42)
         transformer = TabPFNEmbedding(n_fold=3, model=clf)
@@ -441,7 +447,8 @@ class TestTabPFNEmbedding:
         assert not np.allclose(oof, via_transform)
 
     def test_fit_transform_returns_oof(
-        self, classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         """fit_transform returns OOF (train_embeddings_), not transform output."""
         X_train, _X_test, y_train, _ = classification_data
@@ -452,7 +459,8 @@ class TestTabPFNEmbedding:
         assert not np.allclose(ft, transformer.transform(X_train))
 
     def test_invalid_n_fold(
-        self, classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         X_train, _, y_train, _ = classification_data
         clf = TabPFNClassifier(n_estimators=1, random_state=42)
@@ -462,7 +470,8 @@ class TestTabPFNEmbedding:
             TabPFNEmbedding(n_fold=-1, model=clf).fit(X_train, y_train)
 
     def test_auto_task_classification_warns(
-        self, classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         """Without an explicit model, classification is inferred and warns."""
         X_train, _, y_train, _ = classification_data
@@ -472,7 +481,8 @@ class TestTabPFNEmbedding:
         assert isinstance(transformer.model_, TabPFNClassifier)
 
     def test_auto_task_regression_warns(
-        self, regression_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        regression_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         X_train, _, y_train, _ = regression_data
         transformer = TabPFNEmbedding(n_fold=0)
@@ -481,7 +491,8 @@ class TestTabPFNEmbedding:
         assert isinstance(transformer.model_, TabPFNRegressor)
 
     def test_transform_before_fit_raises(
-        self, classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         from sklearn.exceptions import NotFittedError
 
@@ -491,30 +502,44 @@ class TestTabPFNEmbedding:
             transformer.transform(X_train)
 
     def test_shuffle_independent_of_random_state(
-        self, classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+        self,
+        classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         """shuffle=True with two different random_states should give different
-        OOF orderings; shuffle=False should ignore random_state entirely."""
+        OOF orderings; shuffle=False should ignore random_state entirely.
+        """
         X_train, _X_test, y_train, _ = classification_data
 
         def clf() -> TabPFNClassifier:
             return TabPFNClassifier(n_estimators=1, random_state=0)
 
         t1 = TabPFNEmbedding(
-            n_fold=3, model=clf(), shuffle=True, random_state=0,
+            n_fold=3,
+            model=clf(),
+            shuffle=True,
+            random_state=0,
         )
         t2 = TabPFNEmbedding(
-            n_fold=3, model=clf(), shuffle=True, random_state=1,
+            n_fold=3,
+            model=clf(),
+            shuffle=True,
+            random_state=1,
         )
         oof1 = t1.fit_transform(X_train, y_train)
         oof2 = t2.fit_transform(X_train, y_train)
         assert not np.allclose(oof1, oof2)
 
         t3 = TabPFNEmbedding(
-            n_fold=3, model=clf(), shuffle=False, random_state=0,
+            n_fold=3,
+            model=clf(),
+            shuffle=False,
+            random_state=0,
         )
         t4 = TabPFNEmbedding(
-            n_fold=3, model=clf(), shuffle=False, random_state=1,
+            n_fold=3,
+            model=clf(),
+            shuffle=False,
+            random_state=1,
         )
         np.testing.assert_array_equal(
             t3.fit_transform(X_train, y_train),

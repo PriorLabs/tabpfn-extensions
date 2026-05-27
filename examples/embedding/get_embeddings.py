@@ -27,7 +27,10 @@ df = load_breast_cancer(return_X_y=False)
 X, y = df["data"], df["target"]
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.5, random_state=42,
+    X,
+    y,
+    test_size=0.5,
+    random_state=42,
 )
 
 # Baseline: vanilla logistic regression
@@ -81,7 +84,10 @@ print(
 # ---------------------------------------------------------------------------
 X, y = load_diabetes(return_X_y=True)
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.33, random_state=42,
+    X,
+    y,
+    test_size=0.33,
+    random_state=42,
 )
 
 # Baseline: vanilla linear regression
