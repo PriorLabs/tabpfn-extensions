@@ -55,7 +55,7 @@ def heatmap_with_box_sizes(
 
     if set_lims:
         ax.set_xlim(x_starts[0], x_ends[-1])
-        if not y_min or not y_max:
+        if y_min is None or y_max is None:
             assert len(y_starts.shape) == 1, (
                 "If y_min and y_max are not provided, y_starts should be 1D. "
                 "Please set y_min and y_max manually."
