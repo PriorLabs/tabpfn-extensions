@@ -87,7 +87,7 @@ def heatmap_with_box_sizes(
 
             if intensity <= 0:
                 continue
-            if y_max and y_min and (row_start > y_max or row_end < y_min):
+            if y_max is not None and y_min is not None and (row_start > y_max or row_end < y_min):
                 continue
             if row_start >= row_end or col_start >= col_end:
                 continue
