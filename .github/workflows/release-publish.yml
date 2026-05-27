@@ -152,10 +152,15 @@ jobs:
           uv venv
           source .venv/bin/activate
 
+          # --refresh-package: bypass uv's HTTP cache for this package.
+          # setup-uv restores the cache across runs; without --refresh-package,
+          # uv reads a stale simple-index page from a previous release and
+          # cannot see the version just published.
           uv pip install \
             --index-url https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple/ \
             --index-strategy unsafe-best-match \
+            --refresh-package tabpfn-extensions \
             tabpfn-extensions==${VERSION}
 
           python - <<PY
