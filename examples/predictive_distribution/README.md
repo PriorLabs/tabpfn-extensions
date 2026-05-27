@@ -21,9 +21,6 @@ point estimate.*
 This folder shows how to read, visualize, and post-process the bar
 distribution.
 
-> Requires the local `tabpfn` package. The cloud `tabpfn-client` does not
-> return raw logits, so `output_type="full"` is unavailable there.
-
 ## What is the bar distribution?
 
 TabPFN treats regression as classification over a fixed grid of buckets on
