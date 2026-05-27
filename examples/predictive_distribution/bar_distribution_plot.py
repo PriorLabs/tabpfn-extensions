@@ -78,9 +78,9 @@ def heatmap_with_box_sizes(
         y_starts = y_starts.unsqueeze(0).expand(len(x_starts), -1)
         y_ends = y_ends.unsqueeze(0).expand(len(x_starts), -1)
 
-    for col_i, (col_start, col_end) in enumerate(zip(x_starts, x_ends, strict=False)):
+    for col_i, (col_start, col_end) in enumerate(zip(x_starts, x_ends)):
         for row_i, (row_start, row_end) in enumerate(
-            zip(y_starts[col_i], y_ends[col_i], strict=False)
+            zip(y_starts[col_i], y_ends[col_i])
         ):
             intensity = data[row_i, col_i].item()
             intensity = max(0.0, (intensity - threshold_i)) / (1 - threshold_i)
