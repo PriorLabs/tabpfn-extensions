@@ -25,7 +25,7 @@ def _validate_embedding_model(model) -> None:
             "(pip install tabpfn). The TabPFN client does not support "
             "embedding extraction.",
         )
-    if not isinstance(model, (_LocalCLF, _LocalREG)):
+    if not isinstance(model, _LocalCLF | _LocalREG):
         raise ImportError(
             "TabPFN embeddings require the full TabPFN implementation "
             "(pip install tabpfn). The TabPFN client does not support "
