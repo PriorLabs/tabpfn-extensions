@@ -123,9 +123,21 @@ jobs:
           enable-cache: true
 
       - name: Wait for TestPyPI propagation
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          echo "⏳ Waiting for package to be available on TestPyPI..."
-          sleep 30
+          PKG="tabpfn-extensions"
+          echo "⏳ Waiting for ${PKG}==${VERSION} on TestPyPI simple index..."
+          for i in $(seq 1 30); do
+            if curl -sf "https://test.pypi.org/simple/${PKG}/" | grep -qF "${VERSION}.tar.gz"; then
+              echo "✅ Found after $((i*10))s"
+              exit 0
+            fi
+            echo "  not yet (attempt ${i}/30, $((i*10))s elapsed)"
+            sleep 10
+          done
+          echo "❌ Timed out after 5 minutes waiting for TestPyPI propagation"
+          exit 1
 
       - name: Test installation from TestPyPI
         env:
