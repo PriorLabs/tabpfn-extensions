@@ -1,4 +1,5 @@
 name: Tag Release Branch on PR Merge
+run-name: "tag from ${{ github.event.pull_request.head.ref }}"
 
 on:
   pull_request:
