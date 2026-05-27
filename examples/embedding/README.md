@@ -1,11 +1,11 @@
 # TabPFN Embeddings
 
-`TabPFNEmbedding` is a scikit-learn style transformer that extracts embeddings from `TabPFNClassifier` or `TabPFNRegressor`. It supports both vanilla embeddings and K-fold cross-validated (out-of-fold) embeddings, which can be used to enhance the performance of downstream machine learning models.
+`TabPFNEmbedding` is a scikit-learn **style** transformer that extracts embeddings from `TabPFNClassifier` or `TabPFNRegressor`. It follows the familiar `fit` / `transform` / `fit_transform` interface, but is not a drop-in replacement for a standard sklearn transformer: its output is a **3D array** of shape `(n_estimators, n_samples, embed_dim)` rather than the 2D array that `Pipeline` / `ColumnTransformer` expect. Pick one ensemble member (`embeds[0]`) or aggregate across `axis=0` before passing to a downstream 2D estimator.
 
 ## Key Features
 
 - **Vanilla embeddings**: with `n_fold=0`, the model is trained once on the entire training set and used to embed both train and test data.
-- **K-fold cross-validation**: with `n_fold>=2`, out-of-fold (OOF) embeddings are produced for the training data (the robust method from *"A Closer Look at TabPFN v2: Strength, Limitation, and Extension"*). A final model is also trained on the full training set and used to embed unseen data.
+- **K-fold cross-validation (recommended)**: with `n_fold>=2`, out-of-fold (OOF) embeddings are produced for the training data. Because TabPFN attends to training labels, train-set embeddings experience a distribution shift relative to test embeddings (where a dummy label is used). OOF embeddings fix this: each training sample is embedded in a fold where it was held out — matching the no-label-attention condition of unseen data. This is the robust variant described in *"A Closer Look at TabPFN v2: Strength, Limitation, and Extension"* (Ye et al., 2025, [arXiv:2502.17361](https://arxiv.org/abs/2502.17361)). A final model is also trained on the full training set for embedding new data.
 - **scikit-learn-style API**: `fit` / `transform` / `fit_transform`.
 
 ## Usage

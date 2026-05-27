@@ -432,17 +432,16 @@ class TestTabPFNEmbedding:
         self,
         classification_data: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
-        """transform(X_train) goes through the final full-data model — it does
-        NOT return cached OOF embeddings, and should therefore differ from
-        train_embeddings_ when CV is on.
+        """fit_transform returns OOF embeddings whereas transform always uses
+        the full-data model — calling transform(X_train) should therefore
+        differ from the OOF result produced by fit_transform(X_train, y_train).
         """
         X_train, _X_test, y_train, _ = classification_data
         clf = TabPFNClassifier(n_estimators=1, random_state=42)
         transformer = TabPFNEmbedding(n_fold=3, model=clf)
-        transformer.fit(X_train, y_train)
 
-        oof = transformer.train_embeddings_
-        via_transform = transformer.transform(X_train)
+        oof = transformer.fit_transform(X_train, y_train)  # OOF embeddings
+        via_transform = transformer.transform(X_train)  # final full-data model
         assert oof.shape == via_transform.shape
         assert not np.allclose(oof, via_transform)
 

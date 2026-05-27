@@ -12,31 +12,25 @@ from tabpfn_common_utils.telemetry import set_extension
 from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 
 
-def _safe_row_index(arr, idx):
-    """Row-index a numpy array, pandas DataFrame/Series, or list-like."""
-    if hasattr(arr, "iloc"):
-        return arr.iloc[idx]
-    if not isinstance(arr, np.ndarray):
-        arr = np.asarray(arr)
-    return arr[idx]
-
-
-def _n_samples(X) -> int:
-    return X.shape[0] if hasattr(X, "shape") else len(X)
-
-
 def _validate_embedding_model(model) -> None:
-    """Raise if the model can't produce embeddings (e.g. TabPFN client)."""
-    if "tabpfn_client" in str(type(model).__module__):
+    """Raise if the model can't produce embeddings (e.g. TabPFN client).
+    """
+    try:
+        from tabpfn import (
+            TabPFNClassifier as _LocalCLF,
+            TabPFNRegressor as _LocalREG,
+        )
+    except ImportError:
         raise ImportError(
             "TabPFN embeddings require the full TabPFN implementation "
             "(pip install tabpfn). The TabPFN client does not support "
             "embedding extraction.",
         )
-    if not hasattr(model, "get_embeddings"):
-        raise AttributeError(
-            f"Model of type {type(model).__name__} has no get_embeddings "
-            "method. Use the full TabPFN package.",
+    if not isinstance(model, (_LocalCLF, _LocalREG)):
+        raise ImportError(
+            "TabPFN embeddings require the full TabPFN implementation "
+            "(pip install tabpfn). The TabPFN client does not support "
+            "embedding extraction.",
         )
 
 
@@ -155,23 +149,6 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
         )
         return inferred_cls(n_estimators=1, random_state=self.random_state)
 
-    def _make_cv(
-        self,
-        *,
-        stratify: bool,
-        shuffle: bool,
-        random_state: int | None,
-    ):
-        """Build the K-fold splitter used by both fit and the legacy path."""
-        rs = random_state if shuffle else None
-        if stratify:
-            return StratifiedKFold(
-                n_splits=self.n_fold,
-                shuffle=shuffle,
-                random_state=rs,
-            )
-        return KFold(n_splits=self.n_fold, shuffle=shuffle, random_state=rs)
-
     def _compute_oof(
         self,
         X: np.ndarray,
@@ -182,25 +159,23 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
         random_state: int | None,
     ) -> np.ndarray:
         """Run K-fold and return OOF embeddings aligned to original order."""
-        cv = self._make_cv(
-            stratify=stratify,
-            shuffle=shuffle,
-            random_state=random_state,
-        )
-        n = _n_samples(X)
-        splits = (
-            cv.split(np.zeros(n), np.asarray(y)) if stratify else cv.split(np.zeros(n))
-        )
+        X = np.asarray(X)
+        y = np.asarray(y)
+
+        rs = random_state if shuffle else None
+        if stratify:
+            cv = StratifiedKFold(n_splits=self.n_fold, shuffle=shuffle, random_state=rs)
+            splits = cv.split(X, y)
+        else:
+            cv = KFold(n_splits=self.n_fold, shuffle=shuffle, random_state=rs)
+            splits = cv.split(X)
 
         chunks: list[np.ndarray] = []
         val_indices: list[np.ndarray] = []
         for train_idx, val_idx in splits:
-            X_tr = _safe_row_index(X, train_idx)
-            y_tr = _safe_row_index(y, train_idx)
-            X_val = _safe_row_index(X, val_idx)
             fold_model = clone(self.model_)
-            fold_model.fit(X_tr, y_tr)
-            chunks.append(fold_model.get_embeddings(X_val, data_source="test"))
+            fold_model.fit(X[train_idx], y[train_idx])
+            chunks.append(fold_model.get_embeddings(X[val_idx], data_source="test"))
             val_indices.append(val_idx)
 
         oof = np.concatenate(chunks, axis=1)
@@ -234,10 +209,16 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
-        """Embed ``X`` using the fitted full-data model.
+        """Embed unseen data ``X`` using the full-data model.
 
-        This always uses ``model_`` — it does NOT return cached OOF
-        embeddings. Use ``fit_transform`` or ``train_embeddings_`` for OOF.
+        Use this method when you have new, held-out data that was not part of
+        training.  It always runs inference through ``model_`` (trained on the
+        full training set) and never returns cached embeddings.
+
+        If you want embeddings for the *training* data, prefer
+        ``fit_transform(X_train, y_train)``, which yields out-of-fold
+        embeddings for ``n_fold >= 2`` (avoiding label leakage) or reads
+        ``train_embeddings_`` after a ``fit`` call.
         """
         check_is_fitted(self, "model_")
         return self.model_.get_embeddings(X, data_source="test")
