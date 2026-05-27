@@ -7,21 +7,6 @@ The release pipeline is fully automated from a single workflow
 dispatch. There are two manual checkpoints: reviewing the
 auto-generated release PR, and approving the `pypi` deployment.
 
-## Prerequisites (one-time, already configured)
-
-- **Trusted publishing** configured on
-  [TestPyPI](https://test.pypi.org/manage/account/publishing/) and
-  [PyPI](https://pypi.org/manage/account/publishing/) for the
-  `tabpfn-extensions` project, pointing at
-  `PriorLabs/tabpfn-extensions`, workflow `release-publish.yml`,
-  environments `testpypi` and `pypi`.
-- **Repo secret `RELEASE_BOT_TOKEN`**: a fine-grained PAT with
-  `Contents: read & write` on this repo. Used by
-  `release-tag-on-merge.yml` to push the release tag — the default
-  `GITHUB_TOKEN` cannot push tags that trigger downstream workflows.
-- **Environments**: `release`, `testpypi`, `pypi` exist on the repo.
-  `pypi` has required reviewers configured.
-
 ## Releasing
 
 1. **Pick the base commit.** Find the full 40-character SHA on `main`
