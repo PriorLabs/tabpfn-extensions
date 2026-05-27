@@ -13,8 +13,7 @@ from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
 
 
 def _validate_embedding_model(model) -> None:
-    """Raise if the model can't produce embeddings (e.g. TabPFN client).
-    """
+    """Raise if the model can't produce embeddings (e.g. TabPFN client)."""
     try:
         from tabpfn import (
             TabPFNClassifier as _LocalCLF,
