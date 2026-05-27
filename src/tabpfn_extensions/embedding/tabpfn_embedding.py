@@ -196,8 +196,9 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
             X_tr = _safe_row_index(X, train_idx)
             y_tr = _safe_row_index(y, train_idx)
             X_val = _safe_row_index(X, val_idx)
-            self.model_.fit(X_tr, y_tr)
-            chunks.append(self.model_.get_embeddings(X_val, data_source="test"))
+            fold_model = clone(self.model_)
+            fold_model.fit(X_tr, y_tr)
+            chunks.append(fold_model.get_embeddings(X_val, data_source="test"))
             val_indices.append(val_idx)
 
         oof = np.concatenate(chunks, axis=1)
