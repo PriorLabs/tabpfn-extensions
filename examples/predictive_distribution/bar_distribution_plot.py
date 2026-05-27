@@ -148,8 +148,10 @@ def plot_bar_distribution(
         **kwargs: Forwarded to :func:`heatmap_with_box_sizes` (e.g. ``palette``,
             ``threshold_i``).
     """
-    x = x.squeeze()
-    predictions = logits.squeeze().softmax(-1)
+    x = x.flatten()
+    if logits.ndim == 3 and logits.shape[0] == 1:
+        logits = logits.squeeze(0)
+    predictions = logits.softmax(-1)
     assert len(x.shape) == 1
     assert len(predictions.shape) == 2
     assert len(predictions) == len(x)
