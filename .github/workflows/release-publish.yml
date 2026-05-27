@@ -145,7 +145,13 @@ jobs:
             --index-strategy unsafe-best-match \
             tabpfn-extensions==${VERSION}
 
-          python -c "import tabpfn_extensions; print('imported tabpfn_extensions OK, version:', tabpfn_extensions.__version__)"
+          python - <<PY
+          import tabpfn_extensions
+          expected = "${VERSION}"
+          actual = tabpfn_extensions.__version__
+          assert actual == expected, f"version mismatch: expected {expected!r}, got {actual!r}"
+          print(f"OK: tabpfn_extensions.__version__ == {actual!r}")
+          PY
 
           echo "✅ Installation test completed."
 
