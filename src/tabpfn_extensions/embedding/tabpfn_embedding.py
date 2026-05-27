@@ -219,7 +219,7 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
             self.model_.fit(X, y)
             self.train_embeddings_ = self.model_.get_embeddings(
                 X,
-                data_source="train",
+                data_source="test",
             )
             return self
 

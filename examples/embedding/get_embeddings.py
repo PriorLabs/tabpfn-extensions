@@ -9,10 +9,14 @@ It will not work with the TabPFN client (pip install tabpfn-client) because
 the embedding functionality is not available in the client version.
 """
 
-from sklearn.datasets import load_breast_cancer, load_diabetes
-from sklearn.linear_model import LinearRegression, LogisticRegression
+import warnings
+
+from sklearn.datasets import fetch_openml, load_breast_cancer
+from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.metrics import accuracy_score, r2_score
 from sklearn.model_selection import train_test_split
+
+warnings.filterwarnings("ignore", "Ill-conditioned matrix")
 
 # Note: You need to install the full TabPFN package for this example
 # pip install tabpfn
@@ -34,7 +38,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # Baseline: vanilla logistic regression
-model = LogisticRegression(max_iter=1000)
+model = LogisticRegression(max_iter=5000)
 model.fit(X_train, y_train)
 print(
     "Baseline Logistic Regression Accuracy: "
@@ -53,7 +57,7 @@ test_embeddings = embedding.transform(X_test)
 
 # TabPFN embeddings are shaped (n_estimators, n_samples, embed_dim); pick the
 # first ensemble member for a 2D matrix that sklearn estimators accept.
-model = LogisticRegression(max_iter=1000)
+model = LogisticRegression(max_iter=5000)
 model.fit(train_embeddings[0], y_train)
 y_pred = model.predict(test_embeddings[0])
 print(
@@ -71,7 +75,7 @@ embedding = TabPFNEmbedding(
 train_embeddings = embedding.fit_transform(X_train, y_train)  # OOF
 test_embeddings = embedding.transform(X_test)
 
-model = LogisticRegression(max_iter=1000)
+model = LogisticRegression(max_iter=5000)
 model.fit(train_embeddings[0], y_train)
 y_pred = model.predict(test_embeddings[0])
 print(
@@ -82,7 +86,12 @@ print(
 # ---------------------------------------------------------------------------
 # Regression
 # ---------------------------------------------------------------------------
-X, y = load_diabetes(return_X_y=True)
+# space_ga: 3107 samples, 6 features — a clean benchmark where TabPFN
+# embeddings clearly outperform a plain Ridge regression baseline.
+print("\nLoading regression dataset (space_ga from OpenML)...")
+dataset = fetch_openml("space_ga", version=1, as_frame=False)
+X, y = dataset["data"], dataset["target"].astype(float)
+
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -90,11 +99,11 @@ X_train, X_test, y_train, y_test = train_test_split(
     random_state=42,
 )
 
-# Baseline: vanilla linear regression
-model = LinearRegression()
+# Baseline: vanilla Ridge regression on raw features
+model = Ridge()
 model.fit(X_train, y_train)
 print(
-    "Baseline Linear Regression R2 Score: "
+    "Baseline Ridge Regression R² Score: "
     f"{r2_score(y_test, model.predict(X_test)):.4f}",
 )
 
@@ -106,12 +115,11 @@ embedding = TabPFNEmbedding(
 train_embeddings = embedding.fit_transform(X_train, y_train)
 test_embeddings = embedding.transform(X_test)
 
-model = LinearRegression()
+model = Ridge()
 model.fit(train_embeddings[0], y_train)
 y_pred = model.predict(test_embeddings[0])
 print(
-    "Linear Regression with TabPFN (Vanilla) R2 Score: "
-    f"{r2_score(y_test, y_pred):.4f}",
+    "Ridge with TabPFN (Vanilla) R² Score: " f"{r2_score(y_test, y_pred):.4f}",
 )
 
 # K-fold cross-validated TabPFN embeddings
@@ -122,10 +130,9 @@ embedding = TabPFNEmbedding(
 train_embeddings = embedding.fit_transform(X_train, y_train)  # OOF
 test_embeddings = embedding.transform(X_test)
 
-model = LinearRegression()
+model = Ridge()
 model.fit(train_embeddings[0], y_train)
 y_pred = model.predict(test_embeddings[0])
 print(
-    "Linear Regression with TabPFN (K-Fold CV) R2 Score: "
-    f"{r2_score(y_test, y_pred):.4f}",
+    "Ridge with TabPFN (K-Fold CV) R² Score: " f"{r2_score(y_test, y_pred):.4f}",
 )
