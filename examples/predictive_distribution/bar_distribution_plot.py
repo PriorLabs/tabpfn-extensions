@@ -167,7 +167,7 @@ def plot_bar_distribution(
             )
         bar_borders = bar_borders[new_borders_inds]
         pred_cumsum = torch.cat(
-            [torch.zeros(len(predictions), 1), predictions.cumsum(-1)], dim=-1
+            [predictions.new_zeros(len(predictions), 1), predictions.cumsum(-1)], dim=-1
         )
         predictions = (
             pred_cumsum[:, new_borders_inds[1:]] - pred_cumsum[:, new_borders_inds[:-1]]
