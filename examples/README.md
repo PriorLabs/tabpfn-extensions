@@ -10,6 +10,7 @@ examples/
 ├── interpretability/  # SHAP, partial dependence, feature selection
 ├── many_class/        # More classes than the checkpoint supports
 ├── multioutput/       # Multi-output regression + multi-label classification (sklearn wrapper)
+├── predictive_distribution/  # Visualize TabPFN's full predictive distribution + derive point estimates
 ├── pval_crt/          # Statistical feature relevance testing
 ├── survival/          # Survival analysis
 ├── tabebm/            # Data augmentation via TabEBM
