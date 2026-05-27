@@ -11,9 +11,9 @@ dependency on `tabpfn_extensions` itself.
 
 from __future__ import annotations
 
-import matplotlib.patches as patches
 import seaborn as sns
 import torch
+from matplotlib import patches
 from matplotlib.collections import PatchCollection
 
 
@@ -78,9 +78,9 @@ def heatmap_with_box_sizes(
         y_starts = y_starts.unsqueeze(0).expand(len(x_starts), -1)
         y_ends = y_ends.unsqueeze(0).expand(len(x_starts), -1)
 
-    for col_i, (col_start, col_end) in enumerate(zip(x_starts, x_ends)):
+    for col_i, (col_start, col_end) in enumerate(zip(x_starts, x_ends, strict=False)):
         for row_i, (row_start, row_end) in enumerate(
-            zip(y_starts[col_i], y_ends[col_i])
+            zip(y_starts[col_i], y_ends[col_i], strict=False)
         ):
             intensity = data[row_i, col_i].item()
             intensity = max(0.0, (intensity - threshold_i)) / (1 - threshold_i)
@@ -168,8 +168,7 @@ def plot_bar_distribution(
             [torch.zeros(len(predictions), 1), predictions.cumsum(-1)], dim=-1
         )
         predictions = (
-            pred_cumsum[:, new_borders_inds[1:]]
-            - pred_cumsum[:, new_borders_inds[:-1]]
+            pred_cumsum[:, new_borders_inds[1:]] - pred_cumsum[:, new_borders_inds[:-1]]
         )
         assert len(bar_borders) - 1 == predictions.shape[-1]
 

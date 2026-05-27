@@ -29,10 +29,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from bar_distribution_plot import plot_bar_distribution
 
 from tabpfn_extensions import TabPFNRegressor
-
-from bar_distribution_plot import plot_bar_distribution
 
 OUT_DIR = Path(__file__).resolve().parent
 
@@ -81,11 +80,7 @@ upper_pick = rng.random(n_train) < upper_prob
 mode_offset = np.where(upper_pick, 1.5, -1.5).astype(np.float32)
 mode_offset = np.where(bimodal_mask, mode_offset, 0.0).astype(np.float32)
 
-y_train = (
-    y_clean
-    + mode_offset
-    + rng.normal(0.0, sigma).astype(np.float32)
-)
+y_train = y_clean + mode_offset + rng.normal(0.0, sigma).astype(np.float32)
 
 X_train = x_train.reshape(-1, 1)
 
@@ -164,7 +159,12 @@ ax.scatter(
 )
 ax.plot(X_test[:, 0], preds["mean"], color="C0", lw=2.2, label="mean", zorder=3)
 ax.plot(
-    X_test[:, 0], preds["median"], color="C1", lw=2.2, ls="--", label="median",
+    X_test[:, 0],
+    preds["median"],
+    color="C1",
+    lw=2.2,
+    ls="--",
+    label="median",
     zorder=3,
 )
 ax.fill_between(
@@ -207,9 +207,7 @@ fig_showcase, (ax_default, ax_coarse) = plt.subplots(
 plot_bar_distribution(
     ax_default, x_test_1d, borders, logits, restrict_to_range=(Y_MIN, Y_MAX)
 )
-ax_default.set_title(
-    "Default density\nplot_bar_distribution(ax, x, borders, logits)"
-)
+ax_default.set_title("Default density\nplot_bar_distribution(ax, x, borders, logits)")
 
 # Coarse merge: merges adjacent buckets for a faster, lower-resolution render.
 plot_bar_distribution(
@@ -261,15 +259,17 @@ bin_idx = np.digitize(bar_centers.numpy(), y_edges) - 1
 valid = (bin_idx >= 0) & (bin_idx < n_coarse)
 
 fig2, axes = plt.subplots(1, len(slice_indices), figsize=(19, 5.5), sharey=True)
-for ax_i, idx in zip(axes, slice_indices):
-    mass = np.bincount(
-        bin_idx[valid], weights=probs_np[idx, valid], minlength=n_coarse
-    )
+for ax_i, idx in zip(axes, slice_indices, strict=False):
+    mass = np.bincount(bin_idx[valid], weights=probs_np[idx, valid], minlength=n_coarse)
     density_slice = mass / y_widths_c
     x_val = X_test[idx, 0]
     ax_i.barh(
-        y_centers_c, density_slice, height=y_widths_c,
-        color="C0", alpha=0.7, align="center",
+        y_centers_c,
+        density_slice,
+        height=y_widths_c,
+        color="C0",
+        alpha=0.7,
+        align="center",
     )
     ax_i.axhline(preds["mean"][idx], color="black", lw=1.8, label="mean")
     ax_i.axhline(preds["median"][idx], color="C1", lw=1.8, ls="--", label="median")
@@ -278,9 +278,7 @@ for ax_i, idx in zip(axes, slice_indices):
 axes[0].set_ylabel("y")
 axes[0].set_ylim(Y_MIN, Y_MAX)
 axes[-1].legend(loc="upper right")
-fig2.suptitle(
-    "Predictive density slices: tight, then heteroscedastic, then bimodal"
-)
+fig2.suptitle("Predictive density slices: tight, then heteroscedastic, then bimodal")
 plt.tight_layout()
 plt.savefig(OUT_DIR / "tabpfn_density_slices.png", dpi=150)
 plt.show()
