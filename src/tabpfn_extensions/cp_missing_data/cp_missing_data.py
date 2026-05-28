@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
 
 from tabpfn_extensions.utils import TabPFNRegressor
@@ -212,14 +212,13 @@ class CPMDATabPFNRegressor(BaseEstimator, RegressorMixin):
 
         return mask_unique, model
 
-    def fit(self, x_train: ArrayLike, y_train: ArrayLike) -> "CPMDATabPFNRegressor":
+    def fit(self, x_train: ArrayLike, y_train: ArrayLike) -> CPMDATabPFNRegressor:
         """Fit the model and compute conformal calibration corrections.
 
         Parameters:
             x_train : matrix-like of shape (n_samples, n_predictors)
             y_train : array-like of continuous outcome with shape (n_samples,)
         """
-
         # check if quantiles are correct
         quantiles = self.quantiles if self.quantiles is not None else [0.05, 0.5, 0.95]
         self._validate_quantiles(quantiles)
