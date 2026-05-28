@@ -79,10 +79,12 @@ jobs:
         run: uv venv --python ${{ matrix.python-version }}
 
       - name: Install dependencies
-        # Use `uv pip install`, rather than `uv sync`, as this matches what end users
-        # do. `uv sync` uses a lockfile shared between all supported Python versions,
-        # which restricts the version range of dependencies that it considers.
-        run: uv pip install --resolution ${{ matrix.dependency-set }} --group ci --editable ".[all]"
+        # Use `uv pip install --python-version` to resolve the dependencies against the
+        # target python version only. If we use `uv sync` or omit `--python-version`,
+        # uv will restrict the version ranges of the packages to those compatible with
+        # all the Python versions specified by `requires-python`, which is not the
+        # behaviour seen by end users.
+        run: uv pip install --python-version ${{ matrix.python-version }} --resolution ${{ matrix.dependency-set }} --group ci --editable ".[all]"
 
       - name: Restore model cache
         id: restore-model-cache
