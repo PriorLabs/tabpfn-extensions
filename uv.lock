@@ -3423,7 +3423,7 @@ requires-dist = [
     { name = "tabpfn-extensions", extras = ["interpretability", "post-hoc-ensembles", "hpo", "survival"], marker = "extra == 'all'" },
     { name = "torch", specifier = ">=2.1" },
 ]
-provides-extras = ["interpretability", "post-hoc-ensembles", "hpo", "survival", "many-class", "classifier-as-regressor", "unsupervised", "all"]
+provides-extras = ["interpretability", "post-hoc-ensembles", "hpo", "survival", "many-class", "unsupervised", "all"]
 
 [package.metadata.requires-dev]
 ci = [
