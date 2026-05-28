@@ -9,7 +9,21 @@ from sklearn.utils.multiclass import type_of_target
 from sklearn.utils.validation import check_is_fitted
 from tabpfn_common_utils.telemetry import set_extension
 
+from tabpfn import (
+    TabPFNClassifier as _LocalCLF,
+    TabPFNRegressor as _LocalREG,
+)
 from tabpfn_extensions.utils import TabPFNClassifier, TabPFNRegressor
+
+
+def _validate_embedding_model(model: object) -> None:
+    """Raise if the model can't produce embeddings (e.g. TabPFN client)."""
+    if not isinstance(model, _LocalCLF | _LocalREG):
+        raise TypeError(
+            "TabPFN embeddings require the full TabPFN implementation "
+            "(pip install tabpfn). The TabPFN client does not support "
+            "embedding extraction.",
+        )
 
 
 @set_extension("embedding")
@@ -165,6 +179,7 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
             raise ValueError("n_fold must be 0 (vanilla) or >= 2.")
 
         self.model_ = self._resolve_template(y)
+        _validate_embedding_model(self.model_)
         self._is_classifier_ = isinstance(self.model_, TabPFNClassifier)
 
         if self.n_fold == 0:
@@ -241,6 +256,7 @@ class TabPFNEmbedding(TransformerMixin, BaseEstimator):
             raise ValueError("No model has been set.")
 
         self.model_ = clone(template)
+        _validate_embedding_model(self.model_)
         self._is_classifier_ = isinstance(self.model_, TabPFNClassifier)
 
         if self.n_fold == 0:
