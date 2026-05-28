@@ -35,7 +35,6 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 
 - **interpretability**: Explain TabPFN predictions with SHAP values and feature selection
 - **many_class**: Handle classification problems with more classes than your TabPFN checkpoint supports
-- **classifier_as_regressor**: Use TabPFN's classifier for regression tasks
 - **unsupervised**: Data generation and outlier detection
 - **embedding**: Get TabPFN's internal dense sample embeddings
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
