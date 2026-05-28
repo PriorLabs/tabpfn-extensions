@@ -82,7 +82,7 @@ jobs:
         # Use `uv pip install`, rather than `uv sync`, as this matches what end users
         # do. `uv sync` uses a lockfile shared between all supported Python versions,
         # which restricts the version range of dependencies that it considers.
-        run: uv pip install --resolution ${{ matrix.dependency-set }} --all-extras --group ci --editable .
+        run: uv pip install --resolution ${{ matrix.dependency-set }} --group ci --editable ".[all]"
 
       - name: Restore model cache
         id: restore-model-cache
