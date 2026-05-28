@@ -4,6 +4,10 @@ This example demonstrates how to extract embeddings from TabPFN models and use t
 for classification and regression tasks via the scikit-learn style
 ``TabPFNEmbedding`` transformer.
 
+The goal is to show that TabPFN embeddings can be used as powerful feature 
+representations for downstream tasks. The robust cross-validated embeddings 
+(with n_fold > 0) yield better performance than the vanilla embeddings (n_fold=0).
+
 NOTE: This example requires the full TabPFN implementation (pip install tabpfn).
 It will not work with the TabPFN client (pip install tabpfn-client) because
 the embedding functionality is not available in the client version.
