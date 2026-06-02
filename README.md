@@ -35,7 +35,6 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 
 - **interpretability**: Explain TabPFN predictions with SHAP values and feature selection
 - **many_class**: Handle classification problems with more classes than your TabPFN checkpoint supports
-- **classifier_as_regressor**: Use TabPFN's classifier for regression tasks
 - **unsupervised**: Data generation and outlier detection
 - **embedding**: Get TabPFN's internal dense sample embeddings
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
@@ -74,6 +73,7 @@ Runnable scripts and notebooks for extensions and general use cases live in the 
 - [`embedding/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding) — access TabPFN's internal dense sample embeddings
 - [`interpretability/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/interpretability) — SHAP values, partial dependence plots, feature selection
 - [`many_class/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/many_class) — classification with more classes than your checkpoint supports
+- [`predictive_distribution/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/predictive_distribution) — visualize the full predictive distribution from `TabPFNRegressor` and derive point estimates / credible intervals
 - [`pval_crt/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/pval_crt) — statistical feature relevance testing
 - [`survival/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/survival) — survival analysis
 - [`tabebm/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/tabebm) — data augmentation via TabEBM

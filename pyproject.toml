@@ -76,7 +76,6 @@ hpo = [
 # `pip install scikit-survival`. Excluded due to GPL.
 survival = []
 many_class = []
-classifier_as_regressor = []
 unsupervised = []
 
 # Meta-package that installs all extensions
