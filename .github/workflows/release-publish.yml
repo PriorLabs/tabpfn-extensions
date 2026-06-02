@@ -112,7 +112,12 @@ jobs:
           path: dist/
 
       - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1.14
+        # Pinned to an immutable version tag rather than a commit SHA: this is
+        # a Docker action that derives its image as
+        # ghcr.io/pypa/gh-action-pypi-publish:<ref>, and pypa publishes images
+        # for version/branch refs only, not per-commit SHAs — a SHA pin fails
+        # with "manifest unknown". v1.14.0 maps to the immutable :v1.14.0 image.
+        uses: pypa/gh-action-pypi-publish@v1.14.0
         with:
           repository-url: https://test.pypi.org/legacy/
           print-hash: true
@@ -190,7 +195,9 @@ jobs:
           path: dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1.14
+        # See note on the TestPyPI publish step: pinned to the immutable
+        # version tag v1.14.0 because this Docker action cannot be SHA-pinned.
+        uses: pypa/gh-action-pypi-publish@v1.14.0
         with:
           print-hash: true
           skip-existing: true
