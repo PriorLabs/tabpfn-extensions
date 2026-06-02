@@ -11,7 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `TabPFNEmbedding` now provides a standard scikit-learn `fit` / `transform` / `fit_transform` interface, so it composes with sklearn workflows. `fit_transform` produces out-of-fold embeddings when `n_fold >= 2`; `transform` uses a final full-data model. The previous `get_embeddings(...)` method is retained for backward compatibility. ([#298](https://github.com/PriorLabs/tabpfn-extensions/pull/298))
+- `interpretability.shapiq_to_shap_explanation(...)` bridge helper (new `interpretability/shap.py` module) that converts a `shapiq` explanation into a `shap.Explanation`, so you can compute Shapley values with `shapiq` but plot with the `shap` library without writing the loop/stack/baseline boilerplate. ([#292](https://github.com/PriorLabs/tabpfn-extensions/pull/292))
+- New examples: bar-distribution / predictive-distribution plotting for regression uncertainty (`examples/predictive_distribution/`) ([#299](https://github.com/PriorLabs/tabpfn-extensions/pull/299)), and multi-output regression + multi-label classification via sklearn's `MultiOutputRegressor` / `MultiOutputClassifier` (`examples/multioutput/`) ([#297](https://github.com/PriorLabs/tabpfn-extensions/pull/297)).
 - Add an automated release pipeline based on TabPFN's pattern: workflows for opening release PRs, auto-tagging on merge, and publishing to PyPI via trusted publishing with a manual approval gate. Per-PR changelog fragments via Towncrier (see `changelog/README.md`). ([#278](https://github.com/PriorLabs/tabpfn-extensions/pull/278))
+
+### Changed
+
+- `feature_selection` now returns a structured `FeatureSelectionResult` (carrying the selected features and the before/after cross-validation scores) instead of the raw sequential-feature-selector object, and logs progress when `verbose` is set. CV scores are now always computed and returned. ([#293](https://github.com/PriorLabs/tabpfn-extensions/pull/293))
+- `TabPFNEmbedding.fit(...)` now returns `self` (was `None`) and takes `X, y` (was `X_train, y_train`), to follow the scikit-learn estimator protocol. ([#298](https://github.com/PriorLabs/tabpfn-extensions/pull/298))
+
+### Fixed
+
+- Numerical overflow in the unsupervised outlier-detection "diffuse density" combiner. `outliers()` now computes the arithmetic mean of densities in log space via the logsumexp identity, fixing overflow on diffuse-density inputs. ([#291](https://github.com/PriorLabs/tabpfn-extensions/pull/291), closes [#289](https://github.com/PriorLabs/tabpfn-extensions/issues/289))
+
+### Removed
+
+- The empty `classifier_as_regressor` install extra and its stale README reference. The underlying module was removed long ago; the extra was a no-op. ([#300](https://github.com/PriorLabs/tabpfn-extensions/pull/300))
 
 
 <!-- Towncrier inserts release sections immediately below the Unreleased
