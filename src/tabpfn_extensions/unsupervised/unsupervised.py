@@ -134,12 +134,12 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         # TODO: ManyClassClassifier resolves this same limit in its own private
         #       helper. A shared utility that reads a TabPFN classifier's maximum class count would remove the
         #       duplication.
-        self.max_num_classes_ = 10
+        self.max_num_classes = 10
         if tabpfn_clf is not None and hasattr(tabpfn_clf, "get_inference_config"):
             cfg = tabpfn_clf.get_inference_config()
             val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None)
             if val:
-                self.max_num_classes_ = int(val)
+                self.max_num_classes = int(val)
 
     def set_categorical_features(self, categorical_features: list[int]) -> None:
         """Set categorical feature indices for the model.
@@ -273,7 +273,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         self.categorical_features = infer_categorical_features(
             X_np,
             self.categorical_features,
-            max_unique_values_as_categorical_feature=self.max_num_classes_,
+            max_unique_values_as_categorical_feature=self.max_num_classes,
         )
 
         # Ensure all estimators have the init_model_and_get_model_config method
@@ -484,7 +484,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         return (
             self.tabpfn_clf is not None
             and column_idx in self.categorical_features
-            and len(np.unique(y)) <= self.max_num_classes_
+            and len(np.unique(y)) <= self.max_num_classes
         )
 
     def density_(
