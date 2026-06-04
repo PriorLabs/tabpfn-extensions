@@ -125,6 +125,22 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         self.categorical_features: list[int] = []
 
+        # Maximum number of classes the classifier backend supports, resolved
+        # once at construction. Older models and
+        # classifiers without get_inference_config() fall back to the
+        # historical default of 10. A categorical feature with up to this many
+        # distinct values is modeled by the classifier; beyond it, by the
+        # regressor.
+        # TODO: ManyClassClassifier resolves this same limit in its own private
+        #       helper. A shared utility that reads a TabPFN classifier's maximum class count would remove the
+        #       duplication.
+        self.max_num_classes_ = 10
+        if tabpfn_clf is not None and hasattr(tabpfn_clf, "get_inference_config"):
+            cfg = tabpfn_clf.get_inference_config()
+            val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None)
+            if val:
+                self.max_num_classes_ = int(val)
+
     def set_categorical_features(self, categorical_features: list[int]) -> None:
         """Set categorical feature indices for the model.
 
@@ -257,6 +273,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         self.categorical_features = infer_categorical_features(
             X_np,
             self.categorical_features,
+            max_unique_values_as_categorical_feature=self.max_num_classes_,
         )
 
         # Ensure all estimators have the init_model_and_get_model_config method
@@ -464,10 +481,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         Returns:
             bool: True if a classifier should be used, False for a regressor
         """
-        # Check if we should use classifier based on feature type and number of unique values
-        max_classes = getattr(self.tabpfn_clf, "max_num_classes_", 10)
         return (
-            column_idx in self.categorical_features and len(np.unique(y)) < max_classes
+            column_idx in self.categorical_features
+            and len(np.unique(y)) <= self.max_num_classes_
         )
 
     def density_(

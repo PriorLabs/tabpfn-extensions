@@ -396,6 +396,7 @@ TabPFNClassifier, TabPFNRegressor = get_tabpfn_models()
 def infer_categorical_features(
     X: np.ndarray,
     categorical_features: list[int] | None = None,
+    max_unique_values_as_categorical_feature: int = 10,
 ) -> list[int]:
     """Infer the categorical features from the input data.
 
@@ -409,6 +410,9 @@ def infer_categorical_features(
         X (np.ndarray or pandas.DataFrame): The input data.
         categorical_features (list[int], optional): Initial list of categorical feature indices.
             If None, will start with an empty list.
+        max_unique_values_as_categorical_feature (int): Maximum number of unique
+            values for a feature listed in ``categorical_features`` to be kept
+            as categorical. Defaults to 10.
 
     Returns:
         list[int]: The indices of the categorical features.
@@ -416,7 +420,6 @@ def infer_categorical_features(
     if categorical_features is None:
         categorical_features = []
 
-    max_unique_values_as_categorical_feature = 10
     min_unique_values_as_numerical_feature = 10
 
     _categorical_features: list[int] = []
