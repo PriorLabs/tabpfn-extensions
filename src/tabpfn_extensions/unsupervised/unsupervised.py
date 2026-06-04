@@ -482,7 +482,8 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             bool: True if a classifier should be used, False for a regressor
         """
         return (
-            column_idx in self.categorical_features
+            self.tabpfn_clf is not None
+            and column_idx in self.categorical_features
             and len(np.unique(y)) <= self.max_num_classes_
         )
 
