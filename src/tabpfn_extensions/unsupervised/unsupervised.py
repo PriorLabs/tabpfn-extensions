@@ -513,9 +513,12 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             # Because of preprocessing, we can't use a zero feature, so we use a random feature
             X_fit, y_fit = (
                 torch.randn(X_fit[:, 0:1].shape, dtype=torch.float32),
-                X_fit[:, 0],
+                X_fit[:, column_idx],
             )
-            X_predict, y_predict = torch.randn_like(X_predict[:, 0:1]), X_predict[:, 0]
+            X_predict, y_predict = (
+                torch.randn_like(X_predict[:, 0:1]),
+                X_predict[:, column_idx],
+            )
 
         model = (
             self.tabpfn_clf
