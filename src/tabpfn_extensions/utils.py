@@ -403,6 +403,12 @@ DEFAULT_MAX_NUM_CLASSES = 10
 # from how many classes a model can *predict* (see ``get_max_num_classes``).
 MAX_UNIQUE_VALUES_FOR_CATEGORICAL = 40
 
+# Minimum average samples per category required to auto-detect a column as
+# categorical. Scales the support requirement with cardinality: a column needs
+# more than ``MIN_SAMPLES_PER_CATEGORY * n_unique`` rows, so high-cardinality
+# columns aren't called categorical on the basis of thin per-level evidence.
+MIN_SAMPLES_PER_CATEGORY = 10
+
 
 def get_max_num_classes(model: Any) -> int | None:
     """Infer the max number of classes a TabPFN estimator can predict in one fit.
@@ -452,9 +458,9 @@ def infer_categorical_features(
     2. It has a string/object/category dtype (pandas DataFrame).
     3. It contains string values (numpy object array).
     4. It is low-cardinality: at most ``MAX_UNIQUE_VALUES_FOR_CATEGORICAL``
-       unique values (and the dataset has more than 100 rows, to avoid
-       mislabelling columns that only look low-cardinality because the sample
-       is tiny).
+       unique values, with more than ``MIN_SAMPLES_PER_CATEGORY`` samples per
+       unique value on average, to avoid mislabelling columns that only look
+       low-cardinality because the sample is too thin per level.
 
     Parameters:
         X (np.ndarray or pandas.DataFrame): The input data.
@@ -514,8 +520,13 @@ def infer_categorical_features(
         if i in categorical_features:
             _categorical_features.append(i)
 
-        # Otherwise auto-detect low-cardinality columns as categorical.
-        elif n_unique <= MAX_UNIQUE_VALUES_FOR_CATEGORICAL and X.shape[0] > 100:
+        # Otherwise auto-detect low-cardinality columns as categorical, but
+        # only when there is enough support per level (samples / categories).
+        # ``n_unique`` can be 0 for an all-NaN pandas column, so guard the ratio.
+        elif (
+            0 < n_unique <= MAX_UNIQUE_VALUES_FOR_CATEGORICAL
+            and X.shape[0] / n_unique > MIN_SAMPLES_PER_CATEGORY
+        ):
             _categorical_features.append(i)
 
     return _categorical_features
