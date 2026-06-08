@@ -571,15 +571,16 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             X_predict, y_predict = X_predict[mask], X_predict[:, column_idx]
             X_predict = X_predict.reshape(mask.shape[0], -1)
         else:
-            # No conditional features: random placeholder input, target from
-            # `column_idx` (not literal 0 — caller's iteration order may be
-            # reordered, e.g. via a DAG).
+            # If the first feature, use a zero feature as input
+            # Because of preprocessing, we can't use a zero feature, so we use a random feature
+            # dtype override: X_fit/X_predict may be integer tensors (e.g.
+            # categorical-only data), for which randn_like is undefined
             X_fit, y_fit = (
-                torch.randn(X_fit[:, 0:1].shape, dtype=torch.float32),
+                torch.randn_like(X_fit[:, 0:1], dtype=torch.float32),
                 X_fit[:, column_idx],
             )
             X_predict, y_predict = (
-                torch.randn_like(X_predict[:, 0:1]),
+                torch.randn_like(X_predict[:, 0:1], dtype=torch.float32),
                 X_predict[:, column_idx],
             )
 
