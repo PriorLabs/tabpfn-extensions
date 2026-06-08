@@ -347,8 +347,8 @@ try:
             return params
 
 except ImportError:
-    TabPFNClassifierWrapper = None
-    TabPFNRegressorWrapper = None
+    ClientTabPFNClassifier = None
+    ClientTabPFNRegressor = None
 
 try:
     from tabpfn import (
@@ -380,8 +380,8 @@ def get_tabpfn_models() -> tuple[type, type]:
         logging.info("Using TabPFN package")
 
         return LocalTabPFNClassifier, LocalTabPFNRegressor
-    elif TabPFNClassifierWrapper is not None:
-        return TabPFNClassifierWrapper, TabPFNRegressorWrapper
+    elif ClientTabPFNClassifier is not None:
+        return ClientTabPFNClassifier, ClientTabPFNRegressor
     else:
         raise ImportError(
             "No TabPFN implementation could be imported. Install with one of the following:\n"
