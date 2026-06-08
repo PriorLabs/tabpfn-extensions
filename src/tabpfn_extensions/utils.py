@@ -393,10 +393,6 @@ def get_tabpfn_models() -> tuple[type, type]:
 TabPFNClassifier, TabPFNRegressor = get_tabpfn_models()
 
 
-# Older TabPFN versions (pre PriorLabs/TabPFN#890) don't expose
-# ``get_inference_config``; their ``MAX_NUMBER_OF_CLASSES`` was always 10.
-DEFAULT_MAX_NUM_CLASSES = 10
-
 # Cardinality threshold for the categorical-detection heuristic (constraint
 # (a) below): a column with at most this many unique values is treated as
 # categorical. This is a property of the *data* and is intentionally separate
@@ -418,9 +414,8 @@ def get_max_num_classes(model: Any) -> int | None:
     classifier/regressor routing, the many-class output-coding wrapper, ...).
 
     The value is read from the model's inference config
-    (``get_inference_config().MAX_NUMBER_OF_CLASSES``). Older TabPFN versions
-    (pre PriorLabs/TabPFN#890) don't expose that config and were always capped
-    at 10, so we fall back to ``DEFAULT_MAX_NUM_CLASSES`` for them.
+    (``get_inference_config().MAX_NUMBER_OF_CLASSES``), which TabPFN exposes as
+    of v8.0.0 (the minimum version this package depends on).
 
     Args:
         model: A (typically TabPFN) classifier instance.
@@ -434,10 +429,6 @@ def get_max_num_classes(model: Any) -> int | None:
         val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None)
         if val:
             return int(val)
-    # Config-less TabPFN builds were always capped at 10; non-TabPFN estimators
-    # have no inherent limit, so signal that with None.
-    if type(model).__module__.startswith("tabpfn"):
-        return DEFAULT_MAX_NUM_CLASSES
     return None
 
 

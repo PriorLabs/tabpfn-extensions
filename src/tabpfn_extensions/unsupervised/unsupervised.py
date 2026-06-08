@@ -57,7 +57,6 @@ from tqdm import tqdm
 
 # Import TabPFN models from extensions (which handles backend compatibility)
 from tabpfn_extensions.utils import (  # type: ignore
-    DEFAULT_MAX_NUM_CLASSES,
     TabPFNClassifier,
     TabPFNRegressor,
     get_max_num_classes,
@@ -534,13 +533,22 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         Returns:
             bool: True if a classifier should be used, False for a regressor
         """
+        is_categorical = column_idx in self.categorical_features
+        if self.tabpfn_clf is None:
+            # No classifier was provided: surface categorical columns so
+            # density_ raises a clear "missing tabpfn_clf" error rather than
+            # silently routing categorical data to the regressor; numerical
+            # columns go to the regressor as usual.
+            return is_categorical
         # Use the classifier only when both constraints hold:
         #   (a) the column is categorical, and
-        #   (b) the classifier can actually predict that many classes.
-        max_classes = get_max_num_classes(self.tabpfn_clf) or DEFAULT_MAX_NUM_CLASSES
+        #   (b) the classifier can actually predict that many classes
+        #       (a TabPFN clf always reports a limit; None means no inherent
+        #       limit, e.g. a non-TabPFN estimator).
+        max_classes = get_max_num_classes(self.tabpfn_clf)
         # torch.unique stays on-device; np.unique raises on CUDA/MPS tensors.
         n_unique = torch.unique(y).numel() if torch.is_tensor(y) else len(np.unique(y))
-        return column_idx in self.categorical_features and n_unique <= max_classes
+        return is_categorical and (max_classes is None or n_unique <= max_classes)
 
     def density_(
         self,

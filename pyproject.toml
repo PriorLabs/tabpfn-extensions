@@ -10,7 +10,7 @@ dependencies = [
     "pandas>=2.2.2",
     "scikit-learn>=1.6.0",
     "scipy>=1.11.1",
-    "tabpfn>=7.0.0",
+    "tabpfn>=8.0.0",
     "tabpfn-common-utils[telemetry-interactive]>=0.2.13",
 ]
 
