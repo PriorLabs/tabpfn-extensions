@@ -476,9 +476,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         #   (a) the column is categorical, and
         #   (b) the classifier can actually predict that many classes.
         max_classes = get_max_num_classes(self.tabpfn_clf) or DEFAULT_MAX_NUM_CLASSES
-        return (
-            column_idx in self.categorical_features and len(np.unique(y)) <= max_classes
-        )
+        # torch.unique stays on-device; np.unique raises on CUDA/MPS tensors.
+        n_unique = torch.unique(y).numel() if torch.is_tensor(y) else len(np.unique(y))
+        return column_idx in self.categorical_features and n_unique <= max_classes
 
     def density_(
         self,
