@@ -511,11 +511,16 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         else:
             # If the first feature, use a zero feature as input
             # Because of preprocessing, we can't use a zero feature, so we use a random feature
+            # dtype override: X_fit/X_predict may be integer tensors (e.g.
+            # categorical-only data), for which randn_like is undefined
             X_fit, y_fit = (
-                torch.randn(X_fit[:, 0:1].shape, dtype=torch.float32),
-                X_fit[:, 0],
+                torch.randn_like(X_fit[:, 0:1], dtype=torch.float32),
+                X_fit[:, column_idx],
             )
-            X_predict, y_predict = torch.randn_like(X_predict[:, 0:1]), X_predict[:, 0]
+            X_predict, y_predict = (
+                torch.randn_like(X_predict[:, 0:1], dtype=torch.float32),
+                X_predict[:, column_idx],
+            )
 
         model = (
             self.tabpfn_clf
