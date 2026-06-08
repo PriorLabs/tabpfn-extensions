@@ -393,31 +393,79 @@ def get_tabpfn_models() -> tuple[type, type]:
 TabPFNClassifier, TabPFNRegressor = get_tabpfn_models()
 
 
+# Older TabPFN versions (pre PriorLabs/TabPFN#890) don't expose
+# ``get_inference_config``; their ``MAX_NUMBER_OF_CLASSES`` was always 10.
+DEFAULT_MAX_NUM_CLASSES = 10
+
+# Cardinality threshold for the categorical-detection heuristic (constraint
+# (a) below): a column with at most this many unique values is treated as
+# categorical. This is a property of the *data* and is intentionally separate
+# from how many classes a model can *predict* (see ``get_max_num_classes``).
+MAX_UNIQUE_VALUES_FOR_CATEGORICAL = 40
+
+
+def get_max_num_classes(model: Any) -> int | None:
+    """Infer the max number of classes a TabPFN estimator can predict in one fit.
+
+    This is the single source of truth for the TabPFN class-count limit across
+    tabpfn-extensions, so a fix here propagates everywhere (unsupervised
+    classifier/regressor routing, the many-class output-coding wrapper, ...).
+
+    The value is read from the model's inference config
+    (``get_inference_config().MAX_NUMBER_OF_CLASSES``). Older TabPFN versions
+    (pre PriorLabs/TabPFN#890) don't expose that config and were always capped
+    at 10, so we fall back to ``DEFAULT_MAX_NUM_CLASSES`` for them.
+
+    Args:
+        model: A (typically TabPFN) classifier instance.
+
+    Returns:
+        The maximum number of classes the model supports, or ``None`` if
+        ``model`` is not a TabPFN estimator (i.e. has no inherent class limit).
+    """
+    if hasattr(model, "get_inference_config"):
+        cfg = model.get_inference_config()
+        val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None)
+        if val:
+            return int(val)
+    # Config-less TabPFN builds were always capped at 10; non-TabPFN estimators
+    # have no inherent limit, so signal that with None.
+    if type(model).__module__.startswith("tabpfn"):
+        return DEFAULT_MAX_NUM_CLASSES
+    return None
+
+
 def infer_categorical_features(
     X: np.ndarray,
     categorical_features: list[int] | None = None,
 ) -> list[int]:
-    """Infer the categorical features from the input data.
+    """Infer which columns are categorical *features* (constraint (a) only).
 
-    Features are identified as categorical if any of these conditions are met:
-    1. The feature index is in the provided categorical_features list AND has few unique values
-    2. The feature has few unique values compared to the dataset size
-    3. The feature has string/object/category data type (pandas DataFrame)
-    4. The feature contains string values (numpy array)
+    This answers a data question — "is this column categorical?" — and is
+    deliberately independent of any model constraint. Whether a categorical
+    column has few enough levels for a TabPFN classifier to *predict* it
+    (constraint (b)) is a separate concern; derive that limit with
+    ``get_max_num_classes`` and apply it at the point of use.
+
+    A column is treated as categorical if any of these hold:
+    1. It is in the caller-provided ``categorical_features`` list.
+    2. It has a string/object/category dtype (pandas DataFrame).
+    3. It contains string values (numpy object array).
+    4. It is low-cardinality: at most ``MAX_UNIQUE_VALUES_FOR_CATEGORICAL``
+       unique values (and the dataset has more than 100 rows, to avoid
+       mislabelling columns that only look low-cardinality because the sample
+       is tiny).
 
     Parameters:
         X (np.ndarray or pandas.DataFrame): The input data.
-        categorical_features (list[int], optional): Initial list of categorical feature indices.
-            If None, will start with an empty list.
+        categorical_features (list[int], optional): Initial list of categorical
+            feature indices. If None, will start with an empty list.
 
     Returns:
         list[int]: The indices of the categorical features.
     """
     if categorical_features is None:
         categorical_features = []
-
-    max_unique_values_as_categorical_feature = 10
-    min_unique_values_as_numerical_feature = 10
 
     _categorical_features: list[int] = []
 
@@ -451,7 +499,7 @@ def infer_categorical_features(
                             _categorical_features.append(i)
                             break
 
-    # Then detect based on unique values
+    # Then detect based on cardinality (constraint (a) heuristic only).
     for i in range(X.shape[-1]):
         # Skip if already identified as categorical
         if i in _categorical_features:
@@ -460,19 +508,14 @@ def infer_categorical_features(
         # Get unique values - handle differently for pandas and numpy
         n_unique = X.iloc[:, i].nunique() if is_pandas else len(np.unique(X[:, i]))
 
-        # Filter categorical features, with too many unique values
-        if (
-            i in categorical_features
-            and n_unique <= max_unique_values_as_categorical_feature
-        ):
+        # Respect caller-declared categoricals unconditionally: whether such a
+        # column has too many levels for a model to *predict* is a separate
+        # concern (see ``get_max_num_classes``), handled at the point of use.
+        if i in categorical_features:
             _categorical_features.append(i)
 
-        # Filter non-categorical features, with few unique values
-        elif (
-            i not in categorical_features
-            and n_unique < min_unique_values_as_numerical_feature
-            and X.shape[0] > 100
-        ):
+        # Otherwise auto-detect low-cardinality columns as categorical.
+        elif n_unique <= MAX_UNIQUE_VALUES_FOR_CATEGORICAL and X.shape[0] > 100:
             _categorical_features.append(i)
 
     return _categorical_features

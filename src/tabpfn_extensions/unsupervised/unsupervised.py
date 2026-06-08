@@ -54,8 +54,10 @@ from tqdm import tqdm
 
 # Import TabPFN models from extensions (which handles backend compatibility)
 from tabpfn_extensions.utils import (  # type: ignore
+    DEFAULT_MAX_NUM_CLASSES,
     TabPFNClassifier,
     TabPFNRegressor,
+    get_max_num_classes,
     infer_categorical_features,
 )
 
@@ -464,10 +466,12 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         Returns:
             bool: True if a classifier should be used, False for a regressor
         """
-        # Check if we should use classifier based on feature type and number of unique values
-        max_classes = getattr(self.tabpfn_clf, "max_num_classes_", 10)
+        # Use the classifier only when both constraints hold:
+        #   (a) the column is categorical, and
+        #   (b) the classifier can actually predict that many classes.
+        max_classes = get_max_num_classes(self.tabpfn_clf) or DEFAULT_MAX_NUM_CLASSES
         return (
-            column_idx in self.categorical_features and len(np.unique(y)) < max_classes
+            column_idx in self.categorical_features and len(np.unique(y)) <= max_classes
         )
 
     def density_(
