@@ -15,6 +15,8 @@ Key features:
 - Compatibility with both TabPFN and TabPFN-client backends
 - Support for mixed data types (categorical and numerical features)
 - Flexible permutation-based approach for feature dependencies
+- Optional Directed Acyclic Graph (DAG) of inter-feature dependencies for
+  causally-informed synthesis / imputation
 
 Example usage:
     ```python
@@ -43,6 +45,7 @@ from __future__ import annotations
 import copy
 import os
 import random
+from graphlib import CycleError, TopologicalSorter
 from typing import Any
 
 import numpy as np
@@ -58,6 +61,37 @@ from tabpfn_extensions.utils import (  # type: ignore
     TabPFNRegressor,
     infer_categorical_features,
 )
+
+
+def _resolve_dag_order(
+    dag: dict[int, list[int]],
+    all_features: list[int],
+) -> tuple[list[int], dict[int, list[int]]]:
+    """Topologically order ``all_features`` according to ``dag``.
+
+    Returns ``(ordered, full_dag)`` where ``ordered`` is a permutation of
+    ``all_features`` consistent with the DAG, and ``full_dag`` is a copy of
+    ``dag`` with empty dependency lists filled in for any feature not present
+    as a key.
+
+    The caller's ``dag`` is **not** mutated. On a cyclic graph we raise
+    ``ValueError`` with the cycle path embedded in the message — easier for a
+    user to debug than the raw stdlib ``CycleError`` traceback.
+    """
+    valid = set(all_features)
+    unknown = (set(dag) | {p for parents in dag.values() for p in parents}) - valid
+    if unknown:
+        raise ValueError(
+            f"DAG references unknown feature indices {sorted(unknown)}; "
+            f"valid indices are {sorted(valid)}.",
+        )
+    full_dag = {i: list(dag.get(i, [])) for i in all_features}
+    try:
+        ordered = list(TopologicalSorter(full_dag).static_order())
+    except CycleError as exc:
+        cycle = exc.args[1] if len(exc.args) > 1 else exc.args[0]
+        raise ValueError(f"DAG contains a cycle through features: {cycle}") from exc
+    return ordered, full_dag
 
 
 class TabPFNUnsupervisedModel(BaseEstimator):
@@ -270,6 +304,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         t: float = 0.000000001,
         n_permutations: int = 10,
         condition_on_all_features: bool = True,
+        dag: dict[int, list[int]] | None = None,
         fast_mode: bool = False,
     ) -> torch.Tensor:
         """Impute missing values (np.nan) in X by sampling all cells independently from the trained models.
@@ -283,11 +318,22 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 Number of permutations to use for imputation
             condition_on_all_features: bool, default=True
                 Whether to condition on all other features (True) or only previous features (False)
+            dag: dict[int, list[int]] | None, default=None
+                Optional Directed Acyclic Graph mapping each column index to its
+                list of parent column indices (i.e. the features it depends on).
+                When provided, columns are imputed in topological order and each
+                column is conditioned on exactly its DAG parents. Mutually
+                exclusive with ``condition_on_all_features=True``. Features
+                absent from the dict default to no dependencies.
             fast_mode: bool, default=False
                 Whether to use faster settings for testing
 
         Returns:
             torch.Tensor: Imputed data with missing values replaced
+
+        Raises:
+            ValueError: If ``dag`` is combined with ``condition_on_all_features=True``,
+                or if ``dag`` contains a cycle.
         """
         n_features = X.shape[1]
         all_features = list(range(n_features))
@@ -295,16 +341,32 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X_fit = self.X_
         impute_X = copy.deepcopy(X)
 
+        # When a DAG is supplied, take a local copy (no caller mutation) and a
+        # topological order; iterate parents before children.
+        full_dag: dict[int, list[int]] | None = None
+        topo_order: list[int] | None = None
+        if dag is not None:
+            if condition_on_all_features:
+                raise ValueError(
+                    "`dag` is mutually exclusive with `condition_on_all_features=True`;"
+                    " pass condition_on_all_features=False when supplying a DAG."
+                )
+            topo_order, full_dag = _resolve_dag_order(dag, all_features)
+
         columns_with_nan = [
             col_idx
             for col_idx in all_features
             if torch.isnan(impute_X[:, col_idx]).any()
         ]
+        if topo_order is not None:
+            with_nan_set = set(columns_with_nan)
+            columns_with_nan = [c for c in topo_order if c in with_nan_set]
 
         for column_idx in tqdm(columns_with_nan):
             y_predict = impute_X[:, column_idx]
-
-            if not condition_on_all_features:
+            if full_dag is not None:
+                conditional_idx = full_dag[column_idx]
+            elif not condition_on_all_features:
                 conditional_idx = all_features[:column_idx] if column_idx > 0 else []
             else:
                 conditional_idx = list(set(range(X.shape[1])) - {column_idx})
@@ -548,6 +610,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X: torch.Tensor | np.ndarray | pd.DataFrame,
         t: float = 0.000000001,
         n_permutations: int = 10,
+        dag: dict[int, list[int]] | None = None,
     ) -> torch.Tensor:
         """Impute missing values in the input data using the fitted TabPFN models.
 
@@ -569,6 +632,13 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 Number of random feature permutations to use for imputation.
                 Higher values may improve robustness but increase computation time.
 
+            dag: dict[int, list[int]] | None, default=None
+                Optional Directed Acyclic Graph mapping each column index to the
+                list of column indices it depends on. When provided, columns are
+                imputed in topological order and each column is conditioned on
+                its DAG parents instead of all other features. Useful for
+                causally-informed imputation.
+
         Returns:
             torch.Tensor
                 Imputed data with missing values replaced, of shape (n_samples, n_features).
@@ -588,8 +658,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         return self.impute_(
             X,
             t,
-            condition_on_all_features=True,
+            condition_on_all_features=(dag is None),
             n_permutations=n_permutations,
+            dag=dag,
             fast_mode=fast_mode,
         )
 
@@ -764,6 +835,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         n_samples: int = 100,
         t: float = 1.0,
         n_permutations: int = 3,
+        dag: dict[int, list[int]] | None = None,
     ) -> torch.Tensor:
         """Generate synthetic tabular data samples using the fitted TabPFN models.
 
@@ -783,6 +855,12 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             n_permutations: int, default=3
                 Number of feature permutations to use for generation
                 More permutations may provide more robust results but increase computation time
+
+            dag: dict[int, list[int]] | None, default=None
+                Optional Directed Acyclic Graph mapping each column index to the
+                list of column indices it depends on. When provided, columns are
+                generated in topological order and each column is conditioned on
+                its DAG parents only. Useful for causally-informed synthesis.
 
         Returns:
             torch.Tensor:
@@ -815,6 +893,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             t=t,
             condition_on_all_features=False,
             n_permutations=actual_n_permutations,
+            dag=dag,
             fast_mode=fast_mode,
         )
 
