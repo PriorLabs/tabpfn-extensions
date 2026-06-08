@@ -571,7 +571,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         # learn from, so we fall back to the previous behaviour rather than
         # failing the whole call.
         target_observed = ~torch.isnan(X_fit[:, column_idx])
-        if bool(target_observed.any()) and not bool(target_observed.all()):
+        if target_observed.any() and not target_observed.all():
             X_fit = X_fit[target_observed]
 
         if len(conditional_idx) > 0:
