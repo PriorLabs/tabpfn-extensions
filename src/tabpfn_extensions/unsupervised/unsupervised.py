@@ -577,6 +577,21 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         # Initialize model if needed
         self.init_model_and_get_model_config()
 
+        # Only rows whose target column is observed can serve as labeled context
+        # for that column. Rows whose target is NaN carry no usable label: they
+        # were previously kept with a fabricated 0 label (see nan_to_num below),
+        # which biases the fit toward 0 and — when the fit data is the same data
+        # being imputed — leaks the query rows into their own training context.
+        # Dropping them addresses both. This is a no-op when the fit data has no
+        # missing targets (e.g. fitting on complete reference data, the
+        # recommended imputation workflow, or outlier detection on complete
+        # data). If the target column is entirely missing there is no signal to
+        # learn from, so we fall back to the previous behaviour rather than
+        # failing the whole call.
+        target_observed = ~torch.isnan(X_fit[:, column_idx])
+        if target_observed.any() and not target_observed.all():
+            X_fit = X_fit[target_observed]
+
         if len(conditional_idx) > 0:
             # If not the first feature, use all previous features
             mask = torch.zeros_like(X_fit).bool()

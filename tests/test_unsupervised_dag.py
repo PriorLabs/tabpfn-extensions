@@ -110,3 +110,38 @@ def test_generate_synthetic_data_with_dag(monkeypatch):
 
     assert isinstance(synthetic_X, torch.Tensor)
     assert synthetic_X.shape == (5, 3)
+
+
+@pytest.mark.client_compatible
+@pytest.mark.local_compatible
+def test_impute_with_dag(monkeypatch):
+    """End-to-end: imputation with a DAG fills every NaN and keeps the shape.
+
+    Uses a different DAG shape from the synthesis test above — a fork/diamond
+    (two children of a shared root that both feed a final feature) rather than
+    a simple chain — to exercise a column conditioned on multiple parents.
+    """
+    monkeypatch.setenv("FAST_TEST_MODE", "1")
+
+    rng = np.random.default_rng(0)
+    X = rng.random((6, 4)).astype(np.float32)
+    model = unsupervised.TabPFNUnsupervisedModel(
+        tabpfn_clf=TabPFNClassifier(n_estimators=1),
+        tabpfn_reg=TabPFNRegressor(n_estimators=1),
+    )
+    # Fit on the complete data; impute a copy with missing values (the
+    # recommended workflow — the fitting context stays fully observed).
+    model.fit(torch.tensor(X))
+
+    X_missing = X.copy()
+    X_missing[1, 2] = np.nan
+    X_missing[4, 3] = np.nan
+    X_missing[5, 1] = np.nan
+
+    # 0 is a root; 1 and 2 both depend on 0; 3 depends on both 1 and 2.
+    dag = {0: [], 1: [0], 2: [0], 3: [1, 2]}
+    imputed = model.impute(torch.tensor(X_missing), dag=dag)
+
+    assert isinstance(imputed, torch.Tensor)
+    assert imputed.shape == (6, 4)
+    assert not torch.isnan(imputed).any()
