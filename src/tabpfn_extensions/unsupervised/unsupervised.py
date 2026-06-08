@@ -639,13 +639,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 logits_tensor = logits.clone().detach()
                 # Match logits dtype/device: MPS rejects float64, and sklearn
                 # inputs arrive as float64, so cast before moving to the device.
-                y_tensor = (
-                    y_predict.clone()
-                    .detach()
-                    .to(
-                        dtype=logits.dtype,
-                        device=logits.device,
-                    )
+                y_tensor = y_predict.detach().to(
+                    dtype=logits.dtype,
+                    device=logits.device,
                 )
                 # criterion.forward returns the NLL, so -forward is log p_θ directly.
                 log_pred = (
