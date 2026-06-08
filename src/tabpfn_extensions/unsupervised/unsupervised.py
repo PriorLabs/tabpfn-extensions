@@ -59,6 +59,7 @@ from tqdm import tqdm
 from tabpfn_extensions.utils import (  # type: ignore
     TabPFNClassifier,
     TabPFNRegressor,
+    get_max_num_classes,
     infer_categorical_features,
 )
 
@@ -146,12 +147,18 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 TabPFNRegressor instance for handling numerical features.
 
         Raises:
-            AssertionError
+            ValueError
                 If both tabpfn_clf and tabpfn_reg are None.
         """
-        assert not (
-            tabpfn_clf is None and tabpfn_reg is None
-        ), "You cannot set both `tabpfn_clf` and `tabpfn_reg` to None. You can set one to None, if your table exclusively consists of categoricals/numericals."
+        # A raise (not assert) so the check survives `python -O`. One may be
+        # None when the table is exclusively categorical/numerical; if a
+        # missing model is later actually needed, ``density_`` raises a clear
+        # error pointing at the column that needs it.
+        if tabpfn_clf is None and tabpfn_reg is None:
+            raise ValueError(
+                "At least one of `tabpfn_clf` or `tabpfn_reg` must be provided; "
+                "both are None.",
+            )
 
         self.tabpfn_clf = tabpfn_clf
         self.tabpfn_reg = tabpfn_reg
@@ -526,11 +533,22 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         Returns:
             bool: True if a classifier should be used, False for a regressor
         """
-        # Check if we should use classifier based on feature type and number of unique values
-        max_classes = getattr(self.tabpfn_clf, "max_num_classes_", 10)
-        return (
-            column_idx in self.categorical_features and len(np.unique(y)) < max_classes
-        )
+        is_categorical = column_idx in self.categorical_features
+        if self.tabpfn_clf is None:
+            # No classifier was provided: surface categorical columns so
+            # density_ raises a clear "missing tabpfn_clf" error rather than
+            # silently routing categorical data to the regressor; numerical
+            # columns go to the regressor as usual.
+            return is_categorical
+        # Use the classifier only when both constraints hold:
+        #   (a) the column is categorical, and
+        #   (b) the classifier can actually predict that many classes
+        #       (a TabPFN clf always reports a limit; None means no inherent
+        #       limit, e.g. a non-TabPFN estimator).
+        max_classes = get_max_num_classes(self.tabpfn_clf)
+        # torch.unique stays on-device; np.unique raises on CUDA/MPS tensors.
+        n_unique = torch.unique(y).numel() if torch.is_tensor(y) else len(np.unique(y))
+        return is_categorical and (max_classes is None or n_unique <= max_classes)
 
     def density_(
         self,
@@ -599,11 +617,18 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 X_predict[:, column_idx],
             )
 
-        model = (
-            self.tabpfn_clf
-            if self.use_classifier_(column_idx, y_fit)
-            else self.tabpfn_reg
-        )
+        use_clf = self.use_classifier_(column_idx, y_fit)
+        model = self.tabpfn_clf if use_clf else self.tabpfn_reg
+        if model is None:
+            needed, estimator = (
+                ("categorical", "tabpfn_clf=TabPFNClassifier(...)")
+                if use_clf
+                else ("numerical", "tabpfn_reg=TabPFNRegressor(...)")
+            )
+            raise ValueError(
+                f"Column {column_idx} needs the {needed} model, but it was not "
+                f"provided. Pass `{estimator}` to TabPFNUnsupervisedModel.",
+            )
         # Handle potential nan values in y_fit
         y_fit_np = y_fit.numpy() if hasattr(y_fit, "numpy") else y_fit
         if np.isnan(y_fit_np).any():
@@ -611,7 +636,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         X_fit_np = X_fit.numpy() if hasattr(X_fit, "numpy") else X_fit
 
-        if self.use_classifier_(column_idx, y_fit):
+        if use_clf:
             y_fit_np = y_fit_np.astype(int)
             y_predict = y_predict.long()
 
