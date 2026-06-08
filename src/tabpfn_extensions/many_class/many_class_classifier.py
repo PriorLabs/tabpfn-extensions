@@ -109,7 +109,6 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
     def _get_alphabet_size(self) -> int | None:
         if self.alphabet_size is not None:
             return int(self.alphabet_size)
-        # Shared inference so a fix to the class-count logic applies everywhere.
         return get_max_num_classes(self.estimator)
 
     def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
