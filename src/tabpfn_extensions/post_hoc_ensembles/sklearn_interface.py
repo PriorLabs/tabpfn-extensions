@@ -1,6 +1,13 @@
 #  Copyright (c) Prior Labs GmbH 2025.
 #  Licensed under the Apache License, Version 2.0
 
+# =============================================================================
+# DEPRECATED MODULE
+# -----------------------------------------------------------------------------
+# AutoTabPFNClassifier / AutoTabPFNRegressor are deprecated and will be
+# removed in a future release.
+# =============================================================================
+
 """TabPFN implementation in AutoGluon taken from TabArena: A Living Benchmark for Machine Learning on Tabular Data,
 Nick Erickson, Lennart Purucker, Andrej Tschalzev, David Holzmüller, Prateek Mutalik Desai, David Salinas,
 Frank Hutter, Preprint., 2025.
@@ -9,6 +16,7 @@ Frank Hutter, Preprint., 2025.
 from __future__ import annotations
 
 import datetime
+import warnings
 from enum import Enum
 from pathlib import Path
 from typing import Any, Literal
@@ -392,6 +400,12 @@ class AutoTabPFNClassifier(ClassifierMixin, AutoTabPFNBase):
         ignore_pretraining_limits: bool = False,
         model_version: ModelVersion = ModelVersion.V2_5,
     ):
+        warnings.warn(
+            "AutoTabPFNClassifier is deprecated and will be removed in a future "
+            "release of tabpfn-extensions.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             max_time=max_time,
             eval_metric=eval_metric,
@@ -542,6 +556,12 @@ class AutoTabPFNRegressor(RegressorMixin, AutoTabPFNBase):
         ignore_pretraining_limits: bool = False,
         model_version: ModelVersion = ModelVersion.V2_5,
     ):
+        warnings.warn(
+            "AutoTabPFNRegressor is deprecated and will be removed in a future "
+            "release of tabpfn-extensions.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             max_time=max_time,
             eval_metric=eval_metric,

@@ -27,6 +27,88 @@ class TabPFNEstimator(Protocol):
     def predict(self, X: Any) -> Any: ...
 
 
+def warn_if_no_kv_cache(model: Any, *, context: str = "This operation") -> None:
+    """Warn if a TabPFN model isn't configured to use the KV cache.
+
+    The KV cache (improved with TabPFN-3) caches the encoder pass over the training set so that
+    repeated predicts against the same fitted model don't re-encode the
+    training data each time. Extensions that issue many predicts per fit
+    (e.g. imputation-based SHAP, certain feature-selection or HPO routines)
+    benefit from it — without the cache, the encoder pass over the training
+    set runs on every predict and these extensions can be 10-100x slower
+    than necessary.
+
+    Two conditions need to hold for the cache fast path:
+        1. ``model`` was constructed with ``fit_mode="fit_with_cache"``
+           (a constructor argument, must be set BEFORE ``.fit()``).
+        2. ``model.executor_.keep_cache_on_device`` is ``True`` (set AFTER
+           ``.fit()``; usually the default but worth setting explicitly).
+
+    This helper warns if either is missing, but does not raise — users may
+    have intentional reasons (e.g. memory).
+
+    Args:
+        model: The TabPFN model (classifier or regressor) to inspect.
+        context: Short noun phrase describing the caller's operation, used
+            to make the warning message specific (e.g. ``"Imputation-based
+            SHAP"``, ``"Sequential feature selection"``). Defaults to a
+            generic ``"This operation"``.
+    """
+    # tabpfn-client doesn't expose fit_mode and doesn't (yet) support the KV
+    # cache — recommend switching to the local tabpfn package instead of
+    # firing the generic "set fit_mode='fit_with_cache'" message that would
+    # TypeError on the client. Walk the MRO because tabpfn-extensions wraps
+    # the client base classes in tabpfn_extensions.utils, so the *immediate*
+    # class' __module__ is "tabpfn_extensions.utils" and won't match.
+    mro_modules = (getattr(cls, "__module__", "") for cls in type(model).__mro__)
+    if any("tabpfn_client" in m for m in mro_modules):
+        warnings.warn(
+            f"{context} would benefit substantially from the KV cache, but "
+            "the tabpfn-client backend does not currently support it. "
+            "Install the local tabpfn package (`pip install tabpfn`) and "
+            "use TabPFNClassifier/TabPFNRegressor with "
+            "fit_mode='fit_with_cache' to enable it.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return
+
+    fit_mode = getattr(model, "fit_mode", None)
+    if fit_mode is None:
+        # Not a TabPFN-shaped model (or some custom estimator without a
+        # fit_mode attribute). Don't fire a misleading warning; the caller
+        # is responsible for ensuring the estimator is something we can
+        # actually accelerate.
+        return
+    if fit_mode != "fit_with_cache":
+        warnings.warn(
+            f"TabPFN model has fit_mode={fit_mode!r}, not 'fit_with_cache'. "
+            f"{context} will be substantially slower than necessary. "
+            "Construct the model with TabPFNClassifier or TabPFNRegressor "
+            "(fit_mode='fit_with_cache', ...) "
+            "(set BEFORE calling .fit) to enable the KV cache, then set "
+            "model.executor_.keep_cache_on_device = True after .fit().",
+            UserWarning,
+            stacklevel=3,
+        )
+        return  # if fit_mode is wrong, the second check is moot
+
+    executor = getattr(model, "executor_", None)
+    if executor is None:
+        # model not fitted yet — we can't check; downstream code will fail anyway
+        return
+    if not getattr(executor, "keep_cache_on_device", False):
+        warnings.warn(
+            "TabPFN model has fit_mode='fit_with_cache' but "
+            f"executor_.keep_cache_on_device is False. {context} will "
+            "be slower than necessary because the cache is shuttled to/from CPU "
+            "on every predict call. Set "
+            "`model.executor_.keep_cache_on_device = True` after .fit().",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def is_tabpfn(estimator: Any) -> bool:
     """Check if an estimator is a TabPFN model."""
     try:
@@ -311,31 +393,76 @@ def get_tabpfn_models() -> tuple[type, type]:
 TabPFNClassifier, TabPFNRegressor = get_tabpfn_models()
 
 
+# Cardinality threshold for the categorical-detection heuristic (constraint
+# (a) below): a column with at most this many unique values is treated as
+# categorical. This is a property of the *data* and is intentionally separate
+# from how many classes a model can *predict* (see ``get_max_num_classes``).
+MAX_UNIQUE_VALUES_FOR_CATEGORICAL = 40
+
+# Minimum average samples per category required to auto-detect a column as
+# categorical. Scales the support requirement with cardinality: a column needs
+# more than ``MIN_SAMPLES_PER_CATEGORY * n_unique`` rows, so high-cardinality
+# columns aren't called categorical on the basis of thin per-level evidence.
+MIN_SAMPLES_PER_CATEGORY = 10
+
+
+def get_max_num_classes(model: Any) -> int | None:
+    """Infer the max number of classes a TabPFN estimator can predict in one fit.
+
+    This is the single source of truth for the TabPFN class-count limit across
+    tabpfn-extensions, so a fix here propagates everywhere (unsupervised
+    classifier/regressor routing, the many-class output-coding wrapper, ...).
+
+    The value is read from the model's inference config
+    (``get_inference_config().MAX_NUMBER_OF_CLASSES``), which TabPFN exposes as
+    of v8.0.0 (the minimum version this package depends on).
+
+    Args:
+        model: A (typically TabPFN) classifier instance.
+
+    Returns:
+        The maximum number of classes the model supports, or ``None`` if
+        ``model`` is not a TabPFN estimator (i.e. has no inherent class limit).
+    """
+    if hasattr(model, "get_inference_config"):
+        cfg = model.get_inference_config()
+        val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None)
+        if val:
+            return int(val)
+    return None
+
+
 def infer_categorical_features(
     X: np.ndarray,
     categorical_features: list[int] | None = None,
 ) -> list[int]:
-    """Infer the categorical features from the input data.
+    """Infer which columns are categorical *features* (constraint (a) only).
 
-    Features are identified as categorical if any of these conditions are met:
-    1. The feature index is in the provided categorical_features list AND has few unique values
-    2. The feature has few unique values compared to the dataset size
-    3. The feature has string/object/category data type (pandas DataFrame)
-    4. The feature contains string values (numpy array)
+    This answers a data question — "is this column categorical?" — and is
+    deliberately independent of any model constraint. Whether a categorical
+    column has few enough levels for a TabPFN classifier to *predict* it
+    (constraint (b)) is a separate concern; derive that limit with
+    ``get_max_num_classes`` and apply it at the point of use.
+
+    A column is treated as categorical if any of these hold:
+    1. It is in the caller-provided ``categorical_features`` list.
+    2. It has a string/object/category dtype (pandas DataFrame).
+    3. It contains string values (numpy object array).
+    4. It is low-cardinality: at most ``MAX_UNIQUE_VALUES_FOR_CATEGORICAL``
+       unique values, with more than ``MIN_SAMPLES_PER_CATEGORY`` samples per
+       unique value on average, to avoid mislabelling columns that only look
+       low-cardinality because the sample is too thin per level.
 
     Parameters:
         X (np.ndarray or pandas.DataFrame): The input data.
-        categorical_features (list[int], optional): Initial list of categorical feature indices.
-            If None, will start with an empty list.
+        categorical_features (list[int], optional): Initial list of categorical
+            feature indices. If None, will start with an empty list.
 
     Returns:
         list[int]: The indices of the categorical features.
     """
     if categorical_features is None:
         categorical_features = []
-
-    max_unique_values_as_categorical_feature = 10
-    min_unique_values_as_numerical_feature = 10
 
     _categorical_features: list[int] = []
 
@@ -369,7 +496,7 @@ def infer_categorical_features(
                             _categorical_features.append(i)
                             break
 
-    # Then detect based on unique values
+    # Then detect based on cardinality (constraint (a) heuristic only).
     for i in range(X.shape[-1]):
         # Skip if already identified as categorical
         if i in _categorical_features:
@@ -378,18 +505,18 @@ def infer_categorical_features(
         # Get unique values - handle differently for pandas and numpy
         n_unique = X.iloc[:, i].nunique() if is_pandas else len(np.unique(X[:, i]))
 
-        # Filter categorical features, with too many unique values
-        if (
-            i in categorical_features
-            and n_unique <= max_unique_values_as_categorical_feature
-        ):
+        # Respect caller-declared categoricals unconditionally: whether such a
+        # column has too many levels for a model to *predict* is a separate
+        # concern (see ``get_max_num_classes``), handled at the point of use.
+        if i in categorical_features:
             _categorical_features.append(i)
 
-        # Filter non-categorical features, with few unique values
+        # Otherwise auto-detect low-cardinality columns as categorical, but
+        # only when there is enough support per level (samples / categories).
+        # ``n_unique`` can be 0 for an all-NaN pandas column, so guard the ratio.
         elif (
-            i not in categorical_features
-            and n_unique < min_unique_values_as_numerical_feature
-            and X.shape[0] > 100
+            0 < n_unique <= MAX_UNIQUE_VALUES_FOR_CATEGORICAL
+            and X.shape[0] / n_unique > MIN_SAMPLES_PER_CATEGORY
         ):
             _categorical_features.append(i)
 
