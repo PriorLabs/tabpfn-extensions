@@ -14,6 +14,7 @@ from sklearn.utils.validation import check_is_fitted
 from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.misc.sklearn_compat import validate_data
+from tabpfn_extensions.utils import get_max_num_classes
 
 from ._strategies import (
     AggregationConfig,
@@ -108,20 +109,7 @@ class ManyClassClassifier(BaseEstimator, ClassifierMixin):
     def _get_alphabet_size(self) -> int | None:
         if self.alphabet_size is not None:
             return int(self.alphabet_size)
-        if hasattr(self.estimator, "get_inference_config"):
-            cfg = self.estimator.get_inference_config()
-            val = getattr(cfg, "MAX_NUMBER_OF_CLASSES", None)
-            if val:
-                return int(val)
-        # Older TabPFN versions (pre PriorLabs/TabPFN#890) don't expose
-        # get_inference_config; their MAX_NUMBER_OF_CLASSES was always 10.
-        if type(self.estimator).__module__.startswith("tabpfn"):
-            logger.info(
-                "Base estimator has no get_inference_config(); assuming "
-                "alphabet_size=10 (older TabPFN default).",
-            )
-            return 10
-        return None
+        return get_max_num_classes(self.estimator)
 
     def _get_n_estimators(self, n_classes: int, alphabet_size: int) -> int:
         if self.n_estimators is not None:

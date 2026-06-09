@@ -130,13 +130,16 @@ def score_classification(
     if optimize_metric is None:
         optimize_metric = "roc"
 
-    if (optimize_metric == "roc") and len(np.unique(y_true)) == 2:
-        y_pred = y_pred[:, 1]
+    # "auroc" is an alias for "roc"; normalize it here so the downstream logic
+    # only ever has to reason about "roc". safe_roc_auc_score already handles
+    # selecting the positive class for binary inputs, so no slicing is needed.
+    if optimize_metric == "auroc":
+        optimize_metric = "roc"
 
     if (not y_pred_is_labels) and (optimize_metric not in ["roc", "log_loss"]):
         y_pred = np.argmax(y_pred, axis=1)
 
-    if optimize_metric in ("roc", "auroc"):
+    if optimize_metric == "roc":
         return safe_roc_auc_score(
             y_true,
             y_pred,
