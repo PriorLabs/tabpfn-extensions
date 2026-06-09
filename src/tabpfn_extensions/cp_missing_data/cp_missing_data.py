@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.base import BaseEstimator, RegressorMixin, clone
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
 
@@ -32,6 +32,14 @@ class CPMDATabPFNRegressor(BaseEstimator, RegressorMixin):
             Fraction of training data used for conformal calibration.
         seed : int or None, default=None
             Random seed for the train/calibration split.
+        tabpfn_estimator : TabPFNRegressor or None, default=None
+            A pre-configured TabPFNRegressor instance. If None, a default
+            TabPFNRegressor() is used. Use this to customise parameters such
+            as n_estimators, device, or random_state. Example::
+
+                CPMDATabPFNRegressor(
+                    tabpfn_estimator=TabPFNRegressor(n_estimators=16, device="cuda")
+                )
 
     Attributes:
         model_ : TabPFNRegressor
@@ -49,10 +57,12 @@ class CPMDATabPFNRegressor(BaseEstimator, RegressorMixin):
         quantiles: list[float] | None = None,
         val_size: float = 0.3,
         seed: int | None = None,
+        tabpfn_estimator: TabPFNRegressor | None = None,
     ) -> None:
         self.quantiles = quantiles
         self.val_size = val_size
         self.seed = seed
+        self.tabpfn_estimator = tabpfn_estimator
 
     def _validate_quantiles(self, quantiles: list[float]) -> None:
         if len(quantiles) != 3:
@@ -112,8 +122,11 @@ class CPMDATabPFNRegressor(BaseEstimator, RegressorMixin):
 
     def _run_tabpfn(self, x_train: pd.DataFrame, y_train: pd.Series) -> TabPFNRegressor:
         """Fit the TabPFN model."""
-        # fit model
-        model = TabPFNRegressor()
+        model = (
+            clone(self.tabpfn_estimator)
+            if self.tabpfn_estimator is not None
+            else TabPFNRegressor()
+        )
         model.fit(x_train, y_train)
         return model
 

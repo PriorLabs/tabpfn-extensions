@@ -12,9 +12,8 @@ from numpy.testing import assert_array_equal
 from sklearn.model_selection import train_test_split
 
 try:
-    from tabpfn_extensions.cp_missing_data import (
-        CPMDATabPFNRegressor,
-    )
+    from tabpfn_extensions.cp_missing_data import CPMDATabPFNRegressor
+    from tabpfn_extensions.utils import TabPFNRegressor
 except ImportError:
     pytest.skip("Required libraries (tabpfn) not installed", allow_module_level=True)
 
@@ -147,3 +146,26 @@ def test_validate_quantiles_not_increasing(seed):
     model = CPMDATabPFNRegressor(quantiles=[0.05, 0.5, 0.95], val_size=0.5, seed=seed)
     with pytest.raises(ValueError, match="strictly increasing"):
         model._validate_quantiles([0.5, 0.3, 0.5])
+
+
+def test_custom_tabpfn_estimator(X_train, Y_train, seed, X_new):
+    """Tests that a custom TabPFNRegressor can be passed and is used correctly."""
+    custom_estimator = TabPFNRegressor(n_estimators=4)
+    model = CPMDATabPFNRegressor(
+        quantiles=[0.05, 0.5, 0.95],
+        val_size=0.5,
+        seed=seed,
+        tabpfn_estimator=custom_estimator,
+    )
+    model.fit(X_train, Y_train)
+
+    # check the fitted model used the custom estimator's settings
+    assert model.model_.n_estimators == 4
+
+    # check predict still works and returns correct shape
+    CP_results = model.predict(X_new)
+    assert len(CP_results) == 5
+    assert CP_results[1].size == X_new.shape[0]
+
+    # check get_params exposes the custom estimator
+    assert model.get_params()["tabpfn_estimator"] is custom_estimator
