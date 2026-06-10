@@ -119,3 +119,42 @@ def test_get_tabpfn_models_selection(
     else:  # "client"
         assert classifier is _FakeClientClassifier
         assert regressor is _FakeClientRegressor
+
+
+def test_local_backend_missing_error_names_local_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When local is requested but absent, the error names the local backend.
+
+    The client is present here, so this also pins that the function does not
+    quietly use it. It must fail, and the message must point at tabpfn and the
+    flag, not at the client.
+    """
+    _set_backends(monkeypatch, use_local=True, local_present=False, client_present=True)
+
+    with pytest.raises(ImportError) as excinfo:
+        utils.get_tabpfn_models()
+
+    message = str(excinfo.value)
+    assert "Local TabPFN backend requested" in message
+    assert "pip install tabpfn" in message
+    # Must not be the client error message (guards against swapped branches).
+    assert "API/client TabPFN backend requested" not in message
+
+
+def test_client_backend_missing_error_names_client_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When the client is requested but absent, the error names the client backend."""
+    _set_backends(
+        monkeypatch, use_local=False, local_present=True, client_present=False
+    )
+
+    with pytest.raises(ImportError) as excinfo:
+        utils.get_tabpfn_models()
+
+    message = str(excinfo.value)
+    assert "API/client TabPFN backend requested" in message
+    assert "pip install tabpfn-client" in message
+    # Must not be the local error message (guards against swapped branches).
+    assert "Local TabPFN backend requested" not in message
