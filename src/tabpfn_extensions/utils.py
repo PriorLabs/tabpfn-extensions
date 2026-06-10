@@ -361,33 +361,44 @@ except ImportError:
 
 
 def get_tabpfn_models() -> tuple[type, type]:
-    """Get TabPFN models with fallback between different versions.
+    """Get the TabPFN model classes for the selected backend.
 
-    Attempts to import TabPFN models in the following order:
-    1. Standard TabPFN package (if USE_TABPFN_LOCAL is True)
-    2. TabPFN client
+    ``USE_TABPFN_LOCAL`` selects the backend; the function does not silently fall
+    back to the other one:
+    1. ``USE_TABPFN_LOCAL`` is True  -> the standard ``tabpfn`` package
+    2. ``USE_TABPFN_LOCAL`` is False -> the ``tabpfn-client`` API backend
+
+    If the selected backend is not installed, an ImportError is raised naming that
+    backend, rather than quietly using the other one.
 
     Returns:
         tuple[type, type]: A tuple containing (TabPFNClassifier, TabPFNRegressor) classes
 
     Raises:
-        ImportError: If none of the TabPFN implementations could be imported
+        ImportError: If the selected TabPFN backend is not installed
     """
-    # First try standard TabPFN package (if local usage is enabled)
-    if USE_TABPFN_LOCAL and LocalTabPFNClassifier is not None:
-        # Debug info controlled by environment variable
-        # (using logging rather than print for better debugging)
-        logging.info("Using TabPFN package")
+    if USE_TABPFN_LOCAL:
+        if LocalTabPFNClassifier is not None:
+            # Debug info controlled by environment variable
+            # (using logging rather than print for better debugging)
+            logging.info("Using TabPFN package")
 
-        return LocalTabPFNClassifier, LocalTabPFNRegressor
-    elif ClientTabPFNClassifier is not None:
-        return ClientTabPFNClassifier, ClientTabPFNRegressor
-    else:
+            return LocalTabPFNClassifier, LocalTabPFNRegressor
         raise ImportError(
-            "No TabPFN implementation could be imported. Install with one of the following:\n"
-            "pip install tabpfn    # For standard TabPFN package\n"
-            "pip install tabpfn-client  # For TabPFN client (API-based inference)",
+            "Local TabPFN backend requested (USE_TABPFN_LOCAL=true) but the "
+            "'tabpfn' package is not installed.\n"
+            "pip install tabpfn       # install the local backend\n"
+            "USE_TABPFN_LOCAL=false   # or switch to the API/client backend",
         )
+
+    if ClientTabPFNClassifier is not None:
+        return ClientTabPFNClassifier, ClientTabPFNRegressor
+    raise ImportError(
+        "API/client TabPFN backend requested (USE_TABPFN_LOCAL=false) but the "
+        "'tabpfn-client' package is not installed.\n"
+        "pip install tabpfn-client   # install the API/client backend\n"
+        "USE_TABPFN_LOCAL=true        # or switch to the local backend",
+    )
 
 
 TabPFNClassifier, TabPFNRegressor = get_tabpfn_models()
