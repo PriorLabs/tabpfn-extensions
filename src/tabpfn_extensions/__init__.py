@@ -5,11 +5,9 @@ try:
 except PackageNotFoundError:
     __version__ = "0.1.0.dev0"
 
-# Create alias for test_utils
 # Import third party extensions
 from tabpfn_common_utils.telemetry.interactive import opt_in
 
-from . import test_utils
 from .embedding import TabPFNEmbedding
 from .hpo import TunedTabPFNClassifier, TunedTabPFNRegressor
 from .many_class import ManyClassClassifier
@@ -20,7 +18,6 @@ from .unsupervised import TabPFNUnsupervisedModel
 from .utils import TabPFNClassifier, TabPFNRegressor, is_tabpfn
 
 __all__ = [
-    "test_utils",
     "TabPFNClassifier",
     "TabPFNRegressor",
     "is_tabpfn",
