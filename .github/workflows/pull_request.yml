@@ -113,13 +113,13 @@ jobs:
         env:
           TABPFN_EXCLUDE_DEVICES: mps
         run: |
-          FAST_TEST_MODE=1 uv run --no-sync pytest tests/
+          FAST_TEST_MODE=1 uv run --no-sync pytest tests/ --run-examples
 
       - name: Run Tests (Windows)
         if: runner.os == 'Windows'
         run: |
           $env:FAST_TEST_MODE = 1
-          uv run --no-sync pytest tests/
+          uv run --no-sync pytest tests/ --run-examples
 
       - name: Save model cache
         if: github.ref == 'refs/heads/main'

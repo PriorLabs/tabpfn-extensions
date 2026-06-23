@@ -4,7 +4,7 @@ This module provides a testing framework for TabPFN example files. It automatica
 1. Detects all example files in the examples/ directory
 2. Categorizes them as fast, slow, or large dataset examples
 3. Runs fast examples normally
-4. Tests slow examples with a short timeout (expecting timeout as success)
+4. Tests slow examples with a 5-second timeout (expecting timeout as success)
 5. Skips large dataset examples entirely unless explicitly requested
 6. Handles backend compatibility for TabPFN package vs. TabPFN client
 
@@ -24,9 +24,12 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import threading
 from pathlib import Path
 
 import pytest
+
+import conftest
 
 # Enable test mode to make examples run faster
 os.environ["TEST_MODE"] = "1"
@@ -37,7 +40,7 @@ def get_example_files() -> list[dict]:
 
     Each example is categorized as:
     - fast: Can run quickly (runs in both normal and fast test mode)
-    - slow: Takes longer to run (runs with a 1-second timeout, expected to timeout)
+    - slow: Takes longer to run (runs with a 5-second timeout, expected to timeout)
     - always_timeout: Examples with large datasets that are always skipped unless explicitly requested
     - requires_tabpfn: If True, requires the full TabPFN package and won't work with client;
                        if False, works with either TabPFN package or TabPFN client
@@ -77,7 +80,7 @@ def get_example_files() -> list[dict]:
             "always_timeout": any(
                 pattern in file_name for pattern in ALWAYS_TIMEOUT_PATTERNS
             ),
-            "timeout": 1
+            "timeout": 5
             if file_name not in FAST_EXAMPLES
             else 30,  # Short timeout for slow examples
         }
@@ -97,7 +100,7 @@ def import_module_from_path(path: Path, timeout: int = None) -> object:
 
     Args:
         path: Path to the Python file to import
-        timeout: Optional timeout parameter (no longer used internally, kept for backward compatibility)
+        timeout: Accepted for backward compatibility; timeout handling is done by callers
 
     Returns:
         The imported module object
@@ -121,7 +124,7 @@ def test_example(request, example_file):
 
     Test strategy:
     1. Fast examples are run with normal timeout
-    2. Slow examples are run with 1-second timeout, expected to timeout
+    2. Slow examples are run with a 5-second timeout, expected to timeout
     3. Examples are skipped if they require missing backends
     4. In FAST_TEST_MODE, only fast examples and examples with --run-examples flag run
 
@@ -129,8 +132,6 @@ def test_example(request, example_file):
         request: PyTest request fixture
         example_file: Dictionary with example file metadata
     """
-    from conftest import HAS_TABPFN, TABPFN_SOURCE
-
     file_name = example_file["name"]
     file_path = example_file["path"]
 
@@ -143,11 +144,11 @@ def test_example(request, example_file):
 
     # Skip if backend not available
     if example_file["requires_tabpfn"]:
-        if not HAS_TABPFN:
+        if not conftest.HAS_TABPFN:
             pytest.skip(
                 f"Example {file_name} requires TabPFN package, but it's not installed",
             )
-        elif TABPFN_SOURCE == "tabpfn_client":
+        elif conftest.TABPFN_SOURCE == "tabpfn_client":
             pytest.skip(
                 f"Example {file_name} requires TabPFN package, not compatible with client",
             )
@@ -157,8 +158,6 @@ def test_example(request, example_file):
         if example_file.get("slow", False) or example_file.get("always_timeout", False):
             # For slow examples, we'll run them with a short internal timeout
             # and expect them to be interrupted
-            import threading
-
             def run_with_timeout(path, max_time=5):
                 """Run import with a timeout using threading approach."""
                 result = {"completed": False, "exception": None}
