@@ -185,6 +185,15 @@ def test_example(request, example_file):
     # inherits TEST_MODE/FAST_TEST_MODE/TABPFN_EXCLUDE_DEVICES from this process.
     env = dict(os.environ)
     env["TEST_MODE"] = "1"
+    # Prepend the in-repo src/ so the example subprocess imports this checkout's
+    # tabpfn_extensions, not some other installed copy (and works even if the
+    # package isn't installed in editable mode).
+    src_dir = str(Path(__file__).parent.parent / "src")
+    env["PYTHONPATH"] = (
+        f"{src_dir}{os.pathsep}{env['PYTHONPATH']}"
+        if env.get("PYTHONPATH")
+        else src_dir
+    )
 
     try:
         proc = subprocess.run(  # noqa: S603 - trusted, repo-local example scripts
@@ -213,7 +222,7 @@ def test_example(request, example_file):
 
     if proc.returncode != 0:
         output = (proc.stdout or b"").decode("utf-8", "replace")
-        tail = "\n".join(output.strip().splitlines()[-25:])
+        tail = "\n".join(output.strip().splitlines()[-100:])
         pytest.fail(
             f"Example {name} exited with code {proc.returncode}:\n{tail}",
         )
