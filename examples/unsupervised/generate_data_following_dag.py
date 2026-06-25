@@ -16,6 +16,7 @@ from sklearn.datasets import load_wine
 from sklearn.model_selection import train_test_split
 
 from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor, unsupervised
+from tabpfn_extensions.unsupervised import experiments
 
 df = load_wine(return_X_y=False)
 X, y = df["data"], df["target"]
@@ -54,7 +55,7 @@ model_unsupervised = unsupervised.TabPFNUnsupervisedModel(
     tabpfn_reg=reg,
 )
 
-exp_synthetic = unsupervised.experiments.GenerateSyntheticDataExperiment(
+exp_synthetic = experiments.GenerateSyntheticDataExperiment(
     task_type="unsupervised",
 )
 

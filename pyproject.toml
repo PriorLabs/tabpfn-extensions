@@ -56,10 +56,12 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 
 [project.optional-dependencies]
 interpretability = [
-    # 1.1.0 is the lowest release where `imputer="baseline"` + `index="SV"` +
-    # `max_order=1` (the default config used by get_tabpfn_imputation_explainer)
-    # works without raising.
-    "shapiq>=1.1.0",
+    # 1.2.0 is the lowest release providing every shapiq feature this package
+    # uses: `class_index` on TabularExplainer/Explainer (added in 1.1.1) and
+    # `shapiq.TabPFNExplainer` (added in 1.2.0, used by get_tabpfn_explainer).
+    # With the old `>=1.1.0` floor, CI's lowest-direct resolution installed
+    # 1.1.0 and the examples crashed (missing class_index / TabPFNExplainer).
+    "shapiq>=1.2.0",
     "seaborn>=0.12.2",
 ]
 post_hoc_ensembles = [
@@ -101,6 +103,20 @@ dev = [
     "build>=1.3.0",
     "twine>=6.2.0",
 ]
+# Extra deps needed only to *run* the example scripts (see examples/), used by the
+# example-file CI job. Deliberately not a published extra: the library itself does
+# not need these, only the example demos do, and the examples ship in the repo (not
+# the wheel), so anyone running them works from a clone where this group is available.
+examples = [
+    # interpretability/shap_example.py bridges shapiq values into a shap.Explanation
+    # purely for plotting (shap.summary_plot / shap.plots.*). The library dropped shap
+    # as a runtime dep in #283 (RES-1467) since shapiq supersedes the adapter; it
+    # survives only as an example plotting convenience.
+    # Floor is 0.46.0, not the older 0.41.0: 0.41.0 pins an ancient numba (0.47.0)
+    # with no cp310+ wheel, which fails to build from source. 0.46.0 leaves numba
+    # unconstrained so a modern, wheel-backed numba is used.
+    "shap>=0.46.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]  # Where the tests are located
@@ -110,6 +126,9 @@ log_cli = false
 log_level = "DEBUG"
 xfail_strict = true
 addopts = "--durations=10 -vv"
+markers = [
+    "example: runs an example script from examples/ (deselect with -m 'not example')",
+]
 
 # https://github.com/astral-sh/ruff
 [tool.ruff]
