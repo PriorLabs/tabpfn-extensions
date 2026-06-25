@@ -140,11 +140,6 @@ class GenerateSyntheticDataExperiment(Experiment):
             self.X, self.y = X, y
             self.X = self.X[:, indices]
             self.feature_names = [attribute_names[i] for i in indices]
-            # Caller-supplied categorical columns are given in the original X
-            # column space (same space as ``indices``). Translate them to their
-            # position within the selected subset; columns not in ``indices`` are
-            # ignored. When none are supplied, default to [] so that tabpfn.fit()
-            # auto-detects categoricals via infer_categorical_features().
             categorical_features = kwargs.get("categorical_features", [])
             categorical_features = [
                 indices.index(c) for c in categorical_features if c in indices
@@ -337,11 +332,6 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
             self.X = X
             self.X = self.X[:, indices]
             self.feature_names = [attribute_names[i] for i in indices]
-            # Caller-supplied categorical columns are given in the original X
-            # column space (same space as ``indices``). Translate them to their
-            # position within the selected subset; columns not in ``indices`` are
-            # ignored. When none are supplied, default to [] so that tabpfn.fit()
-            # auto-detects categoricals via infer_categorical_features().
             categorical_features = kwargs.get("categorical_features", [])
             categorical_features = [
                 indices.index(c) for c in categorical_features if c in indices

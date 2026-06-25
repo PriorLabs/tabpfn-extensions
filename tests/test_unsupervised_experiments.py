@@ -59,8 +59,8 @@ def test_generate_synthetic_experiment_uses_supplied_categorical_features():
     """Only the caller-designated column is marked categorical (issue #323)."""
     X = np.column_stack(
         [
-            np.repeat(np.arange(4), 30),  # 120 rows, 4 unique -> categorical
-            np.random.default_rng(0).normal(size=120),  # continuous -> numerical
+            np.repeat(np.arange(4), 30),
+            np.random.default_rng(0).normal(size=120),
         ],
     ).astype(np.float32)
 
@@ -77,7 +77,6 @@ def test_generate_synthetic_experiment_uses_supplied_categorical_features():
         should_plot=False,
     )
 
-    # Previously the experiment force-marked every selected column categorical.
     assert model.categorical_features == [0]
 
 
@@ -113,9 +112,9 @@ def test_generate_synthetic_experiment_translates_original_indices_to_subset():
     """categorical_features given in original X space map to the selected subset."""
     X = np.column_stack(
         [
-            np.random.default_rng(0).normal(size=120),  # col 0
-            np.random.default_rng(1).normal(size=120),  # col 1 (not selected)
-            np.repeat(np.arange(4), 30),  # col 2 categorical
+            np.random.default_rng(0).normal(size=120),
+            np.random.default_rng(1).normal(size=120),
+            np.repeat(np.arange(4), 30),
         ],
     ).astype(np.float32)
 
@@ -126,8 +125,8 @@ def test_generate_synthetic_experiment_translates_original_indices_to_subset():
         X=X,
         y=np.array([]),
         attribute_names=["a", "b", "c"],
-        indices=[2, 0],  # original col 2 lands at subset position 0
-        categorical_features=[2, 1],  # col 1 is not selected -> ignored
+        indices=[2, 0],
+        categorical_features=[2, 1],
         n_samples=10,
         should_plot=False,
     )
@@ -173,8 +172,8 @@ def test_generate_synthetic_experiment_keeps_numerical_features_numerical(monkey
     rng = np.random.default_rng(0)
     X = np.column_stack(
         [
-            np.repeat(np.arange(4), 15),  # 60 rows, 4 unique -> categorical
-            rng.normal(size=60),  # continuous -> numerical
+            np.repeat(np.arange(4), 15),
+            rng.normal(size=60),
         ],
     ).astype(np.float32)
 
@@ -195,7 +194,6 @@ def test_generate_synthetic_experiment_keeps_numerical_features_numerical(monkey
         should_plot=False,
     )
 
-    # The bug marked both columns categorical; the numerical one must stay numerical.
     assert 0 in model.categorical_features
     assert 1 not in model.categorical_features
 
