@@ -101,10 +101,28 @@ class GenerateSyntheticDataExperiment(Experiment):
         g.add_legend()
 
     def run(self, tabpfn, **kwargs):
-        """:param tabpfn:
-        :param kwargs:
-            indices: list of indices from X features to use
-        :return:
+        """Generate synthetic data and store it on the experiment instance.
+
+        Args:
+            tabpfn: A ``TabPFNUnsupervisedModel`` used to learn the joint
+                distribution of the selected features and sample synthetic rows.
+            **kwargs: Keyword arguments controlling the run:
+                X: Input data array of shape ``(n_samples, n_features)``.
+                y: Targets (unused for unsupervised generation; may be empty).
+                attribute_names: Column names for every column in ``X``.
+                indices: Column indices of ``X`` to model. Defaults to all columns.
+                categorical_features: Column indices of ``X`` (same index space as
+                    ``indices``) to treat as categorical. Indices not present in
+                    ``indices`` are ignored. Defaults to ``[]``, in which case the
+                    model auto-detects categorical columns at ``fit`` time.
+                temp: Sampling temperature. Defaults to ``1.0``.
+                n_samples: Number of synthetic rows to generate. Defaults to
+                    ``X.shape[0]``.
+                n_permutations: Number of feature-order permutations to average.
+                    Defaults to ``3``.
+                dag: Optional causal DAG passed to the generator.
+                should_plot: Whether to render the pairwise plot. Defaults to
+                    ``True``.
         """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -121,13 +139,15 @@ class GenerateSyntheticDataExperiment(Experiment):
 
             self.X, self.y = X, y
             self.X = self.X[:, indices]
-            old_features_names = attribute_names
             self.feature_names = [attribute_names[i] for i in indices]
-            # generate subset of categorical indices
+            # Caller-supplied categorical columns are given in the original X
+            # column space (same space as ``indices``). Translate them to their
+            # position within the selected subset; columns not in ``indices`` are
+            # ignored. When none are supplied, default to [] so that tabpfn.fit()
+            # auto-detects categoricals via infer_categorical_features().
+            categorical_features = kwargs.get("categorical_features", [])
             categorical_features = [
-                self.feature_names.index(name)
-                for name in old_features_names
-                if name in self.feature_names
+                indices.index(c) for c in categorical_features if c in indices
             ]
             tabpfn.set_categorical_features(categorical_features)
             tabpfn.fit(self.X)
@@ -180,7 +200,8 @@ class GenerateSyntheticDataExperiment(Experiment):
                 )
             self.data = pd.concat([self.data_real, self.data_synthetic])
 
-            self.plot()
+            if kwargs.get("should_plot", True):
+                self.plot()
 
 
 class OutlierDetectionUnsupervisedExperiment(Experiment):
@@ -280,6 +301,30 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
         overwrite_tabpfn_cache=True,
         **kwargs,
     ):
+        """Estimate per-sample outlier scores for the selected features.
+
+        Args:
+            tabpfn: A ``TabPFNUnsupervisedModel`` used to estimate sample density.
+            overwrite_baseline_cache: Unused placeholder kept for API symmetry.
+            overwrite_tabpfn_cache: Unused placeholder kept for API symmetry.
+            **kwargs: Keyword arguments controlling the run:
+                X: Input data array of shape ``(n_samples, n_features)``.
+                y: Targets (unused; may be empty).
+                attribute_names: Column names for every column in ``X``.
+                indices: Column indices of ``X`` to model. Defaults to all columns.
+                categorical_features: Column indices of ``X`` (same index space as
+                    ``indices``) to treat as categorical. Indices not present in
+                    ``indices`` are ignored. Defaults to ``[]``, in which case the
+                    model auto-detects categorical columns at ``fit`` time.
+                n_permutations: Number of feature-order permutations to average.
+                    Defaults to ``3``.
+                should_plot: Whether to render the density plot. Defaults to
+                    ``True``.
+
+        Returns:
+            dict: Mapping with key ``"log_p"`` holding the per-sample log-density
+                (lower values indicate more likely outliers).
+        """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
@@ -291,13 +336,15 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
 
             self.X = X
             self.X = self.X[:, indices]
-            old_features_names = attribute_names
             self.feature_names = [attribute_names[i] for i in indices]
-            # generate subset of categorical indices
+            # Caller-supplied categorical columns are given in the original X
+            # column space (same space as ``indices``). Translate them to their
+            # position within the selected subset; columns not in ``indices`` are
+            # ignored. When none are supplied, default to [] so that tabpfn.fit()
+            # auto-detects categoricals via infer_categorical_features().
+            categorical_features = kwargs.get("categorical_features", [])
             categorical_features = [
-                self.feature_names.index(name)
-                for name in old_features_names
-                if name in self.feature_names
+                indices.index(c) for c in categorical_features if c in indices
             ]
             tabpfn.set_categorical_features(categorical_features)
 
