@@ -136,6 +136,33 @@ def test_generate_synthetic_experiment_translates_original_indices_to_subset():
 
 @pytest.mark.client_compatible
 @pytest.mark.local_compatible
+def test_generate_synthetic_experiment_accepts_array_indices():
+    """Array-typed indices and categorical_features are accepted, not just lists."""
+    X = np.column_stack(
+        [
+            np.random.default_rng(0).normal(size=120),
+            np.repeat(np.arange(4), 30),
+        ],
+    ).astype(np.float32)
+
+    model = _RecordingUnsupervisedModel()
+    experiment = GenerateSyntheticDataExperiment(task_type="unsupervised")
+    experiment.run(
+        tabpfn=model,
+        X=X,
+        y=np.array([]),
+        attribute_names=["numerical", "categorical"],
+        indices=np.array([0, 1]),
+        categorical_features=np.array([1]),
+        n_samples=10,
+        should_plot=False,
+    )
+
+    assert model.categorical_features == [1]
+
+
+@pytest.mark.client_compatible
+@pytest.mark.local_compatible
 def test_outlier_experiment_uses_supplied_categorical_features():
     """OutlierDetection shares the same fix: respect the supplied categorical list."""
     X = torch.tensor(
