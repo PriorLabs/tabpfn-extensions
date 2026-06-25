@@ -1,9 +1,8 @@
 """Tests for the unsupervised experiment wrappers in ``experiments.py``.
 
 These cover the categorical-feature handling of ``GenerateSyntheticDataExperiment``
-and ``OutlierDetectionUnsupervisedExperiment`` (regression test for issue #323,
-where every selected feature was force-marked categorical and numerical columns
-were generated as integers).
+and ``OutlierDetectionUnsupervisedExperiment``: only caller-designated columns are
+treated as categorical, and numerical columns are generated as floats.
 
 The fast tests use a lightweight recording stand-in so they need no TabPFN
 weights; one end-to-end test uses a real model under ``FAST_TEST_MODE=1``.
@@ -56,7 +55,7 @@ class _RecordingUnsupervisedModel:
 @pytest.mark.client_compatible
 @pytest.mark.local_compatible
 def test_generate_synthetic_experiment_uses_supplied_categorical_features():
-    """Only the caller-designated column is marked categorical (issue #323)."""
+    """Only the caller-designated column is marked categorical."""
     X = np.column_stack(
         [
             np.repeat(np.arange(4), 30),
@@ -193,7 +192,7 @@ def test_outlier_experiment_uses_supplied_categorical_features():
 @pytest.mark.client_compatible
 @pytest.mark.local_compatible
 def test_generate_synthetic_experiment_keeps_numerical_features_numerical(monkeypatch):
-    """End-to-end: a numerical column must not be generated as integers (issue #323)."""
+    """End-to-end: a numerical column must not be generated as integers."""
     monkeypatch.setenv("FAST_TEST_MODE", "1")
 
     rng = np.random.default_rng(0)
