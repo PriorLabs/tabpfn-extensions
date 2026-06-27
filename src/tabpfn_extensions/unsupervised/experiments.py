@@ -17,6 +17,28 @@ from tabpfn_extensions.benchmarking import Experiment
 DEFAULT_HEIGHT = 6
 
 
+def _map_categorical_to_subset(categorical_features, indices):
+    """Map categorical column indices (original X space) to selected-subset positions.
+
+    Args:
+        categorical_features: Column indices in the original ``X`` space, or ``None``.
+            Any sequence type (list, tuple, numpy array, torch tensor) is accepted.
+        indices: The selected columns, as a list of ints in subset order.
+
+    Returns:
+        list[int]: Positions within ``indices`` of the selected categorical columns;
+            indices not present in ``indices`` are dropped.
+    """
+    if categorical_features is None:
+        return []
+    subset_position = {col: pos for pos, col in enumerate(indices)}
+    return [
+        subset_position[int(c)]
+        for c in categorical_features
+        if int(c) in subset_position
+    ]
+
+
 class EmbeddingUnsupervisedExperiment(Experiment):
     """This class is used to run experiments on synthetic toy functions."""
 
@@ -100,11 +122,28 @@ class GenerateSyntheticDataExperiment(Experiment):
         g.map_offdiag(sns.scatterplot, s=2, alpha=0.5)
         g.add_legend()
 
-    def run(self, tabpfn, **kwargs):
-        """:param tabpfn:
-        :param kwargs:
-            indices: list of indices from X features to use
-        :return:
+    def run(self, tabpfn, *, categorical_features=None, should_plot=True, **kwargs):
+        """Generate synthetic data and store it on the experiment instance.
+
+        Args:
+            tabpfn: A ``TabPFNUnsupervisedModel`` used to learn the joint
+                distribution of the selected features and sample synthetic rows.
+            categorical_features: Column indices of ``X`` (same index space as
+                ``indices``) to treat as categorical. Indices not present in
+                ``indices`` are ignored. Defaults to ``None``, in which case the
+                model auto-detects categorical columns at ``fit`` time.
+            should_plot: Whether to render the pairwise plot. Defaults to ``True``.
+            **kwargs: Keyword arguments controlling the run:
+                X: Input data array of shape ``(n_samples, n_features)``.
+                y: Targets (unused for unsupervised generation; may be empty).
+                attribute_names: Column names for every column in ``X``.
+                indices: Column indices of ``X`` to model. Defaults to all columns.
+                temp: Sampling temperature. Defaults to ``1.0``.
+                n_samples: Number of synthetic rows to generate. Defaults to
+                    ``X.shape[0]``.
+                n_permutations: Number of feature-order permutations to average.
+                    Defaults to ``3``.
+                dag: Optional causal DAG passed to the generator.
         """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -112,7 +151,7 @@ class GenerateSyntheticDataExperiment(Experiment):
             X, y = copy.deepcopy(kwargs.get("X")), copy.deepcopy(kwargs.get("y"))
             attribute_names = kwargs.get("attribute_names")
 
-            indices = kwargs.get("indices", list(range(X.shape[1])))
+            indices = [int(i) for i in kwargs.get("indices", range(X.shape[1]))]
 
             temp = kwargs.get("temp", 1.0)
             n_samples = kwargs.get("n_samples", X.shape[0])
@@ -121,14 +160,11 @@ class GenerateSyntheticDataExperiment(Experiment):
 
             self.X, self.y = X, y
             self.X = self.X[:, indices]
-            old_features_names = attribute_names
             self.feature_names = [attribute_names[i] for i in indices]
-            # generate subset of categorical indices
-            categorical_features = [
-                self.feature_names.index(name)
-                for name in old_features_names
-                if name in self.feature_names
-            ]
+            categorical_features = _map_categorical_to_subset(
+                categorical_features,
+                indices,
+            )
             tabpfn.set_categorical_features(categorical_features)
             tabpfn.fit(self.X)
 
@@ -180,7 +216,8 @@ class GenerateSyntheticDataExperiment(Experiment):
                 )
             self.data = pd.concat([self.data_real, self.data_synthetic])
 
-            self.plot()
+            if should_plot:
+                self.plot()
 
 
 class OutlierDetectionUnsupervisedExperiment(Experiment):
@@ -278,27 +315,50 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
         tabpfn,
         overwrite_baseline_cache=False,
         overwrite_tabpfn_cache=True,
+        *,
+        categorical_features=None,
+        should_plot=True,
         **kwargs,
     ):
+        """Estimate per-sample outlier scores for the selected features.
+
+        Args:
+            tabpfn: A ``TabPFNUnsupervisedModel`` used to estimate sample density.
+            overwrite_baseline_cache: Unused placeholder kept for API symmetry.
+            overwrite_tabpfn_cache: Unused placeholder kept for API symmetry.
+            categorical_features: Column indices of ``X`` (same index space as
+                ``indices``) to treat as categorical. Indices not present in
+                ``indices`` are ignored. Defaults to ``None``, in which case the
+                model auto-detects categorical columns at ``fit`` time.
+            should_plot: Whether to render the density plot. Defaults to ``True``.
+            **kwargs: Keyword arguments controlling the run:
+                X: Input data array of shape ``(n_samples, n_features)``.
+                y: Targets (unused; may be empty).
+                attribute_names: Column names for every column in ``X``.
+                indices: Column indices of ``X`` to model. Defaults to all columns.
+                n_permutations: Number of feature-order permutations to average.
+                    Defaults to ``3``.
+
+        Returns:
+            dict: Mapping with key ``"log_p"`` holding the per-sample log-density
+                (lower values indicate more likely outliers).
+        """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
             X, _y = copy.deepcopy(kwargs.get("X")), copy.deepcopy(kwargs.get("y"))
             attribute_names = kwargs.get("attribute_names")
 
-            indices = kwargs.get("indices", list(range(X.shape[1])))
+            indices = [int(i) for i in kwargs.get("indices", range(X.shape[1]))]
             n_permutations = kwargs.get("n_permutations", 3)
 
             self.X = X
             self.X = self.X[:, indices]
-            old_features_names = attribute_names
             self.feature_names = [attribute_names[i] for i in indices]
-            # generate subset of categorical indices
-            categorical_features = [
-                self.feature_names.index(name)
-                for name in old_features_names
-                if name in self.feature_names
-            ]
+            categorical_features = _map_categorical_to_subset(
+                categorical_features,
+                indices,
+            )
             tabpfn.set_categorical_features(categorical_features)
 
             tabpfn.fit(self.X)
@@ -314,7 +374,7 @@ class OutlierDetectionUnsupervisedExperiment(Experiment):
                 columns=["log_p", "log_p_rank", *self.feature_names],
             )
 
-            if kwargs.get("should_plot", True):
+            if should_plot:
                 try:
                     # We don't need to import the module directly here
                     # since plot_two() will do the import
