@@ -15,7 +15,7 @@ jobs:
     name: Changelog entry
     if: >-
       github.event_name == 'pull_request' &&
-      github.actor != 'dependabot[bot]' &&
+      !startsWith(github.head_ref, 'dependabot/') &&
       !startsWith(github.head_ref, 'release/v')
     runs-on: ubuntu-latest
     steps:
