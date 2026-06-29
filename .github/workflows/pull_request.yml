@@ -123,7 +123,80 @@ jobs:
 
       - name: Save model cache
         if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true
+
+  test_gpu:
+    name: Test on GPU
+    # Gate only on linting so this runs in parallel with test_compatibility.
+    # The GPU runner is the expensive/scarce tier; linting is a ~seconds-long
+    # cheap guard that avoids spinning it up for obviously broken PRs.
+    needs: check_python_linting
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.10"
+            dependency-set: lowest-direct
+          - python-version: "3.13"
+            dependency-set: highest
+
+    runs-on: ubuntu-22.04-4core-gpu
+
+    env:
+      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras --group ci --resolution ${{ matrix.dependency-set }}
+
+      - name: Restore model cache
+        id: restore-model-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ github.workspace }}/model_cache
+          # This cache read will always fail as the model_cache directory is empty.
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          restore-keys: |
+            model-cache-
+          enableCrossOsArchive: true
+
+      # Download all models fails, if there is a missing model that can't be downloaded.
+      - name: Download models from Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
+        run: uv run --no-sync python scripts/download_all_models.py
+
+      - name: Run GPU Test Suite
+        env:
+          CUDA_VISIBLE_DEVICES: "0"
+          # Exclude cpu/mps so TabPFN selects the GPU. The cpu code paths are
+          # already covered by the test_compatibility job.
+          TABPFN_EXCLUDE_DEVICES: "cpu,cpu:0,mps"
+        run: |
+          FAST_TEST_MODE=1 uv run --no-sync pytest tests/
+
+      - name: Save model cache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/model_cache
           key: model-cache-${{ hashFiles('model_cache/**') }}
