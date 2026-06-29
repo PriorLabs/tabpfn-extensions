@@ -81,7 +81,7 @@ jobs:
 
       - name: Restore model cache
         id: restore-model-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/model_cache
           # This cache read will always fail as the model_cache directory is empty.
@@ -169,7 +169,7 @@ jobs:
 
       - name: Restore model cache
         id: restore-model-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/model_cache
           # This cache read will always fail as the model_cache directory is empty.
