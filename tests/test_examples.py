@@ -1,227 +1,231 @@
-"""Test examples to ensure they work as expected.
+"""Run the example files in ``examples/`` and check they work.
 
-This module provides a testing framework for TabPFN example files. It automatically:
-1. Detects all example files in the examples/ directory
-2. Categorizes them as fast, slow, or large dataset examples
-3. Runs fast examples normally
-4. Tests slow examples with a short timeout (expecting timeout as success)
-5. Skips large dataset examples entirely unless explicitly requested
-6. Handles backend compatibility for TabPFN package vs. TabPFN client
+Each example is executed as a subprocess. The outcome is interpreted with one
+of two policies, selected per CI layer:
+
+* **Per-PR smoke (default):** each example gets a short timeout. An example that
+  *errors* fails the test; one that simply doesn't finish in time *passes* — we
+  only assert it starts and runs without crashing. This is a fast, cheap guard
+  against broken example scripts and import errors.
+* **Weekly full run (``--example-strict``):** a longer timeout, and a normal
+  example that doesn't finish is a *failure* — i.e. we assert it actually runs
+  to completion. Examples explicitly marked long-running (``LONG_RUNNING``) are
+  still allowed to time out even here, since they cannot complete in CI by
+  design; we still run them to catch import/startup errors.
+
+Regardless of policy:
+* An example that needs an optional dependency which isn't installed is
+  **skipped** (not failed).
+* A GPU-only example is **skipped** when no CUDA device is available (some
+  examples exceed TabPFN's CPU sample guard and only run on a GPU).
 
 Usage:
-    # Run only fast examples:
-    FAST_TEST_MODE=1 python -m pytest tests/test_examples.py
+    # Per-PR smoke (short timeout; not finishing is OK):
+    uv run --no-sync pytest tests/test_examples.py --run-examples \
+        --example-timeout 120
 
-    # Run all examples except large dataset ones (slow ones will timeout and be marked as xfail):
-    FAST_TEST_MODE=1 python -m pytest tests/test_examples.py --run-examples
-
-    # Run specific example, even if it's a large dataset example:
-    python -m pytest tests/test_examples.py::test_example[large_datasets_example.py] --run-examples
+    # Weekly full run (long timeout; a normal example not finishing fails):
+    uv run --no-sync pytest tests/test_examples.py --run-examples \
+        --example-strict --example-timeout 600 --example-long-timeout 120
 """
 
 from __future__ import annotations
 
 import importlib.util
 import os
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-# Enable test mode to make examples run faster
+# Enable test mode so examples shrink their workload where they support it.
 os.environ["TEST_MODE"] = "1"
+
+# Directories whose examples need the full TabPFN package (won't work with the
+# TabPFN client).
+REQUIRES_TABPFN_DIRS = ["embedding/"]
+
+# Examples needing a module that is intentionally never installed, so they skip
+# (rather than fail) when it is absent. Reserved for the GPL-excluded case:
+# scikit-survival is in no extra or group, so survival_example always skips unless
+# the user installs it manually. (Other example deps -- shapiq, shap, hyperopt, ... --
+# are installed via --all-extras / the "examples" group and are expected to be present.)
+REQUIRES_MODULE = {
+    "survival_example.py": "sksurv",
+}
+
+# Examples that exceed TabPFN's CPU sample guard and only run on a GPU.
+# Skipped when no CUDA device is available.
+GPU_ONLY = {
+    "get_embeddings.py",
+}
+
+# Examples that cannot complete within any CI time budget by design (e.g. PHE's
+# hard-coded ``max_time``). A timeout is NOT a failure for these, even in strict
+# mode; we still run them to catch import/startup errors.
+LONG_RUNNING = {
+    "phe_example.py",
+}
+
+# Examples known to be broken against current dependencies, with a tracking issue.
+# xfailed so the suite stays green while the breakage is documented; when the
+# upstream fix lands the example will start passing (reported as XPASS) and the
+# entry should be removed.
+KNOWN_BROKEN = {
+    # TabEBM relies on tabpfn.config.ModelInterfaceConfig / PREPROCESS_TRANSFORMS,
+    # removed/renamed in TabPFN's inference_config API -> import error.
+    "tabebm_augment_real_world_data.py": (
+        "TabEBM is broken with current TabPFN; see "
+        "https://github.com/PriorLabs/tabpfn-extensions/issues/225"
+    ),
+}
+
+
+def _example_params() -> list:
+    """Build the parametrize values, xfailing known-broken examples."""
+    params = []
+    for example_file in get_example_files():
+        marks = []
+        reason = KNOWN_BROKEN.get(example_file["name"])
+        if reason is not None:
+            # Non-strict: in smoke mode a timeout counts as a pass, so a partially
+            # fixed example could XPASS without truly being fixed -- don't fail the
+            # suite on that, just surface it as XPASS for follow-up.
+            marks.append(pytest.mark.xfail(reason=reason, strict=False))
+        params.append(
+            pytest.param(example_file, marks=marks, id=example_file["name"]),
+        )
+    return params
 
 
 def get_example_files() -> list[dict]:
-    """Get all Python files from the examples directory with metadata.
-
-    Each example is categorized as:
-    - fast: Can run quickly (runs in both normal and fast test mode)
-    - slow: Takes longer to run (runs with a 1-second timeout, expected to timeout)
-    - always_timeout: Examples with large datasets that are always skipped unless explicitly requested
-    - requires_tabpfn: If True, requires the full TabPFN package and won't work with client;
-                       if False, works with either TabPFN package or TabPFN client
-
-    Returns:
-        List of dictionaries containing example file info
-    """
+    """Discover example files and attach the metadata the runner needs."""
     package_root = Path(__file__).parent.parent
     examples_dir = package_root / "examples"
 
-    # The only example that runs fast enough for CI
-    FAST_EXAMPLES = []
-
-    # These directories/files need the full TabPFN package and won't work with client
-    REQUIRES_TABPFN_DIRS = ["embedding/"]
-
-    # Large dataset examples are always expected to timeout,
-    # even if --run-examples is provided
-    ALWAYS_TIMEOUT_PATTERNS = ["large_datasets_example.py"]
-
-    # Find all Python files in the examples directory
-    all_file_paths = list(examples_dir.glob("**/*.py"))
-    all_files = []
-
-    # Process each file with appropriate metadata
-    for file_path in all_file_paths:
+    files = []
+    for file_path in sorted(examples_dir.glob("**/*.py")):
         rel_path = str(file_path.relative_to(package_root))
-        file_name = file_path.name
-
-        file_info = {
-            "path": file_path,
-            "name": file_name,
-            # Default classification - most examples work with both implementations
-            "requires_tabpfn": False,  # By default, examples work with either implementation
-            "fast": file_name in FAST_EXAMPLES,  # Only listed examples are fast
-            "slow": file_name not in FAST_EXAMPLES,  # All others are slow
-            "always_timeout": any(
-                pattern in file_name for pattern in ALWAYS_TIMEOUT_PATTERNS
-            ),
-            "timeout": 1
-            if file_name not in FAST_EXAMPLES
-            else 30,  # Short timeout for slow examples
-        }
-
-        # Check if example requires full TabPFN package
-        if any(pattern in rel_path for pattern in REQUIRES_TABPFN_DIRS):
-            # Example explicitly requires TabPFN package
-            file_info["requires_tabpfn"] = True
-
-        all_files.append(file_info)
-
-    return all_files
+        name = file_path.name
+        files.append(
+            {
+                "path": file_path,
+                "name": name,
+                "requires_tabpfn": any(
+                    pattern in rel_path for pattern in REQUIRES_TABPFN_DIRS
+                ),
+                "requires_module": REQUIRES_MODULE.get(name),
+                "gpu_only": name in GPU_ONLY,
+                "long": name in LONG_RUNNING,
+            },
+        )
+    return files
 
 
-def import_module_from_path(path: Path, timeout: int = None) -> object:
-    """Dynamically import a Python module from a file path.
+def _cuda_available() -> bool:
+    """Whether a CUDA device is visible to torch (best-effort)."""
+    try:
+        import torch
 
-    Args:
-        path: Path to the Python file to import
-        timeout: Optional timeout parameter (no longer used internally, kept for backward compatibility)
-
-    Returns:
-        The imported module object
-    """
-    # Add the parent directory to sys.path to allow imports within example files
-    parent_dir = str(path.parent)
-    if parent_dir not in sys.path:
-        sys.path.insert(0, parent_dir)
-
-    # Import the module
-    spec = importlib.util.spec_from_file_location(path.stem, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+        return torch.cuda.is_available()
+    except Exception:  # noqa: BLE001
+        return False
 
 
 @pytest.mark.example
-@pytest.mark.parametrize("example_file", get_example_files(), ids=lambda x: x["name"])
+@pytest.mark.parametrize("example_file", _example_params())
 def test_example(request, example_file):
-    """Run example files to ensure they work as expected.
-
-    Test strategy:
-    1. Fast examples are run with normal timeout
-    2. Slow examples are run with 1-second timeout, expected to timeout
-    3. Examples are skipped if they require missing backends
-    4. In FAST_TEST_MODE, only fast examples and examples with --run-examples flag run
+    """Run a single example file as a subprocess and check the outcome.
 
     Args:
-        request: PyTest request fixture
-        example_file: Dictionary with example file metadata
+        request: PyTest request fixture.
+        example_file: Dictionary with example file metadata.
     """
     from conftest import HAS_TABPFN, TABPFN_SOURCE
 
-    file_name = example_file["name"]
-    file_path = example_file["path"]
+    name = example_file["name"]
+    path = example_file["path"]
 
-    run_examples = request.config.getoption("--run-examples")
+    if not request.config.getoption("--run-examples"):
+        pytest.skip(f"Skipping {name} since --run-examples not set")
 
-    if not run_examples:
-        pytest.skip(
-            f"Skipping {file_name} since --run-examples not set",
-        )
-
-    # Skip if backend not available
+    # Backend availability
     if example_file["requires_tabpfn"]:
         if not HAS_TABPFN:
             pytest.skip(
-                f"Example {file_name} requires TabPFN package, but it's not installed",
+                f"Example {name} requires the TabPFN package, which is not installed",
             )
-        elif TABPFN_SOURCE == "tabpfn_client":
+        if TABPFN_SOURCE == "tabpfn_client":
             pytest.skip(
-                f"Example {file_name} requires TabPFN package, not compatible with client",
+                f"Example {name} requires the TabPFN package, not the client",
             )
+
+    # Optional dependency not installed -> skip (not a failure)
+    required_module = example_file["requires_module"]
+    if required_module and importlib.util.find_spec(required_module) is None:
+        pytest.skip(
+            f"Example {name} requires '{required_module}', which is not installed"
+        )
+
+    # GPU-only example with no CUDA device -> skip
+    if example_file["gpu_only"] and not _cuda_available():
+        pytest.skip(
+            f"Example {name} requires a CUDA device (exceeds TabPFN's CPU sample limit)",
+        )
+
+    strict = request.config.getoption("--example-strict")
+    if example_file["long"]:
+        timeout = request.config.getoption("--example-long-timeout")
+    else:
+        timeout = request.config.getoption("--example-timeout")
+
+    # Examples are top-to-bottom scripts; run each in its own process so a hang
+    # can be killed cleanly and state never leaks between examples. The example
+    # inherits TEST_MODE/FAST_TEST_MODE/TABPFN_EXCLUDE_DEVICES from this process.
+    env = dict(os.environ)
+    env["TEST_MODE"] = "1"
+    # Prepend the in-repo src/ so the example subprocess imports this checkout's
+    # tabpfn_extensions, not some other installed copy (and works even if the
+    # package isn't installed in editable mode).
+    src_dir = str(Path(__file__).parent.parent / "src")
+    env["PYTHONPATH"] = (
+        f"{src_dir}{os.pathsep}{env['PYTHONPATH']}"
+        if env.get("PYTHONPATH")
+        else src_dir
+    )
 
     try:
-        # Handle slow examples (including large datasets) differently
-        if example_file.get("slow", False) or example_file.get("always_timeout", False):
-            # For slow examples, we'll run them with a short internal timeout
-            # and expect them to be interrupted
-            import threading
+        proc = subprocess.run(  # noqa: S603 - trusted, repo-local example scripts
+            [sys.executable, str(path)],
+            cwd=str(path.parent),
+            env=env,
+            timeout=timeout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        if example_file["long"]:
+            print(
+                f"{name}: ran {timeout}s without error "
+                f"(long-running; not run to completion by design)",
+            )
+            return
+        if strict:
+            pytest.fail(f"Example {name} did not finish within {timeout}s")
+        print(
+            f"{name}: ran {timeout}s without error "
+            f"(smoke mode; completion not verified)",
+        )
+        return
 
-            def run_with_timeout(path, max_time=5):
-                """Run import with a timeout using threading approach."""
-                result = {"completed": False, "exception": None}
-
-                def target():
-                    try:
-                        # Import the module
-                        spec = importlib.util.spec_from_file_location(path.stem, path)
-                        module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(module)
-                        result["completed"] = True
-                    except Exception as e:  # noqa: BLE001
-                        result["exception"] = e
-
-                # Start the import in a separate thread
-                thread = threading.Thread(target=target)
-                thread.daemon = (
-                    True  # Daemon threads are killed when the main thread exits
-                )
-                thread.start()
-
-                # Wait for the thread to complete or timeout
-                thread.join(timeout=max_time)
-
-                return result
-
-            # Add parent directory to path
-            parent_dir = str(file_path.parent)
-            if parent_dir not in sys.path:
-                sys.path.insert(0, parent_dir)
-
-            # Run with a 5 second timeout
-            run_result = run_with_timeout(file_path, max_time=5)
-
-            if run_result["completed"]:
-                # If it completed within the timeout, that's fine
-                print(
-                    f"Note: Slow example {file_name} completed successfully within 5 seconds",
-                )
-            elif run_result["exception"]:
-                # If it failed for reasons other than timeout
-                pytest.xfail(f"Example {file_name} failed: {run_result['exception']}")
-            else:
-                # Expected timeout after running for 5 seconds
-                pytest.xfail(
-                    f"Example {file_name} ran for 5 seconds and was stopped as expected",
-                )
-        else:
-            # Fast examples should complete normally
-            import_module_from_path(file_path, timeout=None)
-    except TimeoutError as e:
-        # Unexpected timeout in fast examples is a failure
-        pytest.fail(f"Example {file_name} timed out: {e!s}")
-
-
-def pytest_addoption(parser):
-    """Add command-line options to pytest."""
-    parser.addoption(
-        "--run-examples",
-        action="store_true",
-        default=False,
-        help="Run all example files (including slow ones that will be expected to timeout)",
-    )
+    if proc.returncode != 0:
+        output = (proc.stdout or b"").decode("utf-8", "replace")
+        tail = "\n".join(output.strip().splitlines()[-100:])
+        pytest.fail(
+            f"Example {name} exited with code {proc.returncode}:\n{tail}",
+        )
 
 
 if __name__ == "__main__":
