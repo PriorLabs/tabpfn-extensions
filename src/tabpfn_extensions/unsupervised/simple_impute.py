@@ -120,14 +120,14 @@ def simple_impute(
         # available and it can predict that many classes; otherwise fall back to
         # the regressor (mirrors TabPFNUnsupervisedModel's routing).
         use_clf = col in categorical_features
-        if use_clf and tabpfn_clf is not None:
+        if use_clf:
+            if tabpfn_clf is None:
+                tabpfn_clf = TabPFNClassifier()
             max_classes = get_max_num_classes(tabpfn_clf)
             n_unique = len(np.unique(X[~np.isnan(X[:, col]), col]))
             use_clf = max_classes is None or n_unique <= max_classes
 
         if use_clf:
-            if tabpfn_clf is None:
-                tabpfn_clf = TabPFNClassifier()
             impute_column(X, col, tabpfn_clf, classification=True)
         else:
             if tabpfn_reg is None:
