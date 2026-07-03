@@ -75,3 +75,25 @@ original_values = X_test[original_nan_mask]
 
 mse = np.mean((imputed_values - original_values) ** 2)
 print(f"Mean Squared Error of imputed values vs. original values: {mse:.4f}")
+
+# --- 6. Alternative: the simple, transductive imputer ---
+# `simple_impute` is a lightweight alternative that needs no separate fit step.
+# For each column with missing values it fits a TabPFN model on the rows where
+# that column is observed (using all other columns as features) and predicts the
+# missing rows. Here we hand it the training rows stacked on top of the test rows
+# so it has the (complete) training data as additional context.
+# thus when predicting each column it can have a larger context and thus
+# higher accuracy
+
+from tabpfn_extensions.unsupervised import simple_impute
+
+print("\nImputing the same data with simple_impute...")
+X_merged_missing = np.vstack([X_train, X_test_missing])
+X_merged_imputed = simple_impute(X_merged_missing, tabpfn_reg=reg, tabpfn_clf=clf)
+
+# Recover the imputed test rows and score them the same way as above.
+X_test_imputed_simple = X_merged_imputed[len(X_train) :]
+imputed_values_simple = X_test_imputed_simple[original_nan_mask]
+
+mse_simple = np.mean((imputed_values_simple - original_values) ** 2)
+print(f"[simple_impute] Mean Squared Error vs. original values: {mse_simple:.4f}")
