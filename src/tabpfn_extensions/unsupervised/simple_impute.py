@@ -65,9 +65,13 @@ def impute_column(
     Returns:
         np.ndarray: ``X`` with column ``col`` filled (mutated in place and returned).
     """
-    features = [c for c in range(X.shape[1]) if c != col]
     missing = np.isnan(X[:, col])
+    if not missing.any():
+        return X
+    if missing.all():
+        raise ValueError(f"Column {col} is entirely NaN and cannot be imputed.")
 
+    features = [c for c in range(X.shape[1]) if c != col]
     # context = rows where the target column is observed (real labels)
     # query   = rows where the target column is missing
     X_ctx, y_ctx = X[~missing][:, features], X[~missing, col]
