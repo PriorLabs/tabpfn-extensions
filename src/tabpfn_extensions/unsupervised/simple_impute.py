@@ -12,8 +12,10 @@ is observed, and predict the rows where it is missing.
 Unlike the permutation-ensembled approach in :mod:`unsupervised`, this does a
 single ``fit`` + ``predict`` per column with missing values. It is transductive:
 it takes one table and figures out reference vs. query rows itself, so no
-separate complete reference set is required. Columns are imputed in place, so a
-column filled earlier is available as a feature when imputing later columns.
+separate complete reference set is required. By default each column is imputed
+using only the original observed data, so the result is independent of column
+order; pass ``use_imputed=True`` for chained, left-to-right imputation where a
+column filled earlier feeds into later columns.
 
 This module intentionally depends only on ``numpy`` and the package's own model
 helpers — not on :class:`TabPFNUnsupervisedModel`.
@@ -87,15 +89,14 @@ def simple_impute(
     tabpfn_clf: object | None = None,
     tabpfn_reg: object | None = None,
     categorical_features: list[int] | None = None,
+    use_imputed: bool = False,
 ) -> np.ndarray:
     """Impute all missing values (``np.nan``) in ``X``, one column at a time.
 
     For each column that contains missing values, fit a TabPFN model on the rows
     where that column is observed and predict the missing rows, using all other
     columns as features. Numerical columns use a regressor; categorical columns
-    use a classifier. The imputation is done in place across columns, so an
-    earlier-imputed column is used as a feature for later ones.
-    Colums are imputed left to right, if needed, change column order beforehand.
+    use a classifier.
 
     Parameters:
         X: Data of shape ``(n_samples, n_features)`` with missing values encoded
@@ -107,6 +108,15 @@ def simple_impute(
             ``TabPFNClassifier()`` when needed.
         categorical_features: Indices of categorical columns. If None, they are
             inferred from the data.
+        use_imputed: How to treat already-imputed columns when imputing later
+            ones.
+
+            * ``False`` (default): every column is imputed using only the
+              *original* observed data as features, so the result does not depend
+              on column order.
+            * ``True``: columns are filled left to right in place, so a column
+              imputed earlier is used as a feature for later columns (chained;
+              order-dependent).
 
     Returns:
         np.ndarray: A new array with all missing values imputed.
@@ -115,6 +125,13 @@ def simple_impute(
     n_features = X.shape[1]
 
     categorical_features = infer_categorical_features(X, categorical_features)
+
+    # X stays the frozen feature source. Results are collected into X_imputed.
+    # With use_imputed=True we fill X_imputed in place so later columns see
+    # earlier imputations; with use_imputed=False we impute each column on a
+    # throwaway copy of the original and keep only that column, so the feature
+    # source never changes and the outcome is independent of column order.
+    X_imputed = X.copy()
 
     for col in range(n_features):
         if not np.isnan(X[:, col]).any():
@@ -132,10 +149,20 @@ def simple_impute(
             use_clf = max_classes is None or n_unique <= max_classes
 
         if use_clf:
-            impute_column(X, col, tabpfn_clf, classification=True)
+            model, classification = tabpfn_clf, True
         else:
             if tabpfn_reg is None:
                 tabpfn_reg = TabPFNRegressor()
-            impute_column(X, col, tabpfn_reg)
+            model, classification = tabpfn_reg, False
 
-    return X
+        if use_imputed:
+            # Chained: read features from and write into the same accumulating array.
+            impute_column(X_imputed, col, model, classification=classification)
+        else:
+            # Independent: impute on a fresh copy of the original data and keep
+            # only this column, leaving the feature source (X) untouched.
+            col_work = X.copy()
+            impute_column(col_work, col, model, classification=classification)
+            X_imputed[:, col] = col_work[:, col]
+
+    return X_imputed
