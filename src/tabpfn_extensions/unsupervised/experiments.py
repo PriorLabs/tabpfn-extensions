@@ -126,7 +126,7 @@ class GenerateSyntheticDataExperiment(Experiment):
         """Generate synthetic data and store it on the experiment instance.
 
         The synthetic data is stored on the following instance property:
-            - synthetic_X: array of generated data, shape (n_samples, n_features)
+            - synthetic_X: array with shape (n_samples, n selected columns)
         The following properties are also set
             - data_real: input X data as a DataFrame, potentially resampled
             - data_synthetic: synthetic_X as a DataFrame, potentially resampled
