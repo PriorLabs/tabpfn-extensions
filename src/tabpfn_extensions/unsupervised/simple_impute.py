@@ -122,6 +122,10 @@ def simple_impute(
         np.ndarray: A new array with all missing values imputed.
     """
     X = np.array(X, dtype=np.float32, copy=True)
+    if X.shape[1] < 2:
+        raise ValueError(
+            "Input data X must have at least 2 columns to perform imputation."
+        )
     n_features = X.shape[1]
 
     categorical_features = infer_categorical_features(X, categorical_features)

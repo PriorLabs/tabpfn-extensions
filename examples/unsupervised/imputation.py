@@ -80,7 +80,7 @@ model_unsupervised.fit(X_train)
 print("Imputing missing values by sampling from the model...")
 X_imputed_tensor = model_unsupervised.impute(
     X_test_missing,
-    n_permutations=5,  # Fewer permutations for a quicker example
+    n_permutations=1,  # Model uses n_estimators=8 by default
 )
 
 n_missing_after = torch.isnan(X_imputed_tensor).sum().item()
