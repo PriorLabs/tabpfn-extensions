@@ -202,6 +202,60 @@ jobs:
           key: model-cache-${{ hashFiles('model_cache/**') }}
           enableCrossOsArchive: true
 
+  example_smoke:
+    name: Example smoke (CPU)
+    # Fast smoke gate for the scripts in examples/. Each example runs as a
+    # subprocess; the test fails only if it *errors*. An example that doesn't
+    # finish within the timeout still passes -- we only assert it starts and runs
+    # without crashing. Running every example to completion (timeout = failure) is
+    # the job of the scheduled GPU run; see PRI-330.
+    runs-on: ubuntu-latest
+    env:
+      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      # Highest resolution on purpose: examples are user-facing tutorials, so we
+      # test them against the deps a fresh install gets. The "examples" group adds
+      # shap (used only by shap_example.py for plotting).
+      - name: Install dependencies
+        run: uv sync --all-extras --group examples --group ci
+
+      - name: Restore model cache
+        id: restore-model-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          restore-keys: |
+            model-cache-
+          enableCrossOsArchive: true
+
+      - name: Download models from Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
+        run: uv run --no-sync python scripts/download_all_models.py
+
+      # Smoke mode (no --example-strict): a timeout is a pass. -n auto runs the
+      # examples in parallel to keep wall-clock down.
+      - name: Run example smoke tests
+        env:
+          TABPFN_EXCLUDE_DEVICES: mps
+        run: |
+          FAST_TEST_MODE=1 uv run --no-sync pytest tests/test_examples.py \
+            --run-examples -n auto --example-timeout 120
+
   build_verify:
     name: Build wheel + sdist
     runs-on: ubuntu-latest

@@ -38,6 +38,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import torch
 
 # Enable test mode so examples shrink their workload where they support it.
 os.environ["TEST_MODE"] = "1"
@@ -123,16 +124,6 @@ def get_example_files() -> list[dict]:
     return files
 
 
-def _cuda_available() -> bool:
-    """Whether a CUDA device is visible to torch (best-effort)."""
-    try:
-        import torch
-
-        return torch.cuda.is_available()
-    except Exception:  # noqa: BLE001
-        return False
-
-
 @pytest.mark.example
 @pytest.mark.parametrize("example_file", _example_params())
 def test_example(request, example_file):
@@ -169,7 +160,7 @@ def test_example(request, example_file):
         )
 
     # GPU-only example with no CUDA device -> skip
-    if example_file["gpu_only"] and not _cuda_available():
+    if example_file["gpu_only"] and not torch.cuda.is_available():
         pytest.skip(
             f"Example {name} requires a CUDA device (exceeds TabPFN's CPU sample limit)",
         )
@@ -185,15 +176,6 @@ def test_example(request, example_file):
     # inherits TEST_MODE/FAST_TEST_MODE/TABPFN_EXCLUDE_DEVICES from this process.
     env = dict(os.environ)
     env["TEST_MODE"] = "1"
-    # Prepend the in-repo src/ so the example subprocess imports this checkout's
-    # tabpfn_extensions, not some other installed copy (and works even if the
-    # package isn't installed in editable mode).
-    src_dir = str(Path(__file__).parent.parent / "src")
-    env["PYTHONPATH"] = (
-        f"{src_dir}{os.pathsep}{env['PYTHONPATH']}"
-        if env.get("PYTHONPATH")
-        else src_dir
-    )
 
     try:
         proc = subprocess.run(  # noqa: S603 - trusted, repo-local example scripts

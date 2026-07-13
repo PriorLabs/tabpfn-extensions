@@ -56,11 +56,8 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 
 [project.optional-dependencies]
 interpretability = [
-    # 1.2.0 is the lowest release providing every shapiq feature this package
-    # uses: `class_index` on TabularExplainer/Explainer (added in 1.1.1) and
-    # `shapiq.TabPFNExplainer` (added in 1.2.0, used by get_tabpfn_explainer).
-    # With the old `>=1.1.0` floor, CI's lowest-direct resolution installed
-    # 1.1.0 and the examples crashed (missing class_index / TabPFNExplainer).
+    # 1.2.0 is the first release with shapiq.TabPFNExplainer (get_tabpfn_explainer)
+    # and class_index on TabularExplainer.
     "shapiq>=1.2.0",
     "seaborn>=0.12.2",
 ]
@@ -108,13 +105,8 @@ dev = [
 # not need these, only the example demos do, and the examples ship in the repo (not
 # the wheel), so anyone running them works from a clone where this group is available.
 examples = [
-    # interpretability/shap_example.py bridges shapiq values into a shap.Explanation
-    # purely for plotting (shap.summary_plot / shap.plots.*). The library dropped shap
-    # as a runtime dep in #283 (RES-1467) since shapiq supersedes the adapter; it
-    # survives only as an example plotting convenience.
-    # Floor is 0.46.0, not the older 0.41.0: 0.41.0 pins an ancient numba (0.47.0)
-    # with no cp310+ wheel, which fails to build from source. 0.46.0 leaves numba
-    # unconstrained so a modern, wheel-backed numba is used.
+    # Only used by interpretability/shap_example.py for plotting.
+    # Floor is 0.46.0 (0.41.0 pins an unbuildable numba).
     "shap>=0.46.0",
 ]
 
