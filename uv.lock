@@ -21,6 +21,13 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[options]
+exclude-newer = "2026-07-06T12:10:48.17113352Z"
+exclude-newer-span = "P7D"
+
+[options.exclude-newer-package]
+torch = false
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.4"
@@ -3485,7 +3492,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.6.0" },
     { name = "scipy", specifier = ">=1.11.1" },
     { name = "seaborn", marker = "extra == 'interpretability'", specifier = ">=0.12.2" },
-    { name = "setuptools", marker = "extra == 'hpo'", specifier = ">=67.0.0,<82" },
+    { name = "setuptools", marker = "extra == 'hpo'", specifier = ">=67.0.0,<84" },
     { name = "shapiq", marker = "extra == 'interpretability'", specifier = ">=1.1.0" },
     { name = "tabpfn", specifier = ">=8.0.0" },
     { name = "tabpfn-common-utils", extras = ["telemetry-interactive"], specifier = ">=0.2.13" },
