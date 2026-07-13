@@ -102,6 +102,10 @@ dev = [
     "twine>=6.2.0",
 ]
 
+[tool.uv]
+exclude-newer = "7 days"
+exclude-newer-package = {torch = false}
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]  # Where the tests are located
 minversion = "8.0"
