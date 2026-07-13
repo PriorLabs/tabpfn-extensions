@@ -15,6 +15,8 @@ Key features:
 - Compatibility with both TabPFN and TabPFN-client backends
 - Support for mixed data types (categorical and numerical features)
 - Flexible permutation-based approach for feature dependencies
+- Optional Directed Acyclic Graph (DAG) of inter-feature dependencies for
+  causally-informed synthesis / imputation
 
 Example usage:
     ```python
@@ -43,6 +45,7 @@ from __future__ import annotations
 import copy
 import os
 import random
+from graphlib import CycleError, TopologicalSorter
 from typing import Any
 
 import numpy as np
@@ -56,8 +59,40 @@ from tqdm import tqdm
 from tabpfn_extensions.utils import (  # type: ignore
     TabPFNClassifier,
     TabPFNRegressor,
+    get_max_num_classes,
     infer_categorical_features,
 )
+
+
+def _resolve_dag_order(
+    dag: dict[int, list[int]],
+    all_features: list[int],
+) -> tuple[list[int], dict[int, list[int]]]:
+    """Topologically order ``all_features`` according to ``dag``.
+
+    Returns ``(ordered, full_dag)`` where ``ordered`` is a permutation of
+    ``all_features`` consistent with the DAG, and ``full_dag`` is a copy of
+    ``dag`` with empty dependency lists filled in for any feature not present
+    as a key.
+
+    The caller's ``dag`` is **not** mutated. On a cyclic graph we raise
+    ``ValueError`` with the cycle path embedded in the message — easier for a
+    user to debug than the raw stdlib ``CycleError`` traceback.
+    """
+    valid = set(all_features)
+    unknown = (set(dag) | {p for parents in dag.values() for p in parents}) - valid
+    if unknown:
+        raise ValueError(
+            f"DAG references unknown feature indices {sorted(unknown)}; "
+            f"valid indices are {sorted(valid)}.",
+        )
+    full_dag = {i: list(dag.get(i, [])) for i in all_features}
+    try:
+        ordered = list(TopologicalSorter(full_dag).static_order())
+    except CycleError as exc:
+        cycle = exc.args[1] if len(exc.args) > 1 else exc.args[0]
+        raise ValueError(f"DAG contains a cycle through features: {cycle}") from exc
+    return ordered, full_dag
 
 
 class TabPFNUnsupervisedModel(BaseEstimator):
@@ -112,12 +147,18 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 TabPFNRegressor instance for handling numerical features.
 
         Raises:
-            AssertionError
+            ValueError
                 If both tabpfn_clf and tabpfn_reg are None.
         """
-        assert not (
-            tabpfn_clf is None and tabpfn_reg is None
-        ), "You cannot set both `tabpfn_clf` and `tabpfn_reg` to None. You can set one to None, if your table exclusively consists of categoricals/numericals."
+        # A raise (not assert) so the check survives `python -O`. One may be
+        # None when the table is exclusively categorical/numerical; if a
+        # missing model is later actually needed, ``density_`` raises a clear
+        # error pointing at the column that needs it.
+        if tabpfn_clf is None and tabpfn_reg is None:
+            raise ValueError(
+                "At least one of `tabpfn_clf` or `tabpfn_reg` must be provided; "
+                "both are None.",
+            )
 
         self.tabpfn_clf = tabpfn_clf
         self.tabpfn_reg = tabpfn_reg
@@ -270,6 +311,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         t: float = 0.000000001,
         n_permutations: int = 10,
         condition_on_all_features: bool = True,
+        dag: dict[int, list[int]] | None = None,
         fast_mode: bool = False,
     ) -> torch.Tensor:
         """Impute missing values (np.nan) in X by sampling all cells independently from the trained models.
@@ -283,11 +325,22 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 Number of permutations to use for imputation
             condition_on_all_features: bool, default=True
                 Whether to condition on all other features (True) or only previous features (False)
+            dag: dict[int, list[int]] | None, default=None
+                Optional Directed Acyclic Graph mapping each column index to its
+                list of parent column indices (i.e. the features it depends on).
+                When provided, columns are imputed in topological order and each
+                column is conditioned on exactly its DAG parents. Mutually
+                exclusive with ``condition_on_all_features=True``. Features
+                absent from the dict default to no dependencies.
             fast_mode: bool, default=False
                 Whether to use faster settings for testing
 
         Returns:
             torch.Tensor: Imputed data with missing values replaced
+
+        Raises:
+            ValueError: If ``dag`` is combined with ``condition_on_all_features=True``,
+                or if ``dag`` contains a cycle.
         """
         n_features = X.shape[1]
         all_features = list(range(n_features))
@@ -295,16 +348,32 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X_fit = self.X_
         impute_X = copy.deepcopy(X)
 
+        # When a DAG is supplied, take a local copy (no caller mutation) and a
+        # topological order; iterate parents before children.
+        full_dag: dict[int, list[int]] | None = None
+        topo_order: list[int] | None = None
+        if dag is not None:
+            if condition_on_all_features:
+                raise ValueError(
+                    "`dag` is mutually exclusive with `condition_on_all_features=True`;"
+                    " pass condition_on_all_features=False when supplying a DAG."
+                )
+            topo_order, full_dag = _resolve_dag_order(dag, all_features)
+
         columns_with_nan = [
             col_idx
             for col_idx in all_features
             if torch.isnan(impute_X[:, col_idx]).any()
         ]
+        if topo_order is not None:
+            with_nan_set = set(columns_with_nan)
+            columns_with_nan = [c for c in topo_order if c in with_nan_set]
 
         for column_idx in tqdm(columns_with_nan):
             y_predict = impute_X[:, column_idx]
-
-            if not condition_on_all_features:
+            if full_dag is not None:
+                conditional_idx = full_dag[column_idx]
+            elif not condition_on_all_features:
                 conditional_idx = all_features[:column_idx] if column_idx > 0 else []
             else:
                 conditional_idx = list(set(range(X.shape[1])) - {column_idx})
@@ -464,11 +533,22 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         Returns:
             bool: True if a classifier should be used, False for a regressor
         """
-        # Check if we should use classifier based on feature type and number of unique values
-        max_classes = getattr(self.tabpfn_clf, "max_num_classes_", 10)
-        return (
-            column_idx in self.categorical_features and len(np.unique(y)) < max_classes
-        )
+        is_categorical = column_idx in self.categorical_features
+        if self.tabpfn_clf is None:
+            # No classifier was provided: surface categorical columns so
+            # density_ raises a clear "missing tabpfn_clf" error rather than
+            # silently routing categorical data to the regressor; numerical
+            # columns go to the regressor as usual.
+            return is_categorical
+        # Use the classifier only when both constraints hold:
+        #   (a) the column is categorical, and
+        #   (b) the classifier can actually predict that many classes
+        #       (a TabPFN clf always reports a limit; None means no inherent
+        #       limit, e.g. a non-TabPFN estimator).
+        max_classes = get_max_num_classes(self.tabpfn_clf)
+        # torch.unique stays on-device; np.unique raises on CUDA/MPS tensors.
+        n_unique = torch.unique(y).numel() if torch.is_tensor(y) else len(np.unique(y))
+        return is_categorical and (max_classes is None or n_unique <= max_classes)
 
     def density_(
         self,
@@ -497,6 +577,21 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         # Initialize model if needed
         self.init_model_and_get_model_config()
 
+        # Only rows whose target column is observed can serve as labeled context
+        # for that column. Rows whose target is NaN carry no usable label: they
+        # were previously kept with a fabricated 0 label (see nan_to_num below),
+        # which biases the fit toward 0 and — when the fit data is the same data
+        # being imputed — leaks the query rows into their own training context.
+        # Dropping them addresses both. This is a no-op when the fit data has no
+        # missing targets (e.g. fitting on complete reference data, the
+        # recommended imputation workflow, or outlier detection on complete
+        # data). If the target column is entirely missing there is no signal to
+        # learn from, so we fall back to the previous behaviour rather than
+        # failing the whole call.
+        target_observed = ~torch.isnan(X_fit[:, column_idx])
+        if target_observed.any() and not target_observed.all():
+            X_fit = X_fit[target_observed]
+
         if len(conditional_idx) > 0:
             # If not the first feature, use all previous features
             mask = torch.zeros_like(X_fit).bool()
@@ -511,17 +606,29 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         else:
             # If the first feature, use a zero feature as input
             # Because of preprocessing, we can't use a zero feature, so we use a random feature
+            # dtype override: X_fit/X_predict may be integer tensors (e.g.
+            # categorical-only data), for which randn_like is undefined
             X_fit, y_fit = (
-                torch.randn(X_fit[:, 0:1].shape, dtype=torch.float32),
-                X_fit[:, 0],
+                torch.randn_like(X_fit[:, 0:1], dtype=torch.float32),
+                X_fit[:, column_idx],
             )
-            X_predict, y_predict = torch.randn_like(X_predict[:, 0:1]), X_predict[:, 0]
+            X_predict, y_predict = (
+                torch.randn_like(X_predict[:, 0:1], dtype=torch.float32),
+                X_predict[:, column_idx],
+            )
 
-        model = (
-            self.tabpfn_clf
-            if self.use_classifier_(column_idx, y_fit)
-            else self.tabpfn_reg
-        )
+        use_clf = self.use_classifier_(column_idx, y_fit)
+        model = self.tabpfn_clf if use_clf else self.tabpfn_reg
+        if model is None:
+            needed, estimator = (
+                ("categorical", "tabpfn_clf=TabPFNClassifier(...)")
+                if use_clf
+                else ("numerical", "tabpfn_reg=TabPFNRegressor(...)")
+            )
+            raise ValueError(
+                f"Column {column_idx} needs the {needed} model, but it was not "
+                f"provided. Pass `{estimator}` to TabPFNUnsupervisedModel.",
+            )
         # Handle potential nan values in y_fit
         y_fit_np = y_fit.numpy() if hasattr(y_fit, "numpy") else y_fit
         if np.isnan(y_fit_np).any():
@@ -529,7 +636,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         X_fit_np = X_fit.numpy() if hasattr(X_fit, "numpy") else X_fit
 
-        if self.use_classifier_(column_idx, y_fit):
+        if use_clf:
             y_fit_np = y_fit_np.astype(int)
             y_predict = y_predict.long()
 
@@ -543,6 +650,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X: torch.Tensor | np.ndarray | pd.DataFrame,
         t: float = 0.000000001,
         n_permutations: int = 10,
+        dag: dict[int, list[int]] | None = None,
     ) -> torch.Tensor:
         """Impute missing values in the input data using the fitted TabPFN models.
 
@@ -564,6 +672,13 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 Number of random feature permutations to use for imputation.
                 Higher values may improve robustness but increase computation time.
 
+            dag: dict[int, list[int]] | None, default=None
+                Optional Directed Acyclic Graph mapping each column index to the
+                list of column indices it depends on. When provided, columns are
+                imputed in topological order and each column is conditioned on
+                its DAG parents instead of all other features. Useful for
+                causally-informed imputation.
+
         Returns:
             torch.Tensor
                 Imputed data with missing values replaced, of shape (n_samples, n_features).
@@ -583,8 +698,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         return self.impute_(
             X,
             t,
-            condition_on_all_features=True,
+            condition_on_all_features=(dag is None),
             n_permutations=n_permutations,
+            dag=dag,
             fast_mode=fast_mode,
         )
 
@@ -593,6 +709,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X: torch.tensor,
         feature_permutation: list[int] | tuple[int],
     ) -> torch.tensor:
+        """Compute the chain-rule log-density / log-probability of each row under one permutation."""
         log_p = torch.zeros_like(
             X[:, 0],
         )  # Start with a log probability of 0 (log(1) = 0)
@@ -623,52 +740,46 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 # Only index with valid indices
                 if valid_indices.any():
                     # Get probabilities for each sample based on its class in y_predict
-                    for idx, (prob_row, y_idx) in enumerate(zip(pred_np, y_indices)):
+                    for idx, (prob_row, y_idx) in enumerate(
+                        zip(pred_np, y_indices, strict=True)
+                    ):
                         if (
                             0 <= y_idx < pred_np.shape[1]
                         ):  # Check bounds again per sample
                             # Proper tensor construction to avoid warning
                             pred[idx] = torch.as_tensor(prob_row[y_idx])
+                log_pred = torch.log(pred)
             else:
                 pred = model.predict(X_predict, output_type="full")
-
-                # Get logits tensor properly
                 logits = pred["logits"]
                 logits_tensor = logits.clone().detach()
-
-                y_tensor = y_predict.clone().detach().to(logits.device)
-
-                # TODO: We use 1/pdf here because pdf() returns probability densities that
-                # can be >> 1, causing exp(sum(log(p))) to overflow. Using 1/p keeps values
-                # small and numerically stable. Ideally, refactor to work in log space
-                # throughout and avoid exponentiating altogether.
-                pred = (1.0 / pred["criterion"].pdf(logits_tensor, y_tensor)).to(
-                    log_p.device
+                # Match logits dtype/device: MPS rejects float64, and sklearn
+                # inputs arrive as float64, so cast before moving to the device.
+                y_tensor = y_predict.detach().to(
+                    dtype=logits.dtype,
+                    device=logits.device,
+                )
+                # criterion.forward returns the NLL, so -forward is log p_θ directly.
+                log_pred = (
+                    -pred["criterion"].forward(logits_tensor, y_tensor).to(log_p.device)
                 )
 
-            # Handle zero or negative probabilities (avoid log(0))
-            pred = torch.clamp(pred, min=1e-10)
-
-            # Convert probabilities to log probabilities
-            log_pred = torch.log(pred)
-
-            # Add log probabilities instead of multiplying probabilities
             log_p = log_p + log_pred
 
-        return log_p, torch.exp(log_p)
+        return log_p
 
     def outliers_pdf(self, X: torch.Tensor, n_permutations: int = 10) -> torch.Tensor:
-        """Calculate outlier scores based on probability density functions for continuous features.
+        """Calculate the log_pdf from numerical features only.
 
         This method filters out categorical features and only considers numerical features
-        for outlier detection using probability density functions.
+        for outlier detection.
 
         Args:
             X: Input data tensor
             n_permutations: Number of permutations to use for the outlier calculation
 
         Returns:
-            Tensor of outlier scores (lower values indicate more likely outliers)
+            log_pdf (lower values indicate more likely outliers).
         """
         X_store = copy.deepcopy(self.X_)
         mask = torch.ones_like(X_store).bool()
@@ -678,15 +789,15 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         mask[self.categorical_features] = False
         X = X[mask]
 
-        pdf = self.outliers(X, n_permutations=n_permutations)
+        log_pdf = self.outliers(X, n_permutations=n_permutations)
         self.X_ = X_store
-        return pdf
+        return log_pdf
 
     def outliers_pmf(self, X: torch.Tensor, n_permutations: int = 10) -> torch.Tensor:
-        """Calculate outlier scores based on probability mass functions for categorical features.
+        """Calculate log_pmf from categorical features only.
 
         This method filters out numerical features and only considers categorical features
-        for outlier detection using probability mass functions.
+        for outlier detection.
 
         Args:
             X: Input data tensor
@@ -703,9 +814,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         mask[self.categorical_features] = True
         X = X[mask]
 
-        pmf = self.outliers(X, n_permutations=n_permutations)
+        log_pmf = self.outliers(X, n_permutations=n_permutations)
         self.X_ = X_store
-        return pmf
+        return log_pmf
 
     @set_extension("unsupervised:outliers")
     def outliers(
@@ -713,12 +824,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         X: torch.Tensor | np.ndarray | pd.DataFrame,
         n_permutations: int = 10,
     ) -> torch.Tensor:
-        """Calculate outlier scores for each sample in the input data.
+        """Calculate outlier scores as the log of the arithmetic mean (AM) of the densities across the permutations used to approximate the chain rule.
 
-        This is the preferred implementation for outlier detection, which calculates
-        sample probability for each sample in X by multiplying the probabilities of
-        each feature according to chain rule of probability. Lower probabilities
-        indicate samples that are more likely to be outliers.
+        The logsumexp trick is used to compute the log of the AM to address the risk of over- or underflow.
 
         Parameters:
             X: Union[torch.Tensor, np.ndarray, pd.DataFrame]
@@ -729,8 +837,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         Returns:
             torch.Tensor:
-                Tensor of outlier scores (lower values indicate more likely outliers),
-                shape (n_samples,)
+                Tensor of outlier scores as log(AM(densities)), (lower values indicate more likely outliers), shape (n_samples,).
 
         Raises:
             RuntimeError: If the model initialization fails
@@ -754,31 +861,18 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         # Use fewer permutations in fast mode
         actual_n_permutations = 1 if fast_mode else n_permutations
 
-        densities: list[torch.Tensor | np.ndarray] = []
+        log_densities: list[torch.Tensor] = []
         for perm in efficient_random_permutation(all_features, actual_n_permutations):
-            perm_density_log, perm_density = self.outliers_single_permutation_(
+            log_p = self.outliers_single_permutation_(
                 X,
                 feature_permutation=perm,
             )
-            densities.append(perm_density)
+            log_densities.append(log_p)
 
-        # Average the densities across all permutations
-        # Handle potential infinite values by replacing them with large finite values
-        densities_clean: list[torch.Tensor] = [
-            torch.nan_to_num(d, nan=0.0, posinf=1e30, neginf=1e-30)
-            if torch.is_tensor(d)
-            else torch.nan_to_num(
-                torch.tensor(d, dtype=torch.float32),
-                nan=0.0,
-                posinf=1e30,
-                neginf=1e-30,
-            )
-            for d in densities
-        ]
-
-        # Stack the clean tensors and compute mean
-        densities_tensor = torch.stack(densities_clean)
-        return densities_tensor.mean(dim=0)
+        # AM combiner via the log-sum-exp identity.
+        return torch.logsumexp(torch.stack(log_densities), dim=0) - np.log(
+            actual_n_permutations
+        )
 
     @set_extension("unsupervised:synthetic")
     def generate_synthetic_data(
@@ -786,6 +880,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         n_samples: int = 100,
         t: float = 1.0,
         n_permutations: int = 3,
+        dag: dict[int, list[int]] | None = None,
     ) -> torch.Tensor:
         """Generate synthetic tabular data samples using the fitted TabPFN models.
 
@@ -805,6 +900,12 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             n_permutations: int, default=3
                 Number of feature permutations to use for generation
                 More permutations may provide more robust results but increase computation time
+
+            dag: dict[int, list[int]] | None, default=None
+                Optional Directed Acyclic Graph mapping each column index to the
+                list of column indices it depends on. When provided, columns are
+                generated in topological order and each column is conditioned on
+                its DAG parents only. Useful for causally-informed synthesis.
 
         Returns:
             torch.Tensor:
@@ -837,6 +938,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             t=t,
             condition_on_all_features=False,
             n_permutations=actual_n_permutations,
+            dag=dag,
             fast_mode=fast_mode,
         )
 

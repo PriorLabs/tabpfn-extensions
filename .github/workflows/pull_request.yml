@@ -1,11 +1,15 @@
 name: In pull request
+run-name: "CI on ${{ github.head_ref || github.ref_name }}"
 on:
   pull_request:
     branches:
       - main
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: pr-${{ github.ref }}
@@ -16,12 +20,12 @@ jobs:
     name: Ruff Linting & Formatting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b # v4.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
         with:
           src: "./src ./tests"
           version-file: pyproject.toml
-      - uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b # v4.0.0
+      - uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
         with:
           src: "./src ./tests"
           version-file: pyproject.toml
@@ -34,64 +38,50 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            python-version: "3.9"
-            dependency-set: minimum
-          - os: macos-15-intel # We need x86 as ARM is  python>= 3.11 only.
-            # https://github.com/actions/setup-python/issues/855
-            python-version: "3.9"
-            dependency-set: minimum
+            python-version: "3.10"
+            dependency-set: lowest-direct
+          - os: macos-latest
+            # Use 3.11 as the minimum Python version for Macs. Python 3.10 doesn't
+            # install reliably on macOS ARM runners, and Apple Silicon is required by
+            # TabPFN's minimum PyTorch.
+            python-version: "3.11"
+            dependency-set: lowest-direct
           - os: windows-latest
-            python-version: "3.9"
-            dependency-set: minimum
+            python-version: "3.10"
+            dependency-set: lowest-direct
           - os: ubuntu-latest
             python-version: "3.13"
-            dependency-set: maximum
+            dependency-set: highest
           - os: macos-latest
             python-version: "3.13"
-            dependency-set: maximum
+            dependency-set: highest
           - os: windows-latest
             python-version: "3.13"
-            dependency-set: maximum
+            dependency-set: highest
     runs-on: ${{ matrix.os }}
 
     env:
       TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ matrix.python-version }}
-          architecture: x64
 
       - name: Install uv
-        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
 
-      - name: Generate requirements file
-        run: python scripts/generate_dependencies.py ${{ matrix.dependency-set }}
-
       - name: Install dependencies
-        run: |
-          uv pip install --system ".[all]"
-          # onnx is required for onnx export tests
-          # we don't install all dev dependencies here for speed
-          uv pip install --system -r requirements.txt
-          uv pip install --system pytest psutil
-          # licensecheck is required for license checking
-          uv pip install --system licensecheck
-          # onnx is not supported on python 3.13 yet https://github.com/onnx/onnx/issues/6339
-          if [[ "${{ matrix.python-version }}" != "3.13" ]]; then
-            uv pip install --system onnx
-          fi
-        shell: bash
+        run: uv sync --all-extras --group ci --resolution ${{ matrix.dependency-set }}
 
       - name: Restore model cache
         id: restore-model-cache
-        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/model_cache
           # This cache read will always fail as the model_cache directory is empty.
@@ -105,12 +95,13 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
-        run: python scripts/download_all_models.py
+        run: uv run --no-sync python scripts/download_all_models.py
 
       - name: Check for forbidden licenses
-        if: runner.os == 'MacOS' && matrix.python-version == '3.9'
+        if: runner.os == 'MacOS' && matrix.dependency-set == 'lowest-direct'
+        shell: bash
         run: |
-          licensecheck \
+          uv run --no-sync licensecheck \
             --requirements-paths pyproject.toml \
             --only-licenses APACHE MIT BSD ISC PYTHON UNLICENSE UNKNOWN \
             --ignore-packages certifi "tabpfn*" \
@@ -122,18 +113,111 @@ jobs:
         env:
           TABPFN_EXCLUDE_DEVICES: mps
         run: |
-          FAST_TEST_MODE=1 pytest tests/
+          FAST_TEST_MODE=1 uv run --no-sync pytest tests/
 
       - name: Run Tests (Windows)
         if: runner.os == 'Windows'
         run: |
           $env:FAST_TEST_MODE = 1
-          pytest tests/
+          uv run --no-sync pytest tests/
 
       - name: Save model cache
         if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/model_cache
           key: model-cache-${{ hashFiles('model_cache/**') }}
           enableCrossOsArchive: true
+
+  test_gpu:
+    name: Test on GPU
+    # Gate only on linting so this runs in parallel with test_compatibility.
+    # The GPU runner is the expensive/scarce tier; linting is a ~seconds-long
+    # cheap guard that avoids spinning it up for obviously broken PRs.
+    needs: check_python_linting
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.10"
+            dependency-set: lowest-direct
+          - python-version: "3.13"
+            dependency-set: highest
+
+    runs-on: ubuntu-22.04-4core-gpu
+
+    env:
+      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras --group ci --resolution ${{ matrix.dependency-set }}
+
+      - name: Restore model cache
+        id: restore-model-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/model_cache
+          # This cache read will always fail as the model_cache directory is empty.
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          restore-keys: |
+            model-cache-
+          enableCrossOsArchive: true
+
+      # Download all models fails, if there is a missing model that can't be downloaded.
+      - name: Download models from Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
+        run: uv run --no-sync python scripts/download_all_models.py
+
+      - name: Run GPU Test Suite
+        env:
+          CUDA_VISIBLE_DEVICES: "0"
+          # Exclude cpu/mps so TabPFN selects the GPU. The cpu code paths are
+          # already covered by the test_compatibility job.
+          TABPFN_EXCLUDE_DEVICES: "cpu,cpu:0,mps"
+        run: |
+          FAST_TEST_MODE=1 uv run --no-sync pytest tests/
+
+      - name: Save model cache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true
+
+  build_verify:
+    name: Build wheel + sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Build sdist + wheel
+        run: uv build
+
+      - name: Check artifacts
+        run: uvx twine check dist/*

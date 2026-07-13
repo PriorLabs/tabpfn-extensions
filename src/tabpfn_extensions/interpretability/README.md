@@ -15,8 +15,57 @@ interactions for machine learning models. The library is a redesigned and improv
 the well-known SHAP library that provides a more efficient and scalable implementation of Shapley
 values and Shapley interactions. In addition, ``shapiq`` offers native support for interpreting
 TabPFN by utilizing a remove-and-recontextualize paradigm of model interpretation tailored towards
-in-context models. The ``shapiq`` library and the paper introducing the improved Shapley value
-computation for TabPFN can be cited as follows:
+in-context models.
+
+We expose two adapters:
+
+* ``get_tabpfn_explainer`` — *remove-and-recontextualize* (Rundel et al. 2024).
+  TabPFN is re-fit for every coalition, so the KV cache cannot be reused
+  across coalitions — expect this path to be substantially slower than the
+  imputation-based one below.
+
+* ``get_tabpfn_imputation_explainer`` — *imputation-based* removal (marginal / conditional /
+  baseline). The training set is fixed across coalitions, so the KV-cache fast path
+  applies. Construct your TabPFN model with ``fit_mode="fit_with_cache"`` (set BEFORE
+  ``.fit()``):
+
+  ```python
+  clf = TabPFNClassifier(fit_mode="fit_with_cache")
+  clf.fit(X_train, y_train)
+  explainer = get_tabpfn_imputation_explainer(model=clf, data=X_train)
+  ```
+
+  The wrapper warns at construction time if the model isn't configured this way.
+
+For SHAP-style plots (waterfall, beeswarm, summary, dependence) you have two options:
+
+1. **Use shapiq's own visualizations** on the returned ``InteractionValues`` object:
+   ``iv.plot_force()``, ``iv.plot_waterfall()``, ``iv.plot_network()``,
+   ``iv.plot_si_graph()``, etc.
+
+2. **Use the SHAP library's plotting** via the bridge helper. Run shapiq's
+   ``.explain()`` over a batch of rows and wrap the result in a
+   ``shap.Explanation`` in one call:
+
+   ```python
+   from tabpfn_extensions.interpretability import shapiq_to_shap_explanation
+
+   explanation = shapiq_to_shap_explanation(
+       explainer, X_explain, budget=256, feature_names=feature_names,
+   )
+   shap.plots.waterfall(explanation[0])
+   ```
+
+   ``shapiq_to_shap_explanation`` extracts first-order Shapley values from
+   shapiq's output and wraps them in a ``shap.Explanation``. Requires
+   ``pip install shap`` — kept out of the ``interpretability`` extra by
+   design (shapiq is the runtime dependency; shap is opt-in for plotting).
+
+See ``examples/interpretability/shapiq_example.py`` and ``shap_example.py``
+for both paths.
+
+The ``shapiq`` library and the paper introducing the improved Shapley value computation
+for TabPFN can be cited as follows:
 
 ```bibtext
 @inproceedings{muschalik2024shapiq,
@@ -35,25 +84,20 @@ and
 @InProceedings{rundel2024interpretableTabPFN,
   author    = {David Rundel and Julius Kobialka and Constantin von Crailsheim and
                Matthias Feurer and Thomas Nagler and David R{\"u}gamer},
-  title     = {Interpretable Machine Learning for TabPFN},
+  title     = {Interpretable Machine Learning for TabPFN},
   booktitle = {Explainable Artificial Intelligence},
   year      = {2024},
   pages     = {465--476},
   url       = {https://link.springer.com/chapter/10.1007/978-3-031-63797-1_23}
 }
-
 ```
 
-## TabPFN SHAP
-
-``shap`` is a library for computing Shapley values explanations for machine learning models.
-``shap`` constructs these explanations by imputing missing values with randomly drawn samples from
-a background distribution. The ``shap`` library can be cited as follows:
+The original ``shap`` library — still used here for plotting via ``shap.Explanation`` —
+can be cited as:
 
 ```bibtext
 @inproceedings{DBLP:conf/nips/LundbergL17,
-  author       = {Scott M. Lundberg and
-                  Su{-}In Lee},
+  author       = {Scott M. Lundberg and Su{-}In Lee},
   title        = {A Unified Approach to Interpreting Model Predictions},
   booktitle    = {Advances in Neural Information Processing Systems 30},
   pages        = {4765--4774},

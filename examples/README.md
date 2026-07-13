@@ -6,13 +6,17 @@ This directory contains examples for using TabPFN extensions. Each extension has
 
 ```
 examples/
-├── classifier_as_regressor/   # Using TabPFN classifiers for regression
-├── hpo/                      # Hyperparameter optimization
-├── interpretability/         # SHAP and feature selection
-├── many_class/               # Handling many classes
-├── post_hoc_ensembles/       # Post-hoc ensembles
-├── rf_pfn/                   # Random Forest + TabPFN combinations
-└── unsupervised/             # Unsupervised learning
+├── embedding/         # Access TabPFN's internal dense sample embeddings
+├── interpretability/  # SHAP, partial dependence, feature selection
+├── many_class/        # More classes than the checkpoint supports
+├── multioutput/       # Multi-output regression + multi-label classification (sklearn wrapper)
+├── predictive_distribution/  # Visualize TabPFN's full predictive distribution + derive point estimates
+├── pval_crt/          # Statistical feature relevance testing
+├── survival/          # Survival analysis
+├── tabebm/            # Data augmentation via TabEBM
+├── unsupervised/      # Data generation, imputation, outlier detection
+├── hpo/               # (deprecated) TunedTabPFN* hyperparameter tuning
+└── phe/               # (deprecated) AutoTabPFN* post-hoc ensembles
 ```
 
 ## Running Examples
@@ -31,15 +35,13 @@ python examples/many_class/many_class_classifier_example.py
    - TabPFN Package - Full PyTorch implementation for local inference
    - TabPFN Client - Lightweight API client for cloud-based inference
 
-3. **Flexible Imports**: Use this pattern for imports to support both backends:
+3. **Imports**: Always import TabPFN classes from `tabpfn_extensions`, which
+   automatically selects the right backend (local `tabpfn` package when
+   available, falling back to `tabpfn_client`):
    ```python
-   try:
-       # Try standard TabPFN package first
-       from tabpfn import TabPFNClassifier, TabPFNRegressor
-   except ImportError:
-       # Fall back to TabPFN client
-       from tabpfn_client import TabPFNClassifier, TabPFNRegressor
+   from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor
    ```
+   No `try/except` boilerplate needed in example files.
 
 4. **Example Datasets**: Use small built-in datasets from scikit-learn. No external data downloads required.
 
