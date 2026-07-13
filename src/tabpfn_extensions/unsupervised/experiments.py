@@ -125,6 +125,17 @@ class GenerateSyntheticDataExperiment(Experiment):
     def run(self, tabpfn, *, categorical_features=None, should_plot=True, **kwargs):
         """Generate synthetic data and store it on the experiment instance.
 
+        The synthetic data is stored on the following instance property:
+            - synthetic_X: array with shape (n_samples, n selected columns)
+        The following properties are also set
+            - data_real: input X data as a DataFrame, potentially resampled
+            - data_synthetic: synthetic_X as a DataFrame, potentially resampled
+            - data: data_real and data_synthetic concatenated
+        If one of data_real or data_synthetic has fewer rows, it is resampled with
+        replacement so both have max(n_input_samples, n_samples) rows.
+        data_real, data_synthetic, and data have an additional real_or_synthetic column
+        that indicates if the data is real or synthetic.
+
         Args:
             tabpfn: A ``TabPFNUnsupervisedModel`` used to learn the joint
                 distribution of the selected features and sample synthetic rows.
@@ -134,7 +145,7 @@ class GenerateSyntheticDataExperiment(Experiment):
                 model auto-detects categorical columns at ``fit`` time.
             should_plot: Whether to render the pairwise plot. Defaults to ``True``.
             **kwargs: Keyword arguments controlling the run:
-                X: Input data array of shape ``(n_samples, n_features)``.
+                X: Input data array of shape ``(n_input_samples, n_features)``.
                 y: Targets (unused for unsupervised generation; may be empty).
                 attribute_names: Column names for every column in ``X``.
                 indices: Column indices of ``X`` to model. Defaults to all columns.
