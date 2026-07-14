@@ -77,11 +77,17 @@ hpo = [
 survival = []
 many_class = []
 unsupervised = []
+bayesian_optimization = [
+    # fit_with_differentiable_input on the regressor shipped in tabpfn 8.1.0.
+    "tabpfn>=8.1.0",
+    # Only needed for the benchmark objective in the example.
+    "botorch>=0.12.0",
+]
 
 # Meta-package that installs all extensions
 all = [
     # scikit-survival not included; install manually if you need SurvivalTabPFN.
-    "tabpfn-extensions[interpretability,post_hoc_ensembles,hpo,survival]",
+    "tabpfn-extensions[interpretability,post_hoc_ensembles,hpo,survival,bayesian_optimization]",
 ]
 
 [dependency-groups]
@@ -104,7 +110,9 @@ dev = [
 
 [tool.uv]
 exclude-newer = "7 days"
-exclude-newer-package = {torch = false}
+# tabpfn is exempt from the quarantine: it is our own package and new
+# extensions may depend on a just-released version (e.g. tabpfn 8.1.0).
+exclude-newer-package = {torch = false, tabpfn = false}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]  # Where the tests are located
