@@ -10,7 +10,7 @@ dependencies = [
     "pandas>=2.2.2",
     "scikit-learn>=1.6.0",
     "scipy>=1.11.1",
-    "tabpfn>=8.0.0",
+    "tabpfn>=8.1.0",
     "tabpfn-common-utils[telemetry-interactive]>=0.2.13",
 ]
 
@@ -104,7 +104,7 @@ dev = [
 
 [tool.uv]
 exclude-newer = "7 days"
-exclude-newer-package = {torch = false}
+exclude-newer-package = {torch = false, tabpfn = false}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]  # Where the tests are located
