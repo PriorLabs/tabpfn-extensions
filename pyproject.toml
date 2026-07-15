@@ -56,17 +56,13 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 
 [project.optional-dependencies]
 interpretability = [
-    # 1.6.0 is the lowest release exposing the OddSHAP and ProxySHAP
-    # approximators that get_tabpfn_imputation_explainer / get_tabpfn_explainer
-    # route to (see interpretability/shapiq.py::_resolve_approximator). It
-    # requires Python >= 3.12, so it is gated by marker; on older Python the
-    # explainers keep working on shapiq's own "auto" selection and the routing
-    # falls back to it (with a warning).
+    # OddSHAP/ProxySHAP routing (see interpretability/shapiq.py) needs shapiq
+    # >=1.6.0, which requires Python >=3.12; older Python falls back to shapiq's
+    # "auto" selection with a warning.
     "shapiq>=1.6.0; python_version >= '3.12'",
     "shapiq>=1.1.0; python_version <  '3.12'",
-    # ProxySHAP fits an XGBoost proxy and OddSHAP a LightGBM surrogate; without
-    # these backends both silently fall back to a weaker DecisionTree. Only
-    # needed where those estimators exist (shapiq >= 1.6.0, i.e. Python >= 3.12).
+    # Surrogate backends: ProxySHAP uses XGBoost, OddSHAP LightGBM; without them
+    # both fall back to a weaker DecisionTree.
     "xgboost>=2.1.0; python_version >= '3.12'",
     "lightgbm>=4.3.0; python_version >= '3.12'",
     "seaborn>=0.12.2",
