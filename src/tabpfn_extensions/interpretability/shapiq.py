@@ -23,6 +23,9 @@ first-order Shapley values (``index="SV"``) use OddSHAP, while higher-order
 interactions use ProxySHAP. Both approximators fit a tree surrogate on sampled
 coalitions — OddSHAP on LightGBM, ProxySHAP on XGBoost — so those backends ship
 with the ``interpretability`` extra.
+
+OddSHAP and ProxySHAP require shapiq >= 1.6.0 (Python >= 3.12). On older setups
+the routing falls back to shapiq's ``"auto"`` selection and warns.
 """
 
 from __future__ import annotations
@@ -57,15 +60,28 @@ def _resolve_approximator(shapiq, approximator, index: str, n_features: int):
     it does (https://github.com/mmschlk/shapiq/issues/565), this routing can be
     dropped in favor of ``approximator="auto"``.
 
+    OddSHAP and ProxySHAP require shapiq >= 1.6.0, which needs Python >= 3.12.
+    On older setups those classes are absent, so this falls back to shapiq's
+    ``"auto"`` selection and warns that upgrading unlocks the better estimators.
+
     A non-``None`` ``approximator`` (a shapiq ``Approximator`` instance or a
     literal string such as ``"auto"``) is returned unchanged, so callers keep
     full control.
     """
     if approximator is not None:
         return approximator
-    if index == "SV":
+    if index == "SV" and hasattr(shapiq, "OddSHAP"):
         return shapiq.OddSHAP(n=n_features)
-    return "proxyshap"
+    if index != "SV" and hasattr(shapiq, "ProxySHAP"):
+        return "proxyshap"
+    warnings.warn(
+        f"shapiq {shapiq.__version__} does not provide the OddSHAP/ProxySHAP "
+        "estimators recommended for TabPFN, so approximator='auto' "
+        "(KernelSHAP/KernelSHAPIQ) is used instead. Upgrading to Python >= 3.12 "
+        "and shapiq >= 1.6.0 enables the more accurate estimators.",
+        stacklevel=2,
+    )
+    return "auto"
 
 
 @set_extension("interpretability")
