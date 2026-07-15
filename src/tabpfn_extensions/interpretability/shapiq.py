@@ -333,11 +333,14 @@ def get_tabpfn_inf_explainer(
         ``value_function`` masks with ``+inf`` (one predict per coalition, no
         sampling). ``calc_empty_prediction`` computes ``v(empty)`` as a single
         ``f(inf, ..., inf)`` row instead of the base class's predict over the
-        whole background, which OOMs on large training sets (PRI-290).
+        whole background, which OOMs on large training sets.
         """
 
         def value_function(self, coalitions: np.ndarray) -> np.ndarray:
-            x_masked = np.tile(self.x, (coalitions.shape[0], 1)).astype(float)
+            x_masked = np.tile(self.x, (coalitions.shape[0], 1))
+            # int/bool arrays can't hold +inf; promote them. float and object already can.
+            if np.issubdtype(x_masked.dtype, np.integer) or x_masked.dtype == bool:
+                x_masked = x_masked.astype(float)
             x_masked[~coalitions] = np.inf
             return self.predict(x_masked)
 

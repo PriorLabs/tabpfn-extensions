@@ -1,7 +1,7 @@
 """Tests for the shapiq interpretability adapters.
 
-Focused on ``get_tabpfn_inf_explainer`` (PRI-290), which masks absent features
-with ``+inf`` and relies on TabPFN's opt-in ``PASSTHROUGH_INF`` inference config.
+Focused on ``get_tabpfn_inf_explainer``, which masks absent features with
+``+inf`` and relies on TabPFN's opt-in ``PASSTHROUGH_INF`` inference config.
 
 These are local-only: ``inference_config``/``PASSTHROUGH_INF`` is a local-tabpfn
 feature not exposed by the client backend. They run on CPU (fp32), where the
@@ -97,8 +97,8 @@ def test_value_function_masks_absent_features_with_inf(
 def test_calc_empty_prediction_uses_single_all_inf_row(
     classification_data, passthrough_clf
 ):
-    """OOM fix (PRI-290): v(empty) is one all-+inf forward pass, not a predict
-    over the whole background (the base MarginalImputer behaviour that OOMs).
+    """v(empty) is one all-+inf forward pass, not a predict over the whole
+    background (the base MarginalImputer behaviour that OOMs on large data).
     """
     X, _ = classification_data
     d = X.shape[1]
@@ -122,3 +122,46 @@ def test_calc_empty_prediction_uses_single_all_inf_row(
     assert row.shape == (1, d)  # a single row, not len(X)
     assert np.isinf(row).all()  # all +inf
     assert np.isclose(value, predict(np.full((1, d), np.inf))[0], atol=1e-5)
+
+
+@pytest.mark.local_compatible
+def test_inf_explainer_handles_string_column(classification_data_with_text):
+    """+inf masking works on a dataset with a string/categorical column.
+
+    Such a row is an object array, so the masked features must stay object dtype
+    for +inf to be assignable, and TabPFN absorbs the +inf as missing. Checks the
+    explainer runs end to end and that masking the string feature with +inf
+    reproduces a hand-built object-array prediction.
+    """
+    from shapiq.explainer.utils import get_predict_function_and_model_type
+
+    df, y = classification_data_with_text
+    d = df.shape[1]
+    text_col = df.columns.get_loc("text")
+    clf = TabPFNClassifier(
+        device="cpu", n_estimators=1, inference_config={"PASSTHROUGH_INF": True}
+    )
+    clf.fit(df, y)
+    predict_fn, _ = get_predict_function_and_model_type(clf, class_index=CLASS_INDEX)
+
+    explainer = tpe_shapiq.get_tabpfn_inf_explainer(
+        model=clf, data=df, class_index=CLASS_INDEX
+    )
+
+    # End-to-end run over the object-dtype array (numeric columns + a string).
+    x0 = df.iloc[0].to_numpy()
+    iv = explainer.explain(x=x0, budget=2**d)
+    sv = iv.get_n_order_values(1)
+    assert sv.shape == (d,)
+    assert np.isfinite(sv).all()
+
+    # Dropping only the string feature keeps an object array and matches a
+    # hand-built prediction with that feature replaced by +inf.
+    imputer = explainer.imputer
+    imputer.fit(x0)
+    coalition = np.ones((1, d), dtype=bool)
+    coalition[0, text_col] = False
+    got = imputer.value_function(coalition)
+    expected_row = x0.astype(object).copy()
+    expected_row[text_col] = np.inf
+    assert np.allclose(got, predict_fn(clf, expected_row.reshape(1, -1)), atol=1e-5)
