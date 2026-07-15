@@ -22,7 +22,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-07-07T14:25:42.800811Z"
+exclude-newer = "2026-07-08T06:46:44.53321Z"
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
@@ -3493,7 +3493,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.11.1" },
     { name = "seaborn", marker = "extra == 'interpretability'", specifier = ">=0.12.2" },
     { name = "setuptools", marker = "extra == 'hpo'", specifier = ">=67.0.0,<84" },
-    { name = "shapiq", marker = "extra == 'interpretability'", specifier = ">=1.1.0" },
+    { name = "shapiq", marker = "extra == 'interpretability'", specifier = ">=1.4.0" },
     { name = "tabpfn", specifier = ">=8.1.0" },
     { name = "tabpfn-common-utils", extras = ["telemetry-interactive"], specifier = ">=0.2.13" },
     { name = "tabpfn-extensions", extras = ["interpretability", "post-hoc-ensembles", "hpo", "survival"], marker = "extra == 'all'" },
