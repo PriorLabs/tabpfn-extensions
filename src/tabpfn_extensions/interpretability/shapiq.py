@@ -52,6 +52,25 @@ def _require_shapiq():
     return shapiq
 
 
+def _build_tabular_explainer(shapiq, **kwargs):
+    """Construct a ``shapiq.TabularExplainer`` with ``kwargs``, silencing one warning.
+
+    shapiq emits a ``UserWarning`` when ``TabularExplainer`` is built with a
+    TabPFN model, recommending ``TabPFNExplainer`` (Rundel) instead. That advice
+    assumes the sampling-based imputers; the wrappers here deliberately use an
+    imputation/masking removal path — which, unlike Rundel, benefits from the KV
+    cache (one predict per coalition, no re-fit) — so the warning is misleading
+    and only that specific message is silenced.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r".*TabPFN model with the.*shapiq\.TabularExplainer.*",
+            category=UserWarning,
+        )
+        return shapiq.TabularExplainer(**kwargs)
+
+
 @set_extension("interpretability")
 def get_tabpfn_explainer(
     model: tabpfn.TabPFNRegressor | tabpfn.TabPFNClassifier,
@@ -190,27 +209,16 @@ def get_tabpfn_imputation_explainer(
     if isinstance(data, pd.DataFrame):
         data = data.values
 
-    # shapiq emits a UserWarning when ``TabularExplainer`` is constructed with a
-    # TabPFN model, recommending ``TabPFNExplainer`` (Rundel) instead. In this
-    # wrapper the user has explicitly chosen the imputation path — precisely
-    # because Rundel cannot benefit from the KV cache (one predict per
-    # coalition fit) while imputation-based removal can. The warning is
-    # misleading here, so silence just that specific message.
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message=r".*TabPFN model with the.*shapiq\.TabularExplainer.*",
-            category=UserWarning,
-        )
-        return shapiq.TabularExplainer(
-            model=model,
-            data=data,
-            index=index,
-            max_order=max_order,
-            imputer=imputer,
-            class_index=class_index,
-            **kwargs,
-        )
+    return _build_tabular_explainer(
+        shapiq,
+        model=model,
+        data=data,
+        index=index,
+        max_order=max_order,
+        imputer=imputer,
+        class_index=class_index,
+        **kwargs,
+    )
 
 
 def _model_has_inf_passthrough(
@@ -368,20 +376,13 @@ def get_tabpfn_inf_explainer(
         sample_size=1,  # unused — value_function is overridden
     )
 
-    # Silence shapiq's "use TabPFNExplainer instead" warning — it assumes the
-    # sampling-based imputers and is misleading for our inf-masking path.
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message=r".*TabPFN model with the.*shapiq\.TabularExplainer.*",
-            category=UserWarning,
-        )
-        return shapiq.TabularExplainer(
-            model=model,
-            data=data,
-            imputer=inf_imputer,
-            index=index,
-            max_order=max_order,
-            class_index=class_index,
-            **kwargs,
-        )
+    return _build_tabular_explainer(
+        shapiq,
+        model=model,
+        data=data,
+        imputer=inf_imputer,
+        index=index,
+        max_order=max_order,
+        class_index=class_index,
+        **kwargs,
+    )
