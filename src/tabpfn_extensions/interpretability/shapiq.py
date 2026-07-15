@@ -98,8 +98,10 @@ def _resolve_approximator(shapiq, approximator, index: str, n_features: int):
     dropped in favor of ``approximator="auto"``.
 
     OddSHAP and ProxySHAP require shapiq >= 1.6.0, which needs Python >= 3.12.
-    On older setups those classes are absent, so this falls back to shapiq's
-    ``"auto"`` selection and warns that upgrading unlocks the better estimators.
+    On older shapiq these names exist but are ``None`` placeholders, so this
+    checks the value (not just the attribute) and falls back to shapiq's
+    ``"auto"`` selection with a warning that upgrading unlocks the better
+    estimators.
 
     A non-``None`` ``approximator`` (a shapiq ``Approximator`` instance or a
     literal string such as ``"auto"``) is returned unchanged, so callers keep
@@ -107,13 +109,18 @@ def _resolve_approximator(shapiq, approximator, index: str, n_features: int):
     """
     if approximator is not None:
         return approximator
-    if index == "SV" and hasattr(shapiq, "OddSHAP"):
-        return shapiq.OddSHAP(n=n_features)
-    if index != "SV" and hasattr(shapiq, "ProxySHAP"):
+    # shapiq < 1.6.0 ships OddSHAP/ProxySHAP as ``None`` placeholders (the
+    # attribute exists but is not a class), so test the value, not ``hasattr``.
+    odd_shap = getattr(shapiq, "OddSHAP", None)
+    proxy_shap = getattr(shapiq, "ProxySHAP", None)
+    if index == "SV" and odd_shap is not None:
+        return odd_shap(n=n_features)
+    if index != "SV" and proxy_shap is not None:
         return "proxyshap"
+    version = getattr(shapiq, "__version__", None) or "< 1.6.0"
     warnings.warn(
-        f"shapiq {shapiq.__version__} does not provide the OddSHAP/ProxySHAP "
-        "estimators recommended for TabPFN, so approximator='auto' "
+        f"shapiq {version} does not provide the OddSHAP/ProxySHAP estimators "
+        "recommended for TabPFN, so approximator='auto' "
         "(KernelSHAP/KernelSHAPIQ) is used instead. Upgrading to Python >= 3.12 "
         "and shapiq >= 1.6.0 enables the more accurate estimators.",
         stacklevel=2,
