@@ -4,7 +4,7 @@
 This module provides functions to create shapiq explainers for TabPFN models that support
 both basic Shapley values and interaction indices for more detailed model explanations.
 
-Two explanation paradigms are exposed:
+Three explanation paradigms are exposed:
 
 * :func:`get_tabpfn_explainer` — *remove-and-recontextualize* (Rundel et al. 2024).
   Re-fits TabPFN on each feature subset; cannot benefit from the KV cache
@@ -16,13 +16,20 @@ Two explanation paradigms are exposed:
   runtime warning is emitted if the cache isn't enabled when this explainer
   is constructed.
 
-Both explainers route to the approximator recommended for TabPFN in the
+* :func:`get_tabpfn_inf_explainer` — *missingness-based* removal. A masked
+  feature is set to ``+inf`` and TabPFN's native missing-value handling
+  absorbs it as "missing" (no sampling, one forward pass per coalition).
+  The training set is fixed across coalitions, so it benefits from the KV
+  cache just like the imputation explainer. Requires the model to be built
+  with ``inference_config={"PASSTHROUGH_INF": True}`` (tabpfn>=8.1.0) so
+  ``+inf`` reaches the model instead of being rejected at validation.
+
+All three explainers route to the approximator recommended for TabPFN in the
 discussion at tabpfn-extensions#342 unless the caller selects one explicitly
-(see :func:`_resolve_approximator`):
-first-order Shapley values (``index="SV"``) use OddSHAP, while higher-order
-interactions use ProxySHAP. Both approximators fit a tree surrogate on sampled
-coalitions — OddSHAP on LightGBM, ProxySHAP on XGBoost — so those backends ship
-with the ``interpretability`` extra.
+(see :func:`_resolve_approximator`): first-order Shapley values (``index="SV"``)
+use OddSHAP, while higher-order interactions use ProxySHAP. Both approximators
+fit a tree surrogate on sampled coalitions — OddSHAP on LightGBM, ProxySHAP on
+XGBoost — so those backends ship with the ``interpretability`` extra.
 
 OddSHAP and ProxySHAP require shapiq >= 1.6.0 (Python >= 3.12). On older setups
 the routing falls back to shapiq's ``"auto"`` selection and warns.
@@ -33,15 +40,45 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 from tabpfn_common_utils.telemetry import set_extension
 
 from tabpfn_extensions.utils import warn_if_no_kv_cache
 
 if TYPE_CHECKING:
-    import numpy as np
-
     import tabpfn
+
+
+def _require_shapiq():
+    """Import and return the ``shapiq`` package, or raise a helpful error."""
+    try:
+        import shapiq
+    except ImportError:
+        raise ImportError(
+            "Package 'shapiq' is required for model explanation. Install it with: "
+            "pip install 'tabpfn-extensions[interpretability]'",
+        ) from None
+    return shapiq
+
+
+def _build_tabular_explainer(shapiq, **kwargs):
+    """Construct a ``shapiq.TabularExplainer`` with ``kwargs``, silencing one warning.
+
+    shapiq emits a ``UserWarning`` when ``TabularExplainer`` is built with a
+    TabPFN model, recommending ``TabPFNExplainer`` (Rundel) instead. That advice
+    assumes the sampling-based imputers; the wrappers here deliberately use an
+    imputation/masking removal path — which, unlike Rundel, benefits from the KV
+    cache (one predict per coalition, no re-fit) — so the warning is misleading
+    and only that specific message is silenced.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r".*TabPFN model with the.*shapiq\.TabularExplainer.*",
+            category=UserWarning,
+        )
+        return shapiq.TabularExplainer(**kwargs)
 
 
 def _resolve_approximator(shapiq, approximator, index: str, n_features: int):
@@ -127,8 +164,8 @@ def get_tabpfn_explainer(
             ignored for regression models. Defaults to None.
 
         approximator: The shapiq approximator to estimate the coalition game with. Defaults to
-            ``None``, which routes to the shapiq authors' recommendation: OddSHAP for first-order
-            Shapley values (``index="SV"``) and ProxySHAP for interaction indices (see
+            ``None``, which routes to the recommended estimator: OddSHAP for first-order Shapley
+            values (``index="SV"``) and ProxySHAP for interaction indices (see
             :func:`_resolve_approximator`). Pass a shapiq ``Approximator`` instance or a literal
             string (e.g. ``"auto"``) to override the routing.
 
@@ -143,15 +180,7 @@ def get_tabpfn_explainer(
         .. [3] Rundel, D., Kobialka, J., von Crailsheim, C., Feurer, M., Nagler, T., Rügamer, D. (2024). Interpretable Machine Learning for TabPFN. In: Longo, L., Lapuschkin, S., Seifert, C. (eds) Explainable Artificial Intelligence. xAI 2024. Communications in Computer and Information Science, vol 2154. Springer, Cham. https://doi.org/10.1007/978-3-031-63797-1_23
 
     """
-    # Defer the import to avoid circular imports
-    try:
-        import shapiq  # Import the main package
-        # Current version of shapiq has TabPFNExplainer in the base module
-    except ImportError:
-        raise ImportError(
-            "Package 'shapiq' is required for model explanation. "
-            "Please install it with: pip install shapiq",
-        )
+    shapiq = _require_shapiq()
 
     # make data to array if it is a pandas DataFrame
     if isinstance(data, pd.DataFrame):
@@ -223,8 +252,8 @@ def get_tabpfn_imputation_explainer(
             ignored for regression models. Defaults to None.
 
         approximator: The shapiq approximator to estimate the coalition game with. Defaults to
-            ``None``, which routes to the shapiq authors' recommendation: OddSHAP for first-order
-            Shapley values (``index="SV"``) and ProxySHAP for interaction indices (see
+            ``None``, which routes to the recommended estimator: OddSHAP for first-order Shapley
+            values (``index="SV"``) and ProxySHAP for interaction indices (see
             :func:`_resolve_approximator`). Pass a shapiq ``Approximator`` instance or a literal
             string (e.g. ``"auto"``) to override the routing.
 
@@ -239,15 +268,7 @@ def get_tabpfn_imputation_explainer(
         .. [3] Lundberg, S. M., & Lee, S. I. (2017). A Unified Approach to Interpreting Model Predictions. Advances in Neural Information Processing Systems 30 (pp. 4765--4774).
 
     """
-    # Defer the import to avoid circular imports
-    try:
-        import shapiq  # Import the main package
-        # Current version of shapiq has TabularExplainer in the base module
-    except ImportError:
-        raise ImportError(
-            "Package 'shapiq' is required for model explanation. "
-            "Please install it with: pip install shapiq",
-        )
+    shapiq = _require_shapiq()
 
     warn_if_no_kv_cache(model, context="Imputation-based SHAP")
 
@@ -257,25 +278,192 @@ def get_tabpfn_imputation_explainer(
 
     approximator = _resolve_approximator(shapiq, approximator, index, data.shape[1])
 
-    # shapiq emits a UserWarning when ``TabularExplainer`` is constructed with a
-    # TabPFN model, recommending ``TabPFNExplainer`` (Rundel) instead. In this
-    # wrapper the user has explicitly chosen the imputation path — precisely
-    # because Rundel cannot benefit from the KV cache (one predict per
-    # coalition fit) while imputation-based removal can. The warning is
-    # misleading here, so silence just that specific message.
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message=r".*TabPFN model with the.*shapiq\.TabularExplainer.*",
-            category=UserWarning,
+    return _build_tabular_explainer(
+        shapiq,
+        model=model,
+        data=data,
+        index=index,
+        max_order=max_order,
+        imputer=imputer,
+        class_index=class_index,
+        approximator=approximator,
+        **kwargs,
+    )
+
+
+def _model_has_inf_passthrough(
+    model: tabpfn.TabPFNRegressor | tabpfn.TabPFNClassifier,
+) -> bool:
+    """Whether ``model`` is configured to pass ``+/-inf`` through to TabPFN.
+
+    Returns ``True`` only if we can positively confirm the ``PASSTHROUGH_INF``
+    inference-config flag is enabled. For estimators we can't introspect (e.g.
+    the tabpfn-client backend, which has no ``get_inference_config``) this
+    returns ``False`` — we simply can't vouch for inf support.
+    """
+    get_inference_config = getattr(model, "get_inference_config", None)
+    if get_inference_config is None:
+        return False
+    return bool(getattr(get_inference_config(), "PASSTHROUGH_INF", False))
+
+
+@set_extension("interpretability")
+def get_tabpfn_inf_explainer(
+    model: tabpfn.TabPFNRegressor | tabpfn.TabPFNClassifier,
+    data: pd.DataFrame | np.ndarray,
+    index: str = "SV",
+    max_order: int = 1,
+    class_index: int | None = None,
+    approximator=None,
+    **kwargs,
+):
+    """Gets a TabularExplainer that masks missing features with ``+inf``.
+
+    When a coalition leaves a feature out, this explainer sets that feature to
+    ``+inf`` and lets TabPFN's native missing-value handling absorb it as
+    "missing" — no sampling from a background distribution, just one forward
+    pass per coalition. Since the training set never changes across
+    coalitions, this is the fastest path on TabPFN v3: construct the model
+    with ``fit_mode="fit_with_cache"`` and set
+    ``model.executor_.keep_cache_on_device = True`` after ``.fit()`` so every
+    coalition evaluation reuses one on-device KV cache.
+
+    This differs from :func:`get_tabpfn_imputation_explainer` — that one
+    *samples* the absent features from a background distribution, so their
+    values are drawn from the data. Here nothing is sampled: a masked feature
+    is genuinely missing and TabPFN decides how to handle it. ``+inf`` (rather
+    than ``NaN``) is used deliberately: ``NaN`` is transformed by TabPFN's
+    preprocessing pipeline before it reaches the model, whereas ``+inf`` is
+    carried through and handled natively as missingness.
+
+    IMPORTANT: this requires the model to be constructed with
+    ``inference_config={"PASSTHROUGH_INF": True}`` (available in
+    ``tabpfn>=8.1.0``). Without it, TabPFN rejects non-finite inputs at
+    validation and this function raises ``ValueError`` up front rather than
+    letting every coalition evaluation fail later.
+
+    Args:
+        model: The TabPFN model to explain. Must be constructed with
+            ``inference_config={"PASSTHROUGH_INF": True}``. For the v3
+            KV-cache fast path, also pass ``fit_mode="fit_with_cache"`` before
+            ``.fit(X, y)`` and set ``model.executor_.keep_cache_on_device =
+            True`` afterwards.
+
+        data: Background data. Only its shape (number of features) and a single
+            row for shapiq's compatibility check are used — it does **not**
+            drive the masking, since absent features are replaced with ``+inf``
+            rather than sampled.
+
+        index: The Shapley-style index to compute. Defaults to ``"SV"`` (plain
+            Shapley values). See shapiq docs for alternatives.
+
+        max_order: Maximum interaction order. Defaults to ``1`` (individual
+            feature attributions, equivalent to classical SHAP values).
+
+        class_index: Class to explain for classification models. Defaults to
+            ``None`` (shapiq uses class 1). Ignored for regression.
+
+        approximator: The shapiq approximator to estimate the coalition game
+            with. Defaults to ``None``, which routes to the recommended
+            estimator: OddSHAP for first-order Shapley values (``index="SV"``,
+            the default here) and ProxySHAP for interaction indices (see
+            :func:`_resolve_approximator`). Pass a shapiq ``Approximator``
+            instance or a literal string (e.g. ``"auto"``) to override.
+
+        **kwargs: Passed through to ``shapiq.TabularExplainer``.
+
+    Returns:
+        shapiq.TabularExplainer: wired up with an ``+inf``-passthrough imputer.
+
+    Raises:
+        ValueError: If ``model`` can be introspected and does not have
+            ``PASSTHROUGH_INF`` enabled.
+
+    Example:
+        >>> from tabpfn import TabPFNClassifier
+        >>> from tabpfn_extensions.interpretability import shapiq as tpe_shapiq
+        >>> clf = TabPFNClassifier(
+        ...     inference_config={"PASSTHROUGH_INF": True},
+        ...     fit_mode="fit_with_cache",
+        ... )
+        >>> clf.fit(X_train, y_train)
+        >>> clf.executor_.keep_cache_on_device = True  # optional but faster
+        >>> explainer = tpe_shapiq.get_tabpfn_inf_explainer(
+        ...     model=clf, data=X_train, class_index=1
+        ... )
+        >>> iv = explainer.explain(x=X_test[0], budget=2 ** X_train.shape[1])
+    """
+    # Deferred import (kept function-local). Once the top package is confirmed
+    # present, its submodules are part of the same install and import safely.
+    shapiq = _require_shapiq()
+    from shapiq.explainer.utils import get_predict_function_and_model_type
+    from shapiq.imputer.marginal_imputer import MarginalImputer
+
+    # Fail fast: without inf passthrough, TabPFN rejects +inf at validation.
+    if not _model_has_inf_passthrough(model):
+        raise ValueError(
+            "get_tabpfn_inf_explainer masks missing features with +inf, which "
+            "requires the TabPFN model to be constructed with "
+            'inference_config={"PASSTHROUGH_INF": True} (available in '
+            "tabpfn>=8.1.0). Without it, TabPFN rejects non-finite inputs at "
+            "validation. Re-create the model, e.g. "
+            'TabPFNClassifier(inference_config={"PASSTHROUGH_INF": True}, '
+            'fit_mode="fit_with_cache"), and refit it before explaining.',
         )
-        return shapiq.TabularExplainer(
-            model=model,
-            data=data,
-            index=index,
-            max_order=max_order,
-            imputer=imputer,
-            class_index=class_index,
-            approximator=approximator,
-            **kwargs,
-        )
+
+    warn_if_no_kv_cache(model, context="Inf-masking SHAP")
+
+    class _InfImputer(MarginalImputer):
+        """Replace absent features with ``+inf`` instead of sampling.
+
+        ``value_function`` masks with ``+inf`` (one predict per coalition, no
+        sampling). ``calc_empty_prediction`` computes ``v(empty)`` as a single
+        ``f(inf, ..., inf)`` row instead of the base class's predict over the
+        whole background, which OOMs on large training sets.
+        """
+
+        def value_function(self, coalitions: np.ndarray) -> np.ndarray:
+            x_masked = np.tile(self.x, (coalitions.shape[0], 1))
+            # int/bool arrays can't hold +inf; promote them. float and object already can.
+            if np.issubdtype(x_masked.dtype, np.integer) or x_masked.dtype == bool:
+                x_masked = x_masked.astype(float)
+            x_masked[~coalitions] = np.inf
+            return self.predict(x_masked)
+
+        def calc_empty_prediction(self) -> float:
+            empty_row = np.full((1, self.n_features), np.inf)
+            empty_prediction = float(np.mean(self.predict(empty_row)))
+            self.empty_prediction = empty_prediction
+            if self.normalize:
+                self.normalization_value = empty_prediction
+            return empty_prediction
+
+    if isinstance(data, pd.DataFrame):
+        data = data.values
+
+    # Wrap the model as a plain callable so the imputer can be built before the
+    # TabularExplainer attaches its own predict function.
+    predict_fn, _ = get_predict_function_and_model_type(model, class_index=class_index)
+
+    def _callable_model(X: np.ndarray) -> np.ndarray:
+        return predict_fn(model, X)
+
+    inf_imputer = _InfImputer(
+        model=_callable_model,
+        data=data,
+        sample_size=1,  # unused — value_function is overridden
+    )
+
+    approximator = _resolve_approximator(shapiq, approximator, index, data.shape[1])
+
+    return _build_tabular_explainer(
+        shapiq,
+        model=model,
+        data=data,
+        imputer=inf_imputer,
+        index=index,
+        max_order=max_order,
+        class_index=class_index,
+        approximator=approximator,
+        **kwargs,
+    )

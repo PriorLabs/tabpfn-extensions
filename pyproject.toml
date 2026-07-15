@@ -10,7 +10,7 @@ dependencies = [
     "pandas>=2.2.2",
     "scikit-learn>=1.6.0",
     "scipy>=1.11.1",
-    "tabpfn>=8.0.0",
+    "tabpfn>=8.1.0",
     "tabpfn-common-utils[telemetry-interactive]>=0.2.13",
 ]
 
@@ -56,13 +56,17 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 
 [project.optional-dependencies]
 interpretability = [
-    # OddSHAP/ProxySHAP routing (see interpretability/shapiq.py) needs shapiq
-    # >=1.6.0, which requires Python >=3.12; older Python falls back to shapiq's
+    # get_tabpfn_inf_explainer needs shapiq>=1.4.0 (MarginalImputer +
+    # get_predict_function_and_model_type(..., class_index=...); 1.3.0 is broken
+    # via an unpackaged `overrides` dep). OddSHAP/ProxySHAP routing (see
+    # interpretability/shapiq.py) additionally needs shapiq>=1.6.0, which
+    # requires Python>=3.12; on older Python the routing falls back to shapiq's
     # "auto" selection with a warning.
     "shapiq>=1.6.0; python_version >= '3.12'",
-    "shapiq>=1.1.0; python_version <  '3.12'",
+    "shapiq>=1.4.0; python_version <  '3.12'",
     # Surrogate backends: ProxySHAP uses XGBoost, OddSHAP LightGBM; without them
-    # both fall back to a weaker DecisionTree.
+    # both fall back to a weaker DecisionTree. Only needed where those estimators
+    # exist (shapiq>=1.6.0, i.e. Python>=3.12).
     "xgboost>=2.1.0; python_version >= '3.12'",
     "lightgbm>=4.3.0; python_version >= '3.12'",
     "seaborn>=0.12.2",
@@ -109,7 +113,7 @@ dev = [
 
 [tool.uv]
 exclude-newer = "7 days"
-exclude-newer-package = {torch = false}
+exclude-newer-package = {torch = false, tabpfn = false}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]  # Where the tests are located
