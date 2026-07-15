@@ -15,6 +15,14 @@ Two explanation paradigms are exposed:
   KV cache (``fit_mode="fit_with_cache"``) drastically reduces wall time. A
   runtime warning is emitted if the cache isn't enabled when this explainer
   is constructed.
+
+Both explainers route to the approximator recommended for TabPFN in the
+discussion at tabpfn-extensions#342 unless the caller selects one explicitly
+(see :func:`_resolve_approximator`):
+first-order Shapley values (``index="SV"``) use OddSHAP, while higher-order
+interactions use ProxySHAP. Both approximators fit a tree surrogate on sampled
+coalitions — OddSHAP on LightGBM, ProxySHAP on XGBoost — so those backends ship
+with the ``interpretability`` extra.
 """
 
 from __future__ import annotations
@@ -33,6 +41,33 @@ if TYPE_CHECKING:
     import tabpfn
 
 
+def _resolve_approximator(shapiq, approximator, index: str, n_features: int):
+    """Pick the approximator for an explainer when the caller didn't.
+
+    Routing follows the recommendation in the discussion at
+    https://github.com/PriorLabs/tabpfn-extensions/issues/342#issuecomment-4977956527:
+    first-order Shapley values (``index="SV"``) use :class:`shapiq.OddSHAP`, the
+    current best regression-based Shapley-value estimator; every other index
+    (e.g. ``"k-SII"`` interactions) uses :class:`shapiq.ProxySHAP`, which
+    supports all cardinal-probabilistic indices and is the state-of-the-art
+    interaction estimator. ``OddSHAP`` computes only ``"SV"``, so it is never
+    selected for interaction indices.
+
+    shapiq's own ``"auto"`` selection does not yet pick these estimators; once
+    it does (https://github.com/mmschlk/shapiq/issues/565), this routing can be
+    dropped in favor of ``approximator="auto"``.
+
+    A non-``None`` ``approximator`` (a shapiq ``Approximator`` instance or a
+    literal string such as ``"auto"``) is returned unchanged, so callers keep
+    full control.
+    """
+    if approximator is not None:
+        return approximator
+    if index == "SV":
+        return shapiq.OddSHAP(n=n_features)
+    return "proxyshap"
+
+
 @set_extension("interpretability")
 def get_tabpfn_explainer(
     model: tabpfn.TabPFNRegressor | tabpfn.TabPFNClassifier,
@@ -41,6 +76,7 @@ def get_tabpfn_explainer(
     index: str = "k-SII",
     max_order: int = 2,
     class_index: int | None = None,
+    approximator=None,
     **kwargs,
 ):
     """Get a TabPFNExplainer (remove-and-recontextualize) from shapiq.
@@ -74,6 +110,12 @@ def get_tabpfn_explainer(
             class index will be set to 1 per default for classification models. This argument is
             ignored for regression models. Defaults to None.
 
+        approximator: The shapiq approximator to estimate the coalition game with. Defaults to
+            ``None``, which routes to the shapiq authors' recommendation: OddSHAP for first-order
+            Shapley values (``index="SV"``) and ProxySHAP for interaction indices (see
+            :func:`_resolve_approximator`). Pass a shapiq ``Approximator`` instance or a literal
+            string (e.g. ``"auto"``) to override the routing.
+
         **kwargs: Additional keyword arguments to pass to the explainer.
 
     Returns:
@@ -103,6 +145,8 @@ def get_tabpfn_explainer(
     if isinstance(labels, pd.Series | pd.DataFrame):
         labels = labels.values
 
+    approximator = _resolve_approximator(shapiq, approximator, index, data.shape[1])
+
     # TabPFNExplainer is directly available in the shapiq module
     return shapiq.TabPFNExplainer(
         model=model,
@@ -111,6 +155,7 @@ def get_tabpfn_explainer(
         index=index,
         max_order=max_order,
         class_index=class_index,
+        approximator=approximator,
         **kwargs,
     )
 
@@ -123,6 +168,7 @@ def get_tabpfn_imputation_explainer(
     max_order: int = 2,
     imputer: str = "baseline",
     class_index: int | None = None,
+    approximator=None,
     **kwargs,
 ):
     """Gets a TabularExplainer from shapiq with imputation-based feature removal.
@@ -160,6 +206,12 @@ def get_tabpfn_imputation_explainer(
             class index will be set to 1 per default for classification models. This argument is
             ignored for regression models. Defaults to None.
 
+        approximator: The shapiq approximator to estimate the coalition game with. Defaults to
+            ``None``, which routes to the shapiq authors' recommendation: OddSHAP for first-order
+            Shapley values (``index="SV"``) and ProxySHAP for interaction indices (see
+            :func:`_resolve_approximator`). Pass a shapiq ``Approximator`` instance or a literal
+            string (e.g. ``"auto"``) to override the routing.
+
         **kwargs: Additional keyword arguments to pass to the explainer.
 
     Returns:
@@ -187,6 +239,8 @@ def get_tabpfn_imputation_explainer(
     if isinstance(data, pd.DataFrame):
         data = data.values
 
+    approximator = _resolve_approximator(shapiq, approximator, index, data.shape[1])
+
     # shapiq emits a UserWarning when ``TabularExplainer`` is constructed with a
     # TabPFN model, recommending ``TabPFNExplainer`` (Rundel) instead. In this
     # wrapper the user has explicitly chosen the imputation path — precisely
@@ -206,5 +260,6 @@ def get_tabpfn_imputation_explainer(
             max_order=max_order,
             imputer=imputer,
             class_index=class_index,
+            approximator=approximator,
             **kwargs,
         )

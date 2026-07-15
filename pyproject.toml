@@ -56,10 +56,14 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 
 [project.optional-dependencies]
 interpretability = [
-    # 1.1.0 is the lowest release where `imputer="baseline"` + `index="SV"` +
-    # `max_order=1` (the default config used by get_tabpfn_imputation_explainer)
-    # works without raising.
-    "shapiq>=1.1.0",
+    # 1.6.0 is the lowest release exposing the OddSHAP and ProxySHAP
+    # approximators that get_tabpfn_imputation_explainer / get_tabpfn_explainer
+    # route to (see interpretability/shapiq.py::_resolve_approximator).
+    "shapiq>=1.6.0",
+    # ProxySHAP fits an XGBoost proxy and OddSHAP a LightGBM surrogate; without
+    # these backends both silently fall back to a weaker DecisionTree.
+    "xgboost",
+    "lightgbm",
     "seaborn>=0.12.2",
 ]
 post_hoc_ensembles = [
