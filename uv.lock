@@ -22,10 +22,11 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-07-06T12:10:48.17113352Z"
+exclude-newer = "2026-07-08T06:46:44.53321Z"
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
+tabpfn = false
 torch = false
 
 [[package]]
@@ -3378,7 +3379,7 @@ wheels = [
 
 [[package]]
 name = "tabpfn"
-version = "8.0.8"
+version = "8.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "einops" },
@@ -3396,14 +3397,13 @@ dependencies = [
     { name = "scikit-learn" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "tabpfn-common-utils" },
     { name = "torch" },
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/65/3e8de3115a1588c58d190a6c26aa8499303f625c6a811eb9dba42d4fa888/tabpfn-8.0.8.tar.gz", hash = "sha256:0bdbc438f2920fb98232a136ee79e01d06499f3883491704ddae332d205e7a43", size = 764626, upload-time = "2026-06-10T15:27:42.401Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/51/b56849eee53641a54337057dda9bb4f1a8188adf686dd822025e32b8f164/tabpfn-8.1.0.tar.gz", hash = "sha256:eab8b5b7c258cc374e4d7c1c614fea9d71d446ae271ad93c748efe92b6fdbfc1", size = 763933, upload-time = "2026-07-13T09:26:50.589Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/b5/bd2262ddf99193c440b96e4a4e1609ef02017bc030dd23e9da2d92e111fa/tabpfn-8.0.8-py3-none-any.whl", hash = "sha256:b6c945c8bf23b86f595697fcfa4ce58d84105441baf7e1313edc7865d7d29658", size = 753248, upload-time = "2026-06-10T15:27:40.466Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/da/579550955d8380d8c5d50dfb039963122798421d332c5fd9c742b9bf627a/tabpfn-8.1.0-py3-none-any.whl", hash = "sha256:127bfdecd4ecfd3054b45f5c292702ed5e4a7e3e47b6f0b989e91fc55d56d374", size = 727932, upload-time = "2026-07-13T09:26:48.92Z" },
 ]
 
 [[package]]
@@ -3493,8 +3493,8 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.11.1" },
     { name = "seaborn", marker = "extra == 'interpretability'", specifier = ">=0.12.2" },
     { name = "setuptools", marker = "extra == 'hpo'", specifier = ">=67.0.0,<84" },
-    { name = "shapiq", marker = "extra == 'interpretability'", specifier = ">=1.1.0" },
-    { name = "tabpfn", specifier = ">=8.0.0" },
+    { name = "shapiq", marker = "extra == 'interpretability'", specifier = ">=1.4.0" },
+    { name = "tabpfn", specifier = ">=8.1.0" },
     { name = "tabpfn-common-utils", extras = ["telemetry-interactive"], specifier = ">=0.2.13" },
     { name = "tabpfn-extensions", extras = ["interpretability", "post-hoc-ensembles", "hpo", "survival"], marker = "extra == 'all'" },
     { name = "torch", specifier = ">=2.1" },
