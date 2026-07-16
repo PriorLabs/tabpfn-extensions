@@ -1,7 +1,7 @@
 """Compute Shapley values and pairwise Shapley interactions for a TabPFN model
 using the ShapIQ library, and visualize them with shapiq's native plots.
 
-Two paradigms for "feature removal" are illustrated:
+Three paradigms for "feature removal" are illustrated:
 
   1. Imputation-based (`get_tabpfn_imputation_explainer`): masked features are
      filled by an imputer (default: baseline). The baseline imputer models
@@ -10,7 +10,13 @@ Two paradigms for "feature removal" are illustrated:
      across coalitions, so the KV-cache fast path applies — make sure
      to construct the model with `fit_mode="fit_with_cache"`.
 
-  2. Remove-and-recontextualize (`get_tabpfn_explainer`): TabPFN is re-fit on
+  2. Inf-masking (`get_tabpfn_inf_explainer`): masked features are set to
+     `+inf` and TabPFN's native missing-value handling absorbs them. No
+     sampling, one forward pass per coalition, and (like imputation) the
+     training set is fixed so the KV cache applies. Requires the model to be
+     built with `inference_config={"PASSTHROUGH_INF": True}`.
+
+  3. Remove-and-recontextualize (`get_tabpfn_explainer`): TabPFN is re-fit on
      each coalition's column subset. Does not benefit from the KV cache
      (one predict per fit).
 
@@ -29,13 +35,21 @@ housing = fetch_california_housing(as_frame=False)
 X, y, feature_names = housing.data, housing.target, list(housing.feature_names)
 
 X_train, X_test, y_train, _ = train_test_split(
-    X, y, train_size=1000, test_size=200, random_state=0,
+    X,
+    y,
+    train_size=1000,
+    test_size=200,
+    random_state=0,
 )
 x_explain = X_test[0]
 
 # Construct the regressor with the KV cache fast path. fit_mode must be set
-# BEFORE .fit().
-reg = TabPFNRegressor(fit_mode="fit_with_cache")
+# BEFORE .fit(). PASSTHROUGH_INF is required by the inf-masking explainer below
+# and is harmless for the other paths (finite inputs are unaffected).
+reg = TabPFNRegressor(
+    fit_mode="fit_with_cache",
+    inference_config={"PASSTHROUGH_INF": True},
+)
 reg.fit(X_train, y_train)
 
 # Exact enumeration for d=8 is 2**8 = 256 coalitions.
@@ -48,7 +62,7 @@ budget = 256
 imputation_explainer = tabpfn_shapiq.get_tabpfn_imputation_explainer(
     model=reg,
     data=X_train,
-    index="SV",     # plain Shapley values
+    index="SV",  # plain Shapley values
     max_order=1,
 )
 print("Computing imputation-based Shapley values...")
@@ -80,7 +94,24 @@ iv_interactions.plot_upset(feature_names=feature_names)
 
 
 # -----------------------------------------------------------------------------
-# 3. Remove-and-recontextualize (Rundel) — slower (no KV cache)
+# 3. Inf-masking explainer (uses the KV cache; TabPFN handles missingness)
+# -----------------------------------------------------------------------------
+# Masks absent features with +inf and lets TabPFN absorb them as missing. Unlike
+# the imputation explainer it does not sample from a background distribution.
+# Requires inference_config={"PASSTHROUGH_INF": True} on the model (set above).
+inf_explainer = tabpfn_shapiq.get_tabpfn_inf_explainer(
+    model=reg,
+    data=X_train,
+    index="SV",  # plain Shapley values
+    max_order=1,
+)
+print("Computing inf-masking Shapley values...")
+sv_inf = inf_explainer.explain(x=x_explain, budget=budget)
+sv_inf.plot_force(feature_names=feature_names)
+
+
+# -----------------------------------------------------------------------------
+# 4. Remove-and-recontextualize (Rundel) — slower (no KV cache)
 # -----------------------------------------------------------------------------
 # Commented out because this path is much slower than the imputation explainer
 # above, as it doesn't benefit from the KV cache: each coalition
