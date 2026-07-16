@@ -56,11 +56,19 @@ source = "https://github.com/PriorLabs/tabpfn-extensions"
 
 [project.optional-dependencies]
 interpretability = [
-    # 1.4.0 is the lowest release get_tabpfn_inf_explainer works with: it needs
-    # `shapiq.imputer.marginal_imputer.MarginalImputer` and
-    # `get_predict_function_and_model_type(..., class_index=...)`, both absent in
-    # <=1.2.x, and 1.3.0 is broken (unpackaged `overrides` dependency).
-    "shapiq>=1.4.0",
+    # get_tabpfn_inf_explainer needs shapiq>=1.4.0 (MarginalImputer +
+    # get_predict_function_and_model_type(..., class_index=...); 1.3.0 is broken
+    # via an unpackaged `overrides` dep). OddSHAP/ProxySHAP routing (see
+    # interpretability/shapiq.py) additionally needs shapiq>=1.6.0, which
+    # requires Python>=3.12; on older Python the routing falls back to shapiq's
+    # "auto" selection with a warning.
+    "shapiq>=1.6.0; python_version >= '3.12'",
+    "shapiq>=1.4.0; python_version <  '3.12'",
+    # Surrogate backends: ProxySHAP uses XGBoost, OddSHAP LightGBM; without them
+    # both fall back to a weaker DecisionTree. Only needed where those estimators
+    # exist (shapiq>=1.6.0, i.e. Python>=3.12).
+    "xgboost>=2.1.0; python_version >= '3.12'",
+    "lightgbm>=4.3.0; python_version >= '3.12'",
     "seaborn>=0.12.2",
 ]
 post_hoc_ensembles = [
