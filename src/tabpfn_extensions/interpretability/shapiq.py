@@ -81,17 +81,29 @@ def _build_tabular_explainer(shapiq, **kwargs):
         return shapiq.TabularExplainer(**kwargs)
 
 
-def _resolve_approximator(shapiq, approximator, index: str, n_features: int):
+def _resolve_approximator(
+    shapiq,
+    approximator,
+    index: str,
+    max_order: int,
+    n_features: int,
+    random_state: int | None,
+):
     """Pick the approximator for an explainer when the caller didn't.
 
     Routing follows the recommendation in the discussion at
     https://github.com/PriorLabs/tabpfn-extensions/issues/342#issuecomment-4977956527:
     first-order Shapley values (``index="SV"``) use :class:`shapiq.OddSHAP`, the
     current best regression-based Shapley-value estimator; every other index
-    (e.g. ``"k-SII"`` interactions) uses :class:`shapiq.ProxySHAP`, which
-    supports all cardinal-probabilistic indices and is the state-of-the-art
-    interaction estimator. ``OddSHAP`` computes only ``"SV"``, so it is never
-    selected for interaction indices.
+    (e.g. ``"k-SII"`` interactions) uses :class:`shapiq.ProxySHAP`, the
+    state-of-the-art interaction estimator. ``OddSHAP`` computes only ``"SV"``,
+    so it is never selected for interaction indices.
+
+    Both are returned as constructed instances (not the ``"proxyshap"`` string
+    alias) so ``random_state`` is threaded through and so ``ProxySHAP`` handles
+    every index in its ``valid_indices`` — the string alias routes through a
+    config table that omits some (e.g. ``"STII"``), raising ``KeyError``. An
+    index ``ProxySHAP`` does not support falls back to shapiq's ``"auto"``.
 
     shapiq's own ``"auto"`` selection does not yet pick these estimators; once
     it does (https://github.com/mmschlk/shapiq/issues/565), this routing can be
@@ -113,18 +125,27 @@ def _resolve_approximator(shapiq, approximator, index: str, n_features: int):
     # attribute exists but is not a class), so test the value, not ``hasattr``.
     odd_shap = getattr(shapiq, "OddSHAP", None)
     proxy_shap = getattr(shapiq, "ProxySHAP", None)
-    if index == "SV" and odd_shap is not None:
-        return odd_shap(n=n_features)
-    if index != "SV" and proxy_shap is not None:
-        return "proxyshap"
-    version = getattr(shapiq, "__version__", None) or "< 1.6.0"
-    warnings.warn(
-        f"shapiq {version} does not provide the OddSHAP/ProxySHAP estimators "
-        "recommended for TabPFN, so approximator='auto' "
-        "(KernelSHAP/KernelSHAPIQ) is used instead. Upgrading to Python >= 3.12 "
-        "and shapiq >= 1.6.0 enables the more accurate estimators.",
-        stacklevel=2,
-    )
+    if odd_shap is None or proxy_shap is None:
+        version = getattr(shapiq, "__version__", None) or "< 1.6.0"
+        warnings.warn(
+            f"shapiq {version} does not provide the OddSHAP/ProxySHAP estimators "
+            "recommended for TabPFN, so approximator='auto' "
+            "(KernelSHAP/KernelSHAPIQ) is used instead. Upgrading to Python >= "
+            "3.12 and shapiq >= 1.6.0 enables the more accurate estimators.",
+            stacklevel=2,
+        )
+        return "auto"
+    if index == "SV":
+        return odd_shap(n=n_features, random_state=random_state)
+    if index in proxy_shap.valid_indices:
+        return proxy_shap(
+            n=n_features,
+            max_order=max_order,
+            index=index,
+            random_state=random_state,
+        )
+    # An index ProxySHAP cannot compute (e.g. it is not in its valid_indices):
+    # let shapiq's "auto" selection handle it rather than crashing.
     return "auto"
 
 
@@ -137,6 +158,7 @@ def get_tabpfn_explainer(
     max_order: int = 2,
     class_index: int | None = None,
     approximator=None,
+    random_state: int | None = None,
     **kwargs,
 ):
     """Get a TabPFNExplainer (remove-and-recontextualize) from shapiq.
@@ -176,6 +198,11 @@ def get_tabpfn_explainer(
             :func:`_resolve_approximator`). Pass a shapiq ``Approximator`` instance or a literal
             string (e.g. ``"auto"``) to override the routing.
 
+        random_state: Seed forwarded to the routed OddSHAP/ProxySHAP approximator
+            for reproducible coalition sampling. Has no effect when an explicit
+            ``approximator`` is passed or the ``"auto"`` fallback is used.
+            Defaults to ``None``.
+
         **kwargs: Additional keyword arguments to pass to the explainer.
 
     Returns:
@@ -197,7 +224,14 @@ def get_tabpfn_explainer(
     if isinstance(labels, pd.Series | pd.DataFrame):
         labels = labels.values
 
-    approximator = _resolve_approximator(shapiq, approximator, index, data.shape[1])
+    approximator = _resolve_approximator(
+        shapiq,
+        approximator,
+        index,
+        max_order,
+        data.shape[1],
+        random_state,
+    )
 
     # TabPFNExplainer is directly available in the shapiq module
     return shapiq.TabPFNExplainer(
@@ -221,6 +255,7 @@ def get_tabpfn_imputation_explainer(
     imputer: str = "baseline",
     class_index: int | None = None,
     approximator=None,
+    random_state: int | None = None,
     **kwargs,
 ):
     """Gets a TabularExplainer from shapiq with imputation-based feature removal.
@@ -264,6 +299,11 @@ def get_tabpfn_imputation_explainer(
             :func:`_resolve_approximator`). Pass a shapiq ``Approximator`` instance or a literal
             string (e.g. ``"auto"``) to override the routing.
 
+        random_state: Seed forwarded to the routed OddSHAP/ProxySHAP approximator
+            for reproducible coalition sampling. Has no effect when an explicit
+            ``approximator`` is passed or the ``"auto"`` fallback is used.
+            Defaults to ``None``.
+
         **kwargs: Additional keyword arguments to pass to the explainer.
 
     Returns:
@@ -283,7 +323,14 @@ def get_tabpfn_imputation_explainer(
     if isinstance(data, pd.DataFrame):
         data = data.values
 
-    approximator = _resolve_approximator(shapiq, approximator, index, data.shape[1])
+    approximator = _resolve_approximator(
+        shapiq,
+        approximator,
+        index,
+        max_order,
+        data.shape[1],
+        random_state,
+    )
 
     return _build_tabular_explainer(
         shapiq,
@@ -322,6 +369,7 @@ def get_tabpfn_inf_explainer(
     max_order: int = 1,
     class_index: int | None = None,
     approximator=None,
+    random_state: int | None = None,
     **kwargs,
 ):
     """Gets a TabularExplainer that masks missing features with ``+inf``.
@@ -376,6 +424,11 @@ def get_tabpfn_inf_explainer(
             the default here) and ProxySHAP for interaction indices (see
             :func:`_resolve_approximator`). Pass a shapiq ``Approximator``
             instance or a literal string (e.g. ``"auto"``) to override.
+
+        random_state: Seed forwarded to the routed OddSHAP/ProxySHAP approximator
+            for reproducible coalition sampling. Has no effect when an explicit
+            ``approximator`` is passed or the ``"auto"`` fallback is used.
+            Defaults to ``None``.
 
         **kwargs: Passed through to ``shapiq.TabularExplainer``.
 
@@ -461,7 +514,14 @@ def get_tabpfn_inf_explainer(
         sample_size=1,  # unused — value_function is overridden
     )
 
-    approximator = _resolve_approximator(shapiq, approximator, index, data.shape[1])
+    approximator = _resolve_approximator(
+        shapiq,
+        approximator,
+        index,
+        max_order,
+        data.shape[1],
+        random_state,
+    )
 
     return _build_tabular_explainer(
         shapiq,
