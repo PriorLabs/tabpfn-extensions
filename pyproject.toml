@@ -86,11 +86,15 @@ hpo = [
 survival = []
 many_class = []
 unsupervised = []
+bayesian_optimization = [
+    # Only needed for the benchmark objective in the example.
+    "botorch>=0.12.0",
+]
 
 # Meta-package that installs all extensions
 all = [
     # scikit-survival not included; install manually if you need SurvivalTabPFN.
-    "tabpfn-extensions[interpretability,post_hoc_ensembles,hpo,survival]",
+    "tabpfn-extensions[interpretability,post_hoc_ensembles,hpo,survival,bayesian_optimization]",
 ]
 
 [dependency-groups]

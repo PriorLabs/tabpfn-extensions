@@ -52,7 +52,7 @@ def get_example_files() -> list[dict]:
     FAST_EXAMPLES = []
 
     # These directories/files need the full TabPFN package and won't work with client
-    REQUIRES_TABPFN_DIRS = ["embedding/"]
+    REQUIRES_TABPFN_DIRS = ["embedding/", "bayesian_optimization/"]
 
     # Large dataset examples are always expected to timeout,
     # even if --run-examples is provided
