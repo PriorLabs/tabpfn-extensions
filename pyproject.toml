@@ -87,8 +87,6 @@ survival = []
 many_class = []
 unsupervised = []
 bayesian_optimization = [
-    # fit_with_differentiable_input on the regressor shipped in tabpfn 8.1.0.
-    "tabpfn>=8.1.0",
     # Only needed for the benchmark objective in the example.
     "botorch>=0.12.0",
 ]

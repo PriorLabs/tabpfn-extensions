@@ -3689,13 +3689,11 @@ all = [
     { name = "setuptools" },
     { name = "shapiq", version = "1.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "shapiq", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "tabpfn" },
     { name = "xgboost", marker = "python_full_version >= '3.12'" },
 ]
 bayesian-optimization = [
     { name = "botorch", version = "0.16.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "botorch", version = "0.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "tabpfn" },
 ]
 hpo = [
     { name = "hyperopt" },
@@ -3748,7 +3746,6 @@ requires-dist = [
     { name = "shapiq", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=1.6.0" },
     { name = "shapiq", marker = "python_full_version < '3.12' and extra == 'interpretability'", specifier = ">=1.4.0" },
     { name = "tabpfn", specifier = ">=8.1.0" },
-    { name = "tabpfn", marker = "extra == 'bayesian-optimization'", specifier = ">=8.1.0" },
     { name = "tabpfn-common-utils", extras = ["telemetry-interactive"], specifier = ">=0.2.13" },
     { name = "tabpfn-extensions", extras = ["interpretability", "post-hoc-ensembles", "hpo", "survival", "bayesian-optimization"], marker = "extra == 'all'" },
     { name = "torch", specifier = ">=2.1" },
