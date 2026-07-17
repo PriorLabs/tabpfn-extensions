@@ -117,8 +117,6 @@ dev = [
 
 [tool.uv]
 exclude-newer = "7 days"
-# tabpfn is exempt from the quarantine: it is our own package and new
-# extensions may depend on a just-released version (e.g. tabpfn 8.1.0).
 exclude-newer-package = {torch = false, tabpfn = false}
 
 [tool.pytest.ini_options]
