@@ -13,8 +13,11 @@ from sklearn.model_selection import train_test_split
 from tabpfn_common_utils.telemetry import set_extension
 from torch.utils.data import DataLoader
 
-from tabpfn.config import ModelInterfaceConfig, PreprocessorConfig
-from tabpfn.utils import meta_dataset_collator
+from tabpfn.finetuning.data_util import (
+    get_preprocessed_dataset_chunks,
+    meta_dataset_collator,
+)
+from tabpfn.inference_config import InferenceConfig, PreprocessorConfig
 from tabpfn_extensions.utils import TabPFNClassifier
 
 
@@ -85,7 +88,7 @@ class TabEBM:
         """
         # Configure TabPFN to disable preprocessing for gradient computation
         # This is crucial for SGLD sampling as we need gradients w.r.t. input features
-        no_preprocessing_inference_config = ModelInterfaceConfig(
+        no_preprocessing_inference_config = InferenceConfig(
             FINGERPRINT_FEATURE=False,
             FEATURE_SHIFT_METHOD=None,
             CLASS_SHIFT_METHOD=None,
@@ -445,8 +448,16 @@ class TabEBM:
         y_cpu = y.cpu()
 
         # Get preprocessed datasets
-        batched_datasets = self.model.get_preprocessed_datasets(
-            X_cpu, y_cpu, splitter, max_data_size=self.max_data_size
+        batched_datasets = get_preprocessed_dataset_chunks(
+            self.model,
+            X_cpu,
+            y_cpu,
+            split_fn=splitter,
+            model_type="classifier",
+            max_data_size=1000,
+            equal_split_size=True,
+            data_shuffle_seed=0,
+            preprocessing_random_state=0
         )
 
         # Create dataloader with minimal overhead
