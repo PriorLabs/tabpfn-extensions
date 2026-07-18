@@ -13,6 +13,7 @@ from sklearn.model_selection import train_test_split
 from tabpfn_common_utils.telemetry import set_extension
 from torch.utils.data import DataLoader
 
+from tabpfn.architectures.interface import PerformanceOptions
 from tabpfn.finetuning.data_util import (
     get_preprocessed_dataset_chunks,
     meta_dataset_collator,
@@ -375,6 +376,7 @@ class TabEBM:
             y_ebm_list,
             cat_ix=cat_ixs,
             configs=confs,
+            performance_options=PerformanceOptions(),
         )
 
         # Cache the fitted state
@@ -470,15 +472,14 @@ class TabEBM:
 
         # Extract first (and only) batch efficiently
         batch_data = next(iter(batch_dataloader))
-        X_train, X_val, y_train, y_val, cat_ixs, confs = batch_data
 
         return {
-            "X_train": X_train,
-            "X_val": X_val,
-            "y_train": y_train,
-            "y_val": y_val,
-            "cat_ixs": cat_ixs,
-            "confs": confs,
+            "X_train": batch_data.X_context,
+            "X_val": batch_data.X_query,
+            "y_train": batch_data.y_context,
+            "y_val": batch_data.y_query,
+            "cat_ixs": batch_data.cat_indices,
+            "confs": batch_data.configs,
         }
 
     def _perform_sgld_sampling(
@@ -725,7 +726,7 @@ class TabEBM:
             train_size=train_size,
             random_state=random_state,
             shuffle=shuffle,
-            stratify=stratify,
+            stratify=stratify if shuffle else None,
         )
 
         # Override with full data in full train mode
