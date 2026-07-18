@@ -456,7 +456,7 @@ class TabEBM:
             y_cpu,
             split_fn=splitter,
             model_type="classifier",
-            max_data_size=1000,
+            max_data_size=self.max_data_size,
             equal_split_size=True,
             data_shuffle_seed=0,
             preprocessing_random_state=0
