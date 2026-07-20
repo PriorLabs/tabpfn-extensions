@@ -114,6 +114,15 @@ dev = [
     "build>=1.3.0",
     "twine>=6.2.0",
 ]
+# Extra deps needed only to *run* the example scripts (see examples/), used by the
+# example-file CI job. Deliberately not a published extra: the library itself does
+# not need these, only the example demos do, and the examples ship in the repo (not
+# the wheel), so anyone running them works from a clone where this group is available.
+examples = [
+    # Only used by interpretability/shap_example.py for plotting.
+    # Floor is 0.46.0 (0.41.0 pins an unbuildable numba).
+    "shap>=0.46.0",
+]
 
 [tool.uv]
 exclude-newer = "7 days"
