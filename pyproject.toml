@@ -136,9 +136,6 @@ log_cli = false
 log_level = "DEBUG"
 xfail_strict = true
 addopts = "--durations=10 -vv"
-markers = [
-    "example: runs an example script from examples/ (deselect with -m 'not example')",
-]
 
 # https://github.com/astral-sh/ruff
 [tool.ruff]

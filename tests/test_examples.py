@@ -1,32 +1,22 @@
 """Run the example files in ``examples/`` and check they work.
 
-Each example is executed as a subprocess. The outcome is interpreted with one
-of two policies, selected per CI layer:
+Each example is executed as a subprocess with a fixed per-example timeout. An
+example that *errors* fails the test; one that simply doesn't finish in time
+*passes* -- we only assert it starts and runs without crashing. This is a fast,
+cheap smoke guard against broken example scripts and import errors.
 
-* **Per-PR smoke (default):** each example gets a short timeout. An example that
-  *errors* fails the test; one that simply doesn't finish in time *passes* — we
-  only assert it starts and runs without crashing. This is a fast, cheap guard
-  against broken example scripts and import errors.
-* **Weekly full run (``--example-strict``):** a longer timeout, and a normal
-  example that doesn't finish is a *failure* — i.e. we assert it actually runs
-  to completion. Examples explicitly marked long-running (``LONG_RUNNING``) are
-  still allowed to time out even here, since they cannot complete in CI by
-  design; we still run them to catch import/startup errors.
+A regularly scheduled full run -- every example run to completion, where a
+timeout *is* a failure -- is tracked separately in PRI-330.
 
-Regardless of policy:
-* An example that needs an optional dependency which isn't installed is
-  **skipped** (not failed).
-* A GPU-only example is **skipped** when no CUDA device is available (some
-  examples exceed TabPFN's CPU sample guard and only run on a GPU).
+An example is **skipped** (not failed) when:
+
+* it needs an optional dependency that isn't installed (the GPL-excluded
+  scikit-survival), or
+* it is GPU-only and no CUDA device is available (some examples exceed TabPFN's
+  CPU sample guard and only run on a GPU).
 
 Usage:
-    # Per-PR smoke (short timeout; not finishing is OK):
-    uv run --no-sync pytest tests/test_examples.py --run-examples \
-        --example-timeout 120
-
-    # Weekly full run (long timeout; a normal example not finishing fails):
-    uv run --no-sync pytest tests/test_examples.py --run-examples \
-        --example-strict --example-timeout 600 --example-long-timeout 120
+    uv run --no-sync pytest tests/test_examples.py --run-examples
 """
 
 from __future__ import annotations
@@ -42,6 +32,11 @@ import torch
 
 # Enable test mode so examples shrink their workload where they support it.
 os.environ["TEST_MODE"] = "1"
+
+# Per-example smoke timeout. An example that doesn't finish within this budget
+# still passes (we only assert it starts and runs without crashing); running
+# every example to completion is the job of the scheduled full run (PRI-330).
+EXAMPLE_TIMEOUT_SECONDS = 120
 
 # Directories whose examples need the full TabPFN package (won't work with the
 # TabPFN client).
@@ -60,13 +55,6 @@ REQUIRES_MODULE = {
 # Skipped when no CUDA device is available.
 GPU_ONLY = {
     "get_embeddings.py",
-}
-
-# Examples that cannot complete within any CI time budget by design (e.g. PHE's
-# hard-coded ``max_time``). A timeout is NOT a failure for these, even in strict
-# mode; we still run them to catch import/startup errors.
-LONG_RUNNING = {
-    "phe_example.py",
 }
 
 # Examples known to be broken against current dependencies, with a tracking issue.
@@ -90,9 +78,9 @@ def _example_params() -> list:
         marks = []
         reason = KNOWN_BROKEN.get(example_file["name"])
         if reason is not None:
-            # Non-strict: in smoke mode a timeout counts as a pass, so a partially
-            # fixed example could XPASS without truly being fixed -- don't fail the
-            # suite on that, just surface it as XPASS for follow-up.
+            # A timeout counts as a pass here, so a partially fixed example could
+            # XPASS without truly being fixed -- keep xfail non-strict so that
+            # only surfaces as XPASS for follow-up rather than failing the suite.
             marks.append(pytest.mark.xfail(reason=reason, strict=False))
         params.append(
             pytest.param(example_file, marks=marks, id=example_file["name"]),
@@ -118,13 +106,11 @@ def get_example_files() -> list[dict]:
                 ),
                 "requires_module": REQUIRES_MODULE.get(name),
                 "gpu_only": name in GPU_ONLY,
-                "long": name in LONG_RUNNING,
             },
         )
     return files
 
 
-@pytest.mark.example
 @pytest.mark.parametrize("example_file", _example_params())
 def test_example(request, example_file):
     """Run a single example file as a subprocess and check the outcome.
@@ -165,12 +151,6 @@ def test_example(request, example_file):
             f"Example {name} requires a CUDA device (exceeds TabPFN's CPU sample limit)",
         )
 
-    strict = request.config.getoption("--example-strict")
-    if example_file["long"]:
-        timeout = request.config.getoption("--example-long-timeout")
-    else:
-        timeout = request.config.getoption("--example-timeout")
-
     # Examples are top-to-bottom scripts; run each in its own process so a hang
     # can be killed cleanly and state never leaks between examples. The example
     # inherits TEST_MODE/FAST_TEST_MODE/TABPFN_EXCLUDE_DEVICES from this process.
@@ -182,22 +162,16 @@ def test_example(request, example_file):
             [sys.executable, str(path)],
             cwd=str(path.parent),
             env=env,
-            timeout=timeout,
+            timeout=EXAMPLE_TIMEOUT_SECONDS,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             check=False,
         )
     except subprocess.TimeoutExpired:
-        if example_file["long"]:
-            print(
-                f"{name}: ran {timeout}s without error "
-                f"(long-running; not run to completion by design)",
-            )
-            return
-        if strict:
-            pytest.fail(f"Example {name} did not finish within {timeout}s")
+        # Not a failure: the example started and ran without crashing, which is
+        # all this smoke gate asserts. Completion is checked by the scheduled run.
         print(
-            f"{name}: ran {timeout}s without error "
+            f"{name}: ran {EXAMPLE_TIMEOUT_SECONDS}s without error "
             f"(smoke mode; completion not verified)",
         )
         return

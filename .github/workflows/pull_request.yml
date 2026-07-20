@@ -211,11 +211,13 @@ jobs:
 
   example_smoke:
     name: Example smoke (CPU)
-    # Fast smoke gate for the scripts in examples/. Each example runs as a
-    # subprocess; the test fails only if it *errors*. An example that doesn't
-    # finish within the timeout still passes -- we only assert it starts and runs
-    # without crashing. Running every example to completion (timeout = failure) is
-    # the job of the scheduled GPU run; see PRI-330.
+    # A separate job (rather than part of test_compatibility) so the examples --
+    # which are comparatively slow -- run in parallel and don't block the normal
+    # test suite. Fast smoke gate: each example runs as a subprocess and fails
+    # only if it *errors*; one that doesn't finish within the timeout still passes,
+    # since we only assert it starts and runs without crashing. Running every
+    # example to completion (timeout = failure) is the job of the scheduled full
+    # run; see PRI-330.
     runs-on: ubuntu-latest
     env:
       TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
@@ -223,12 +225,12 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: true
 
@@ -240,7 +242,7 @@ jobs:
 
       - name: Restore model cache
         id: restore-model-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/model_cache
           key: model-cache-${{ hashFiles('model_cache/**') }}
@@ -254,14 +256,14 @@ jobs:
           TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
         run: uv run --no-sync python scripts/download_all_models.py
 
-      # Smoke mode (no --example-strict): a timeout is a pass. -n auto runs the
-      # examples in parallel to keep wall-clock down.
+      # -n auto runs the examples in parallel to keep wall-clock down. The
+      # per-example timeout is fixed in tests/test_examples.py.
       - name: Run example smoke tests
         env:
           TABPFN_EXCLUDE_DEVICES: mps
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/test_examples.py \
-            --run-examples -n auto --example-timeout 120
+            --run-examples -n auto
 
   build_verify:
     name: Build wheel + sdist

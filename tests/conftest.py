@@ -121,26 +121,6 @@ def pytest_addoption(parser):
         default="all",
         help="Specify which TabPFN backend to use: 'tabpfn', 'tabpfn_client', or 'all' (use both if available)",
     )
-    parser.addoption(
-        "--example-timeout",
-        action="store",
-        type=int,
-        default=120,
-        help="Per-example timeout in seconds for normal examples (see tests/test_examples.py)",
-    )
-    parser.addoption(
-        "--example-long-timeout",
-        action="store",
-        type=int,
-        default=120,
-        help="Per-example timeout in seconds for long-running examples (a timeout never fails these)",
-    )
-    parser.addoption(
-        "--example-strict",
-        action="store_true",
-        default=False,
-        help="Treat a normal example that doesn't finish within the timeout as a failure (weekly full run)",
-    )
 
 
 # Define markers for tests
