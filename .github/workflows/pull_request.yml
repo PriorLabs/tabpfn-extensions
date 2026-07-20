@@ -108,6 +108,13 @@ jobs:
             --show-only-failing \
             -0
 
+      # The interpretability extra pulls xgboost/lightgbm (ProxySHAP/OddSHAP
+      # surrogates), whose macOS wheels dlopen the OpenMP runtime at import.
+      # The runner doesn't ship libomp, so install it before the test run.
+      - name: Install libomp (macOS)
+        if: runner.os == 'MacOS'
+        run: brew install libomp
+
       - name: Run Tests (Unix)
         if: runner.os != 'Windows'
         env:

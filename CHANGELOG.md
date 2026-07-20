@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-07-17
+
+### Breaking Changes
+
+- Require `tabpfn>=8.0.0` (was `>=7.0.0`). The class-count limit is now read directly from the model's inference config, so the fallback that assumed a 10-class cap for older TabPFN builds has been removed. ([#312](https://github.com/PriorLabs/tabpfn-extensions/pull/312))
+
+### Added
+
+- Add `CPMDATabPFNRegressor` function to obtain better uncertainty estimates when there are missing values in the features. Conformal prediction is used conditional on missing masks. ([#231](https://github.com/PriorLabs/tabpfn-extensions/pull/231))
+- `score_classification` now accepts `"auroc"` as an alias for `"roc"`, so callers can use either name interchangeably (e.g. scripts passing `"auroc"` no longer fall through to the wrong scoring path). ([#280](https://github.com/PriorLabs/tabpfn-extensions/pull/280))
+- Support an optional `dag` argument in `TabPFNUnsupervisedModel.impute()` and `generate_synthetic_data()` to condition synthesis/imputation on a known causal structure (features processed in topological order, each conditioned on its DAG parents). ([#306](https://github.com/PriorLabs/tabpfn-extensions/pull/306))
+- Added a GPU CI job (`test_gpu`) that runs the test suite on an `ubuntu-22.04-4core-gpu` runner with CUDA forced, mirroring TabPFN's `test_gpu` job, to give the package GPU code-path coverage. ([#322](https://github.com/PriorLabs/tabpfn-extensions/pull/322))
+- The unsupervised `GenerateSyntheticDataExperiment` and `OutlierDetectionUnsupervisedExperiment` `run()` methods now accept a `categorical_features` argument to designate which columns are categorical, plus a `should_plot` flag to skip plotting. ([#326](https://github.com/PriorLabs/tabpfn-extensions/pull/326))
+- Add `simple_impute`, a fast, lightweight column-by-column missing-value imputer in `unsupervised` — a single-pass alternative to `TabPFNUnsupervisedModel.impute()`. ([#335](https://github.com/PriorLabs/tabpfn-extensions/pull/335))
+- Add `get_tabpfn_inf_explainer`, a shapiq explainer that masks absent features with `+inf` so TabPFN's native missing-value handling absorbs them (no sampling, one forward pass per coalition). Requires the model to be built with `inference_config={"PASSTHROUGH_INF": True}` (`tabpfn>=8.1.0`). ([#344](https://github.com/PriorLabs/tabpfn-extensions/pull/344))
+
+### Changed
+
+- `infer_categorical_features` now treats columns with up to 40 unique values as categorical (was 10), requires more than 10 samples per category on average (replacing the flat 100-row guard), and keeps caller-declared categoricals regardless of cardinality; whether the model can predict that many classes is now a separate check. ([#312](https://github.com/PriorLabs/tabpfn-extensions/pull/312))
+- Removed the unused, always-empty `test_utils` module from the `tabpfn_extensions` package namespace. ([#318](https://github.com/PriorLabs/tabpfn-extensions/pull/318))
+- The shapiq interpretability explainers now route to OddSHAP for first-order Shapley values (`index="SV"`) and ProxySHAP for interaction indices instead of shapiq's `auto` default (KernelSHAP/KernelSHAPIQ); each wrapper gained `approximator` (to override the routing) and `random_state` (for reproducible coalition sampling) arguments. This needs `shapiq>=1.6.0` (Python >= 3.12) plus the `xgboost` and `lightgbm` surrogate backends; on older setups the routing falls back to `auto` with a warning. ([#345](https://github.com/PriorLabs/tabpfn-extensions/pull/345))
+
+### Fixed
+
+- `score_classification` no longer slices `y_pred[:, 1]` based on the number of unique labels in `y_true`, which produced incorrect ROC AUC scores for multiclass predictions whose `y_true` subset happened to contain only two classes. Positive-class selection and missing-class handling are now delegated to `safe_roc_auc_score`. ([#280](https://github.com/PriorLabs/tabpfn-extensions/pull/280))
+- `TabPFNUnsupervisedModel.density_` now models the requested feature for the unconditional term of the chain-rule decomposition instead of always using the first column. Previously every feature permutation in `outliers` (and `outliers_pdf`/`outliers_pmf`) opened with the first column's marginal — double-counting feature 0 and dropping the first permuted feature's marginal — and `generate_synthetic_data` sampled the first generated feature of each permutation from the first column's distribution. ([#307](https://github.com/PriorLabs/tabpfn-extensions/pull/307))
+- Fix `TabPFNUnsupervisedModel.outliers` crashing on the MPS backend by casting the target to the logits dtype before moving it to the device. ([#311](https://github.com/PriorLabs/tabpfn-extensions/pull/311))
+- Infer TabPFN's supported class count from the model (`utils.get_max_num_classes`) instead of hard-coding it to 10, so the unsupervised model and `ManyClassClassifier` work correctly with TabPFN-3's higher class limit. `TabPFNUnsupervisedModel` now raises a clear error naming the column that needs a missing classifier/regressor, instead of a cryptic `AttributeError` on `None`. ([#312](https://github.com/PriorLabs/tabpfn-extensions/pull/312))
+- `TabPFNUnsupervisedModel` imputation/density now fits each column's conditional model only on rows whose target value is observed, instead of keeping rows with a missing target and replacing their label with 0. This removes a bias toward 0 and, when fitting on the same data being imputed, stops the query rows from leaking into their own training context. ([#313](https://github.com/PriorLabs/tabpfn-extensions/pull/313))
+- Fix TabPFN backend selection in `get_tabpfn_models()`. Selecting the API/client backend (`USE_TABPFN_LOCAL=false`) with `tabpfn-client` installed previously raised a `NameError` at import time, because the client wrapper classes were not bound to the names the selector reads; they now are, so API inference resolves correctly. Backend selection is also now strict and symmetric: the requested backend is used and, when it is not installed, an `ImportError` naming that backend is raised instead of silently falling back to the other one (which could hide a broken local setup or trigger unexpected API calls). ([#315](https://github.com/PriorLabs/tabpfn-extensions/pull/315))
+- `GenerateSyntheticDataExperiment` and `OutlierDetectionUnsupervisedExperiment` no longer treat every selected feature as categorical, which previously caused numerical columns to be generated as integers. ([#326](https://github.com/PriorLabs/tabpfn-extensions/pull/326))
+- Clarify doc string for GenerateSyntheticDataExperiment in "unsupervised" extension. ([#338](https://github.com/PriorLabs/tabpfn-extensions/pull/338))
+
+
 ## [0.4.2] - 2026-06-02
 
 ### Added

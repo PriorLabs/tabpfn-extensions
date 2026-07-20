@@ -45,7 +45,7 @@ os.environ["TEST_MODE"] = "1"
 
 # Directories whose examples need the full TabPFN package (won't work with the
 # TabPFN client).
-REQUIRES_TABPFN_DIRS = ["embedding/"]
+REQUIRES_TABPFN_DIRS = ["embedding/", "bayesian_optimization/"]
 
 # Examples needing a module that is intentionally never installed, so they skip
 # (rather than fail) when it is absent. Reserved for the GPL-excluded case:
