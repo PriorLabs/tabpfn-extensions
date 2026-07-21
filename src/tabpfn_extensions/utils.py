@@ -165,6 +165,55 @@ def infer_device(device: DeviceSpecification) -> torch.device | FakeTorchDevice:
 
 USE_TABPFN_LOCAL = os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"
 
+
+def _client_full_output_with_criterion(client_output: dict) -> dict:
+    """Return a client ``output_type="full"`` prediction that has a ``criterion``.
+
+    Recent versions of ``tabpfn-client`` already attach a compatible
+    ``FullSupportBarDistribution`` criterion to the full output (when the local
+    ``tabpfn`` package is installed), in which case the output is returned
+    unchanged. Older clients only return the raw arrays; for those the
+    criterion is reconstructed from the returned ``borders``.
+
+    Args:
+        client_output: The dictionary returned by the client's
+            ``predict(..., output_type="full")``.
+
+    Returns:
+        The full-output dictionary, guaranteed to contain a ``criterion``.
+
+    Raises:
+        ValueError: If the criterion is missing from the client output and the
+            local ``tabpfn`` package (needed to reconstruct it) is not
+            installed.
+    """
+    if "criterion" in client_output:
+        return client_output
+
+    try:
+        import torch
+
+        # The same import path tabpfn-client itself uses: stable across
+        # tabpfn versions, unlike the class' concrete module, which has
+        # moved repeatedly (tabpfn.model.bar_distribution ->
+        # tabpfn.architectures.base.bar_distribution ->
+        # tabpfn.architectures.shared.bar_distribution).
+        from tabpfn.regressor import FullSupportBarDistribution
+    except ImportError as err:
+        raise ValueError(
+            "The installed tabpfn-client did not return a 'criterion' with "
+            "output_type='full', and reconstructing it requires the local "
+            "'tabpfn' package. Upgrade tabpfn-client or install tabpfn with "
+            "`pip install tabpfn`.",
+        ) from err
+
+    result = dict(client_output)  # don't mutate the client's output
+    result["criterion"] = FullSupportBarDistribution(
+        borders=torch.as_tensor(client_output["borders"]),
+    )
+    return result
+
+
 try:
     from tabpfn_client import (
         TabPFNClassifier as ClientTabPFNClassifierBase,
@@ -281,8 +330,6 @@ try:
                 paper_version=paper_version,
             )
 
-            # This is the client wrapper - distribution output parameters are not supported
-
         def predict(self, X, output_type=None, **kwargs):
             """Predict target values for X.
 
@@ -305,39 +352,18 @@ try:
             y : array-like of shape (n_samples,) or dict
                 The predicted values or the full distribution output dictionary.
             """
-            # For regular prediction, just call the parent method
+            # For regular prediction, call the parent method with the
+            # requested output type (None means the parent's default).
+            if output_type is None:
+                return super().predict(X, **kwargs)
             if output_type != "full":
-                return super().predict(X)
+                return super().predict(X, output_type=output_type, **kwargs)
 
-            # Handle output_type="full" - we need to wrap the client output
-            # in a compatible format that includes a criterion object
-            try:
-                # Import the distribution class from TabPFN package
-                import torch
-
-                from tabpfn.model.bar_distribution import FullSupportBarDistribution
-
-                # Get prediction output from client (already contains all the data)
-                client_output = super().predict(X, output_type="full")
-
-                # Create a proper criterion object using the data from client
-                # The client already returns logits and borders we can use
-                criterion = FullSupportBarDistribution(
-                    borders=torch.tensor(client_output["borders"]),
-                )
-
-                # Add the criterion to the client output
-                result = dict(client_output)  # Make a copy
-                result["criterion"] = criterion
-
-                return result
-
-            except ImportError:
-                # TabPFN package not available
-                raise ValueError(
-                    "output_type='full' requires the TabPFN package with "
-                    "FullSupportBarDistribution to be installed",
-                )
+            # output_type="full": make sure the output carries a criterion
+            # object, reconstructing it for old client versions that don't
+            # include one themselves.
+            client_output = super().predict(X, output_type="full", **kwargs)
+            return _client_full_output_with_criterion(client_output)
 
         def get_params(self, deep: bool = True) -> dict[str, Any]:
             """Return parameters for this estimator."""
