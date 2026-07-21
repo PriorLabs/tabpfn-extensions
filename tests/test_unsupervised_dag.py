@@ -31,9 +31,15 @@ def test_resolve_dag_order_basic():
 
 @pytest.mark.client_compatible
 @pytest.mark.local_compatible
-def test_resolve_dag_order_partial():
-    """Features with no explicit deps get empty parents."""
-    ordered, full = _resolve_dag_order({2: [0, 1]}, [0, 1, 2, 3])
+def test_resolve_dag_order_rejects_partial_dag():
+    """A DAG that omits features fails loudly instead of silently making the
+    omitted features marginal — parentless features must be stated with an
+    empty list.
+    """
+    with pytest.raises(ValueError, match="must specify every feature"):
+        _resolve_dag_order({2: [0, 1]}, [0, 1, 2, 3])
+    # The same graph with the roots spelled out explicitly is accepted.
+    ordered, full = _resolve_dag_order({0: [], 1: [], 2: [0, 1], 3: []}, [0, 1, 2, 3])
     assert ordered.index(2) > ordered.index(0)
     assert ordered.index(2) > ordered.index(1)
     assert set(ordered) == {0, 1, 2, 3}
@@ -62,8 +68,8 @@ def test_resolve_dag_order_rejects_unknown_indices():
 @pytest.mark.client_compatible
 @pytest.mark.local_compatible
 def test_resolve_dag_order_does_not_mutate_caller_dict():
-    """Filling in empty deps must not write into the caller's dict."""
-    user_dag = {2: [0, 1]}
+    """Resolving the order must not write into the caller's dict."""
+    user_dag = {0: [], 1: [], 2: [0, 1], 3: []}
     snapshot = {k: list(v) for k, v in user_dag.items()}
     _resolve_dag_order(user_dag, [0, 1, 2, 3])
     assert user_dag == snapshot, "caller's DAG dict was mutated"
