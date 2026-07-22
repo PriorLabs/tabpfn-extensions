@@ -165,55 +165,6 @@ def infer_device(device: DeviceSpecification) -> torch.device | FakeTorchDevice:
 
 USE_TABPFN_LOCAL = os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"
 
-
-def _client_full_output_with_criterion(client_output: dict) -> dict:
-    """Return a client ``output_type="full"`` prediction that has a ``criterion``.
-
-    Recent versions of ``tabpfn-client`` already attach a compatible
-    ``FullSupportBarDistribution`` criterion to the full output (when the local
-    ``tabpfn`` package is installed), in which case the output is returned
-    unchanged. Older clients only return the raw arrays; for those the
-    criterion is reconstructed from the returned ``borders``.
-
-    Args:
-        client_output: The dictionary returned by the client's
-            ``predict(..., output_type="full")``.
-
-    Returns:
-        The full-output dictionary, guaranteed to contain a ``criterion``.
-
-    Raises:
-        ValueError: If the criterion is missing from the client output and the
-            local ``tabpfn`` package (needed to reconstruct it) is not
-            installed.
-    """
-    if "criterion" in client_output:
-        return client_output
-
-    try:
-        import torch
-
-        # The same import path tabpfn-client itself uses: stable across
-        # tabpfn versions, unlike the class' concrete module, which has
-        # moved repeatedly (tabpfn.model.bar_distribution ->
-        # tabpfn.architectures.base.bar_distribution ->
-        # tabpfn.architectures.shared.bar_distribution).
-        from tabpfn.regressor import FullSupportBarDistribution
-    except ImportError as err:
-        raise ValueError(
-            "The installed tabpfn-client did not return a 'criterion' with "
-            "output_type='full', and reconstructing it requires the local "
-            "'tabpfn' package. Upgrade tabpfn-client or install tabpfn with "
-            "`pip install tabpfn`.",
-        ) from err
-
-    result = dict(client_output)  # don't mutate the client's output
-    result["criterion"] = FullSupportBarDistribution(
-        borders=torch.as_tensor(client_output["borders"]),
-    )
-    return result
-
-
 try:
     from tabpfn_client import (
         TabPFNClassifier as ClientTabPFNClassifierBase,
@@ -330,40 +281,8 @@ try:
                 paper_version=paper_version,
             )
 
-        def predict(self, X, output_type=None, **kwargs):
-            """Predict target values for X.
-
-            Parameters
-            ----------
-            X : array-like of shape (n_samples, n_features)
-                The input samples.
-
-            output_type : str, default=None
-                Type of output to return. Options are:
-                - None: Default prediction (mean)
-                - "full": Return distribution dictionary with criterion object
-                - Other values are passed to the parent predict
-
-            **kwargs : Additional keyword arguments
-                Passed to the parent predict method.
-
-            Returns:
-            -------
-            y : array-like of shape (n_samples,) or dict
-                The predicted values or the full distribution output dictionary.
-            """
-            # For regular prediction, call the parent method with the
-            # requested output type (None means the parent's default).
-            if output_type is None:
-                return super().predict(X, **kwargs)
-            if output_type != "full":
-                return super().predict(X, output_type=output_type, **kwargs)
-
-            # output_type="full": make sure the output carries a criterion
-            # object, reconstructing it for old client versions that don't
-            # include one themselves.
-            client_output = super().predict(X, output_type="full", **kwargs)
-            return _client_full_output_with_criterion(client_output)
+        # predict is inherited unchanged: tabpfn-client >= 0.2.7 supports all
+        # output types itself and attaches the criterion to output_type="full".
 
         def get_params(self, deep: bool = True) -> dict[str, Any]:
             """Return parameters for this estimator."""
