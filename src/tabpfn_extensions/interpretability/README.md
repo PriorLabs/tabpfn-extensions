@@ -17,7 +17,7 @@ values and Shapley interactions. In addition, ``shapiq`` offers native support f
 TabPFN by utilizing a remove-and-recontextualize paradigm of model interpretation tailored towards
 in-context models.
 
-We expose two adapters:
+We expose three adapters:
 
 * ``get_tabpfn_explainer`` — *remove-and-recontextualize* (Rundel et al. 2024).
   TabPFN is re-fit for every coalition, so the KV cache cannot be reused
@@ -36,6 +36,25 @@ We expose two adapters:
   ```
 
   The wrapper warns at construction time if the model isn't configured this way.
+
+* ``get_tabpfn_inf_explainer`` — *inf-masking* removal. A masked feature is set to
+  ``+inf`` and TabPFN's native missing-value handling absorbs it as "missing" — no
+  sampling, one forward pass per coalition. Like the imputation path the training set
+  is fixed, so the KV cache applies. It requires the model to be built with
+  ``inference_config={"PASSTHROUGH_INF": True}`` (``tabpfn>=8.1.0``) so ``+inf`` reaches
+  the model instead of being rejected at validation; unlike ``NaN``, which TabPFN's
+  preprocessing transforms before it reaches the model, ``+inf`` is carried through:
+
+  ```python
+  clf = TabPFNClassifier(
+      fit_mode="fit_with_cache",
+      inference_config={"PASSTHROUGH_INF": True},
+  )
+  clf.fit(X_train, y_train)
+  explainer = get_tabpfn_inf_explainer(model=clf, data=X_train)
+  ```
+
+  The wrapper raises at construction time if ``PASSTHROUGH_INF`` isn't enabled.
 
 For SHAP-style plots (waterfall, beeswarm, summary, dependence) you have two options:
 

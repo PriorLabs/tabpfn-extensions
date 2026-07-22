@@ -33,6 +33,11 @@ MULTICLASS_TEST_SIZE = (
 )
 DEFAULT_TIMEOUT = 60  # Default timeout in seconds
 
+# Fast mode runs the shared fixtures with a single ensemble member for speed;
+# ensembling is covered separately by test_ensemble_configurations. Outside fast
+# mode n_estimators is left unset so each backend keeps its own default.
+FAST_FIXTURE_KWARGS = {"n_estimators": 1} if FAST_TEST_MODE else {}
+
 # Global variables to track TabPFN implementation availability
 HAS_TABPFN = False  # Is full TabPFN package available?
 HAS_TABPFN_CLIENT = False  # Is TabPFN client available?
@@ -238,13 +243,13 @@ def tabpfn_classifier(backend):
         from tabpfn_extensions.utils import LocalTabPFNClassifier
 
         print("Using TabPFN package for classifier")
-        return LocalTabPFNClassifier()
+        return LocalTabPFNClassifier(**FAST_FIXTURE_KWARGS)
     elif backend == "tabpfn_client":
         # For client backend, use our wrapper to ensure compatibility
         from tabpfn_extensions.utils import ClientTabPFNClassifier
 
         print("Using TabPFN client wrapper for classifier")
-        return ClientTabPFNClassifier()
+        return ClientTabPFNClassifier(**FAST_FIXTURE_KWARGS)
     else:
         pytest.fail(f"Unknown backend: {backend}")
 
@@ -260,13 +265,13 @@ def tabpfn_regressor(backend):
         from tabpfn_extensions.utils import LocalTabPFNRegressor
 
         print("Using TabPFN package for regressor")
-        return LocalTabPFNRegressor()
+        return LocalTabPFNRegressor(**FAST_FIXTURE_KWARGS)
     elif backend == "tabpfn_client":
         # For client backend, use our wrapper to ensure compatibility
         from tabpfn_extensions.utils import ClientTabPFNRegressor
 
         print("Using TabPFN client wrapper for regressor")
-        return ClientTabPFNRegressor()
+        return ClientTabPFNRegressor(**FAST_FIXTURE_KWARGS)
     else:
         pytest.fail(f"Unknown backend: {backend}")
 
@@ -297,6 +302,25 @@ def classification_data(dataset_generator):
         n_features=3,
         n_classes=2,
     )
+    return X, y
+
+
+@pytest.fixture
+def classification_data_with_text(dataset_generator):
+    """Return a classification dataset (pandas) with a string/text column.
+
+    The label depends only on the numeric features; the ``text`` column is a
+    plain string categorical for exercising non-numeric feature handling.
+    """
+    test_size = SMALL_TEST_SIZE if FAST_TEST_MODE else DEFAULT_TEST_SIZE
+    X, y = dataset_generator.generate_classification_data(
+        n_samples=test_size,
+        n_features=2,
+        n_classes=2,
+        as_pandas=True,
+    )
+    X = X.copy()
+    X["text"] = dataset_generator.rng.choice(["a", "b", "c"], size=len(X))
     return X, y
 
 
