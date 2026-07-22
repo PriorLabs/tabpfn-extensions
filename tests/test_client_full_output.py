@@ -7,12 +7,16 @@ output. It also silently dropped any other ``output_type`` (e.g.
 ``"quantiles"``) instead of passing it to the parent predict.
 
 The override is gone: tabpfn-client >= 0.2.7 handles every output type itself
-and attaches a compatible ``criterion`` to ``output_type="full"``. These tests
-pin that the wrapper defers to the client untouched, with the (network-bound)
-parent predict stubbed out so no API credentials are needed.
+and attaches a compatible ``criterion`` to ``output_type="full"``. That version
+floor is enforced when the wrapper is constructed, since tabpfn-client is not a
+declared dependency of tabpfn-extensions. These tests pin that the wrapper
+defers to the client untouched, with the (network-bound) parent predict stubbed
+out so no API credentials are needed.
 """
 
 from __future__ import annotations
+
+import importlib.metadata
 
 import numpy as np
 import pytest
@@ -20,13 +24,47 @@ import pytest
 from tabpfn_extensions import utils
 
 
-@pytest.fixture
-def client_regressor():
-    """A ClientTabPFNRegressor instance (construction needs no credentials)."""
+def _skip_without_client_wrapper() -> None:
     pytest.importorskip("tabpfn_client")
     if utils.ClientTabPFNRegressor is None:
         pytest.skip("tabpfn-client wrapper not available")
+
+
+@pytest.fixture
+def client_regressor():
+    """A ClientTabPFNRegressor instance (construction needs no credentials)."""
+    _skip_without_client_wrapper()
     return utils.ClientTabPFNRegressor()
+
+
+@pytest.mark.local_compatible
+@pytest.mark.client_compatible
+def test_old_client_version_raises_at_construction(monkeypatch):
+    """A pre-0.2.7 client fails fast with an upgrade hint, not a late KeyError."""
+    _skip_without_client_wrapper()
+
+    def fake_version(name):
+        assert name == "tabpfn-client"
+        return "0.2.6"
+
+    monkeypatch.setattr(importlib.metadata, "version", fake_version)
+
+    with pytest.raises(ImportError, match="tabpfn-client>=0.2.7.*installed: 0.2.6"):
+        utils.ClientTabPFNRegressor()
+
+
+@pytest.mark.local_compatible
+@pytest.mark.client_compatible
+def test_missing_client_metadata_is_tolerated(monkeypatch):
+    """Editable/dev installs without package metadata skip the version check."""
+    _skip_without_client_wrapper()
+
+    def fake_version(name):
+        raise importlib.metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(importlib.metadata, "version", fake_version)
+
+    utils.ClientTabPFNRegressor()
 
 
 @pytest.mark.local_compatible

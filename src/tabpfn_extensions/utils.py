@@ -165,6 +165,41 @@ def infer_device(device: DeviceSpecification) -> torch.device | FakeTorchDevice:
 
 USE_TABPFN_LOCAL = os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"
 
+# First tabpfn-client version to attach `criterion` to output_type="full".
+_MIN_CLIENT_VERSION = "0.2.7"
+
+
+def _check_client_version() -> None:
+    """Raise if the installed tabpfn-client is too old for the regressor wrapper.
+
+    ``ClientTabPFNRegressor`` relies on the client attaching the
+    ``FullSupportBarDistribution`` criterion to ``output_type="full"``
+    predictions (tabpfn-client >= 0.2.7); with older clients this would only
+    surface much later as a bare ``KeyError: 'criterion'``. tabpfn-client is
+    not a declared dependency of tabpfn-extensions, so the version floor has
+    to be enforced here rather than in pyproject.toml.
+
+    Raises:
+        ImportError: If the installed tabpfn-client is older than
+            ``_MIN_CLIENT_VERSION``.
+    """
+    import importlib.metadata
+
+    from packaging.version import Version
+
+    try:
+        installed = importlib.metadata.version("tabpfn-client")
+    except importlib.metadata.PackageNotFoundError:
+        return  # editable/dev installs without metadata: assume new enough
+    if Version(installed) < Version(_MIN_CLIENT_VERSION):
+        raise ImportError(
+            f"tabpfn-extensions requires tabpfn-client>={_MIN_CLIENT_VERSION} "
+            f"(installed: {installed}): output_type='full' needs the "
+            "criterion the client attaches itself since that version. "
+            "Upgrade with `pip install --upgrade tabpfn-client`.",
+        )
+
+
 try:
     from tabpfn_client import (
         TabPFNClassifier as ClientTabPFNClassifierBase,
@@ -252,6 +287,7 @@ try:
             inference_config: dict | None = None,
             paper_version: bool = False,
         ) -> None:
+            _check_client_version()
             self.device = device
             self.categorical_features_indices = categorical_features_indices
             if categorical_features_indices is not None:
@@ -281,8 +317,9 @@ try:
                 paper_version=paper_version,
             )
 
-        # predict is inherited unchanged: tabpfn-client >= 0.2.7 supports all
-        # output types itself and attaches the criterion to output_type="full".
+        # predict is inherited unchanged: tabpfn-client >= 0.2.7 (enforced in
+        # __init__) supports all output types itself and attaches the
+        # criterion to output_type="full".
 
         def get_params(self, deep: bool = True) -> dict[str, Any]:
             """Return parameters for this estimator."""
