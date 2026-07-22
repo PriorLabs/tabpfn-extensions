@@ -435,7 +435,7 @@ class TestTabEBMErrorHandling:
             y=y,
             num_samples=num_samples,
             sgld_steps=sgld_steps,
-            debug=True,
+            verbose=True,
             seed=42,
         )
 
