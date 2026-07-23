@@ -56,7 +56,7 @@ Many TabPFN Extensions works with two TabPFN implementations:
 
 2. **TabPFN Client** — Lightweight API client for cloud-based inference:
    ```bash
-   pip install tabpfn-client
+   pip install "tabpfn-client>=0.2.7"
    ```
 
 Choose the backend that fits your needs - most extensions work with either option!
