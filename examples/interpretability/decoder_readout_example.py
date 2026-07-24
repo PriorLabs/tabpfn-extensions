@@ -183,10 +183,10 @@ fig.legend(
     bbox_to_anchor=(0.5, -0.01),
 )
 fig.suptitle(
-    f"TabPFN decoder-head readout — the prediction as a label-vote over training "
-    f"rows ({proj_name} of embeddings, decoder attention weights, Σ = 1)",
+    f"TabPFN decoder-head readout: a label-vote over training rows ({proj_name})",
     fontsize=15,
     fontweight="bold",
 )
 fig.tight_layout(rect=(0, 0.03, 1, 0.97))
+fig.savefig("decoder_readout.png", dpi=150, bbox_inches="tight")
 plt.show()
