@@ -1,8 +1,8 @@
 name: Example full run (GPU)
-run-name: "Example full run (strict) on ${{ github.ref_name }}"
+run-name: "Example full run on ${{ github.ref_name }}"
 
 # Runs every example to completion at full size on a GPU runner
-# (EXAMPLE_STRICT=1: FAST_TEST_MODE is stripped, a timeout is a failure).
+# (EXAMPLE_FULL=1: FAST_TEST_MODE is stripped, a timeout is a failure).
 # Complements the per-PR CPU smoke gate in pull_request.yml, which only
 # asserts that each example starts and runs without crashing.
 
@@ -17,8 +17,8 @@ permissions:
   issues: write
 
 jobs:
-  example_strict:
-    name: Example strict run (GPU)
+  example_full:
+    name: Example full run (GPU)
     runs-on: ubuntu-22.04-4core-gpu
     # Full sequential run measured ~40-50 min on a Tesla T4 incl. setup;
     # generous headroom below the 900s-per-example cap x 17 examples.
@@ -64,16 +64,16 @@ jobs:
         run: uv run --no-sync python scripts/download_all_models.py
 
       # Sequential on purpose: the examples share one GPU, and parallel workers
-      # would distort per-example runtimes against the strict timeout.
+      # would distort per-example runtimes against the per-example timeout.
       # `tee` captures output for the failure-issue body while still streaming
       # to the log; pipefail preserves pytest's exit code through the pipe.
-      - name: Run examples to completion (strict)
+      - name: Run examples to completion (full)
         env:
           CUDA_VISIBLE_DEVICES: "0"
           # Exclude cpu/mps so TabPFN selects the GPU. The cpu code paths are
           # already covered by the per-PR smoke gate.
           TABPFN_EXCLUDE_DEVICES: "cpu,cpu:0,mps"
-          EXAMPLE_STRICT: "1"
+          EXAMPLE_FULL: "1"
         run: |
           set -o pipefail
           uv run --no-sync pytest tests/test_examples.py --run-examples -v 2>&1 \
@@ -86,7 +86,7 @@ jobs:
       # cancels the steps rather than failing them, so failure() alone would
       # stay silent exactly when the run hangs.
       - name: Open or update tracking issue on failure
-        if: (failure() || cancelled()) && github.event_name != 'pull_request'
+        if: failure() || cancelled()
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |

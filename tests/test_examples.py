@@ -9,7 +9,7 @@ There are two run modes:
   (directly, or via library code that reads the flag) shrink their workload.
   This is the fast, cheap per-PR guard against broken example scripts and
   import errors.
-* **Strict** (``EXAMPLE_STRICT=1``): every example must run *to completion*,
+* **Full** (``EXAMPLE_FULL=1``): every example must run *to completion*,
   and a timeout is a failure. ``FAST_TEST_MODE`` is stripped, so examples run
   at full size -- exactly as a user would run them. This is the scheduled GPU
   full run. The switch is an environment variable rather than a pytest CLI
@@ -21,12 +21,11 @@ An example is **skipped** (not failed) when:
 * it needs an optional dependency that isn't installed (the GPL-excluded
   scikit-survival), or
 * it is GPU-only and no CUDA device is available (some examples exceed TabPFN's
-  CPU sample guard and only run on a GPU), or
-* it demonstrates a deprecated module that is scheduled for removal.
+  CPU sample guard and only run on a GPU).
 
 Usage:
     uv run --no-sync pytest tests/test_examples.py --run-examples
-    EXAMPLE_STRICT=1 uv run --no-sync pytest tests/test_examples.py --run-examples
+    EXAMPLE_FULL=1 uv run --no-sync pytest tests/test_examples.py --run-examples
 """
 
 from __future__ import annotations
@@ -40,17 +39,17 @@ from pathlib import Path
 import pytest
 import torch
 
-# Strict mode: run every example at full size to completion; a timeout is a
+# Full run: every example runs at full size to completion; a timeout is a
 # failure. Used by the scheduled GPU full run. In the default smoke mode a
 # timeout still passes -- we only assert the example starts and runs without
 # crashing.
-STRICT_MODE = os.environ.get("EXAMPLE_STRICT", "0") == "1"
+FULL_RUN = os.environ.get("EXAMPLE_FULL", "0") == "1"
 
 # Per-example timeout. The smoke budget is short since a timeout passes anyway;
-# the strict budget is sized so it only bites on genuine hangs or regressions
+# the full-run budget is sized so it only bites on genuine hangs or regressions
 # (the slowest full-size example measured ~504s on a Tesla T4, leaving ~45%
 # headroom for runner variance).
-EXAMPLE_TIMEOUT_SECONDS = 900 if STRICT_MODE else 120
+EXAMPLE_TIMEOUT_SECONDS = 900 if FULL_RUN else 120
 
 # Directories whose examples need the full TabPFN package (won't work with the
 # TabPFN client).
@@ -69,15 +68,6 @@ REQUIRES_MODULE = {
 # Skipped when no CUDA device is available.
 GPU_ONLY = {
     "get_embeddings.py",
-}
-
-# Examples for deprecated modules that are scheduled for removal (see the
-# deprecation banners in the modules themselves). Not worth CI time to keep
-# green -- delete each entry together with its module. The regular unit-test
-# suite still covers these modules until they are removed.
-DEPRECATED = {
-    "phe_example.py": "AutoTabPFN* (post_hoc_ensembles) is deprecated",
-    "tuned_tabpfn.py": "TunedTabPFN* (hpo) is deprecated",
 }
 
 # Examples known to be broken against current dependencies, with a tracking issue.
@@ -150,12 +140,6 @@ def test_example(request, example_file):
     if not request.config.getoption("--run-examples"):
         pytest.skip(f"Skipping {name} since --run-examples not set")
 
-    # Deprecated module -> skip (kept visible as a skip until the module and
-    # its example are removed)
-    deprecation = DEPRECATED.get(name)
-    if deprecation is not None:
-        pytest.skip(f"Example {name}: {deprecation}")
-
     # Backend availability
     if example_file["requires_tabpfn"]:
         if not HAS_TABPFN:
@@ -184,11 +168,11 @@ def test_example(request, example_file):
     # can be killed cleanly and state never leaks between examples. The example
     # inherits TABPFN_EXCLUDE_DEVICES from this process.
     env = dict(os.environ)
-    if STRICT_MODE:
+    if FULL_RUN:
         # Full size, exactly as a user would run the example. Stripped rather
         # than inherited so the CI job env (which sets FAST_TEST_MODE for the
         # unit suite) or a stray local setting can't quietly shrink what the
-        # strict run verifies -- the flag is read by the examples themselves
+        # full run verifies -- the flag is read by the examples themselves
         # and by library code paths they call.
         env.pop("FAST_TEST_MODE", None)
     else:
@@ -212,13 +196,13 @@ def test_example(request, example_file):
             check=False,
         )
     except subprocess.TimeoutExpired:
-        if STRICT_MODE:
+        if FULL_RUN:
             pytest.fail(
                 f"Example {name} did not complete within "
-                f"{EXAMPLE_TIMEOUT_SECONDS}s (strict mode: a timeout is a failure)",
+                f"{EXAMPLE_TIMEOUT_SECONDS}s (full run: a timeout is a failure)",
             )
         # Not a failure: the example started and ran without crashing, which is
-        # all the smoke gate asserts. Completion is checked by the strict run.
+        # all the smoke gate asserts. Completion is checked by the full run.
         print(
             f"{name}: ran {EXAMPLE_TIMEOUT_SECONDS}s without error "
             f"(smoke mode; completion not verified)",
