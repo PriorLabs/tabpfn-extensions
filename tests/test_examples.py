@@ -5,14 +5,16 @@ There are two run modes:
 
 * **Smoke** (default): an example that *errors* fails the test; one that simply
   doesn't finish in time *passes* -- we only assert it starts and runs without
-  crashing. Examples run with ``TEST_MODE=1`` so those that support it shrink
-  their workload. This is the fast, cheap per-PR guard against broken example
-  scripts and import errors.
+  crashing. Examples run with ``FAST_TEST_MODE=1`` so those that support it
+  (directly, or via library code that reads the flag) shrink their workload.
+  This is the fast, cheap per-PR guard against broken example scripts and
+  import errors.
 * **Strict** (``EXAMPLE_STRICT=1``): every example must run *to completion*,
-  and a timeout is a failure. Examples run at full size (no ``TEST_MODE``) --
-  exactly as a user would run them. This is the scheduled GPU full run. The
-  switch is an environment variable rather than a pytest CLI option so that
-  command-line arguments cannot flip the pass/fail semantics of a run.
+  and a timeout is a failure. ``FAST_TEST_MODE`` is stripped, so examples run
+  at full size -- exactly as a user would run them. This is the scheduled GPU
+  full run. The switch is an environment variable rather than a pytest CLI
+  option so that command-line arguments cannot flip the pass/fail semantics of
+  a run.
 
 An example is **skipped** (not failed) when:
 
@@ -180,17 +182,19 @@ def test_example(request, example_file):
 
     # Examples are top-to-bottom scripts; run each in its own process so a hang
     # can be killed cleanly and state never leaks between examples. The example
-    # inherits FAST_TEST_MODE/TABPFN_EXCLUDE_DEVICES from this process.
+    # inherits TABPFN_EXCLUDE_DEVICES from this process.
     env = dict(os.environ)
     if STRICT_MODE:
         # Full size, exactly as a user would run the example. Stripped rather
-        # than inherited so a stray TEST_MODE in the environment can't quietly
-        # shrink what the strict run verifies.
-        env.pop("TEST_MODE", None)
+        # than inherited so the CI job env (which sets FAST_TEST_MODE for the
+        # unit suite) or a stray local setting can't quietly shrink what the
+        # strict run verifies -- the flag is read by the examples themselves
+        # and by library code paths they call.
+        env.pop("FAST_TEST_MODE", None)
     else:
         # Shrink the workload where the example supports it, so it can
         # complete within the smoke budget.
-        env["TEST_MODE"] = "1"
+        env["FAST_TEST_MODE"] = "1"
     # Headless plotting: an example calling plt.show() must never block on a
     # GUI window (on a machine with a display, the interactive backend blocks
     # until the window is closed -- fatal in strict mode, where that reads as
