@@ -42,6 +42,13 @@ EXAMPLE_TIMEOUT_SECONDS = 120
 # TabPFN client).
 REQUIRES_TABPFN_DIRS = ["embedding/", "bayesian_optimization/"]
 
+# Individual examples that need the full TabPFN package, in directories that
+# otherwise work with the client (so a whole-directory match would be too broad).
+REQUIRES_TABPFN_FILES = {
+    # get_decoder_readout reads model_ internals the client backend doesn't expose.
+    "decoder_readout_example.py",
+}
+
 # Examples needing a module that is intentionally never installed, so they skip
 # (rather than fail) when it is absent. Reserved for the GPL-excluded case:
 # scikit-survival is in no extra or group, so survival_example always skips unless
@@ -101,8 +108,9 @@ def get_example_files() -> list[dict]:
             {
                 "path": file_path,
                 "name": name,
-                "requires_tabpfn": any(
-                    pattern in rel_path for pattern in REQUIRES_TABPFN_DIRS
+                "requires_tabpfn": (
+                    any(pattern in rel_path for pattern in REQUIRES_TABPFN_DIRS)
+                    or name in REQUIRES_TABPFN_FILES
                 ),
                 "requires_module": REQUIRES_MODULE.get(name),
                 "gpu_only": name in GPU_ONLY,

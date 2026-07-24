@@ -122,6 +122,9 @@ examples = [
     # Only used by interpretability/shap_example.py for plotting.
     # Floor is 0.46.0 (0.41.0 pins an unbuildable numba).
     "shap>=0.46.0",
+    # Only used by interpretability/decoder_readout_example.py for the 2D
+    # embedding projection; the example falls back to PCA when it is absent.
+    "umap-learn>=0.5.0",
 ]
 
 [tool.uv]
