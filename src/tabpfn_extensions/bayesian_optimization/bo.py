@@ -56,7 +56,12 @@ def expected_improvement(
     """
     averaged_logits, _outputs, _borders = reg.forward(x, use_inference_mode=True)
     logits = averaged_logits.transpose(0, 1).float()
-    return reg.raw_space_bardist_.ei(logits, best_f, maximize=True)
+    # The raw-space bar distribution can live on a different device than the
+    # logits (TabPFN builds it on cpu in the differentiable-input path even
+    # when the model runs on cuda). It is an nn.Module, so .to() moves its
+    # borders buffer in place and the EI computation never mixes devices.
+    bardist = reg.raw_space_bardist_.to(logits.device)
+    return bardist.ei(logits, best_f, maximize=True)
 
 
 def propose_next_point(

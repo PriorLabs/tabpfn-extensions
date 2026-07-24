@@ -1,3 +1,4 @@
+import os
 import warnings
 
 import matplotlib.pyplot as plt
@@ -7,6 +8,10 @@ from sklearn.model_selection import train_test_split
 from tabpfn_extensions import TabPFNClassifier
 from tabpfn_extensions.interpretability.pdp import partial_dependence_plots
 
+# Under FAST_TEST_MODE=1 (set by the CI example tests) the workload shrinks so
+# the example finishes quickly; the plots are correspondingly coarser.
+FAST_TEST_MODE = os.environ.get("FAST_TEST_MODE") == "1"
+
 # Load example dataset
 data = load_breast_cancer()
 X, y = data.data, data.target
@@ -14,6 +19,10 @@ feature_names = list(data.feature_names)
 
 # Split data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5)
+if FAST_TEST_MODE:
+    # PD cost is grid points x rows per predict; the 2D pair alone needs
+    # grid_resolution^2 grid points.
+    X_test = X_test[:50]
 
 # Initialize and train model. Enable the KV cache (improved with TabPFN-3):
 # PDP issues many predicts (grid_resolution per feature * #features) against
@@ -46,7 +55,7 @@ disp = partial_dependence_plots(
     estimator=clf,
     X=X_test,
     features=[0, 1, 2, (0, 3)],
-    grid_resolution=30,
+    grid_resolution=5 if FAST_TEST_MODE else 30,
     kind="average",
     target_class=1,
 )
