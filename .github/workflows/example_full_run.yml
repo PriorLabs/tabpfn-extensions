@@ -11,8 +11,6 @@ on:
   # introduces this workflow (schedule/workflow_dispatch only fire once the
   # file exists on the default branch).
   pull_request:
-    paths:
-      - ".github/workflows/example_full_run.yml"
   schedule:
     # Every other day; a full run costs ~40-50 GPU-minutes.
     - cron: "0 3 */2 * *"
