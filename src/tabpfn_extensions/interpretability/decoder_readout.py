@@ -12,7 +12,11 @@ weights over the training rows whose label is ``c``.
 can see *which* training points drive a prediction and by how much. For each test
 row the weights sum to 1 (averaged over the decoder's attention heads and over the
 ensemble members). Collapsing them by training label with ``class_vote`` reproduces
-the model's ``predict_proba`` up to the head's clamping.
+the model's ``predict_proba`` up to the head's log-clamping, at the classifier's
+default ``softmax_temperature=0.9`` and ``balance_probabilities=False``. Both
+settings are applied to the decoder's logits *after* this readout, so a
+non-default ``softmax_temperature`` or ``balance_probabilities=True`` will make
+``class_vote`` diverge further from ``predict_proba``.
 
 Only the local ``tabpfn`` backend is supported: the client/API backend does not
 expose the model internals this reads from. Row subsampling
@@ -115,6 +119,16 @@ def get_decoder_readout(
             "get_decoder_readout does not support multi-model ensembles.",
         ) from err
 
+    subsample_samples = estimator.inference_config_.SUBSAMPLE_SAMPLES
+    if subsample_samples is not None:
+        raise NotImplementedError(
+            "get_decoder_readout does not support row subsampling "
+            f"(inference_config SUBSAMPLE_SAMPLES={subsample_samples!r}): each "
+            "estimator would attend over a different subset of training rows, so "
+            "the weight columns would no longer align to a single set of rows. "
+            "Refit with SUBSAMPLE_SAMPLES=None.",
+        )
+
     decoder = _find_decoder(model)
     captured: list[np.ndarray] = []
 
@@ -151,7 +165,10 @@ def class_vote(
 
     Sums the attention weights within each training label, turning the readout
     into a class distribution. Averaged over the ensemble, this reproduces the
-    model's ``predict_proba`` up to the head's log-clamping.
+    model's ``predict_proba`` up to the head's log-clamping, at the classifier's
+    default ``softmax_temperature=0.9`` and ``balance_probabilities=False``
+    (both are applied downstream of this readout, so non-default values widen
+    the gap to ``predict_proba``).
 
     Args:
         weights: Readout weights ``(n_test, n_train)`` from ``get_decoder_readout``.

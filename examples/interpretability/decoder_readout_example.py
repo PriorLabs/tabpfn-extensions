@@ -10,7 +10,9 @@ This script fits a TabPFNClassifier, projects the model's training embeddings to
 2D (UMAP, falling back to PCA), and for four queries spanning the confidence
 range draws the readout: lines from the query to its most-attended training rows,
 colored by the row's class and scaled by its vote weight. Summing the red (positive
-class) weights gives the readout probability, which matches ``predict_proba``.
+class) weights gives the readout probability, which approximates ``predict_proba``
+(they match up to the head's log-clamping and the classifier's
+``softmax_temperature``/``balance_probabilities`` post-processing).
 
 Dataset: breast cancer (binary classification).
 """
@@ -53,9 +55,8 @@ p_pos = votes[:, 1]  # readout P(positive class)
 def pick_queries(p: np.ndarray) -> list[int]:
     """Four test rows spanning confident-negative to confident-positive."""
     order = np.argsort(p)
-    lean_neg = order[np.searchsorted(p[order], 0.5) - 1]
-    lean_pos = order[np.searchsorted(p[order], 0.5)]
-    return [order[0], lean_neg, lean_pos, order[-1]]
+    split = np.clip(np.searchsorted(p[order], 0.5), 1, len(order) - 1)
+    return [order[0], order[split - 1], order[split], order[-1]]
 
 
 queries = pick_queries(p_pos)

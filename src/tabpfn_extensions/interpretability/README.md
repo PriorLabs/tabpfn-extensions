@@ -20,14 +20,18 @@ clf = TabPFNClassifier().fit(X_train, y_train)
 weights, train_indices = get_decoder_readout(clf, X_test)
 
 # Collapse by training label; averaged over the ensemble this reproduces
-# predict_proba up to the head's log-clamping.
+# predict_proba up to the head's log-clamping, at the default
+# softmax_temperature=0.9 and balance_probabilities=False (both are applied
+# downstream of this readout, so non-default values widen the gap).
 votes, classes = class_vote(weights, y_train)
 ```
 
 Only the local `tabpfn` backend is supported (the client/API backend does not
 expose the model internals), and row subsampling
-(`TabPFNClassifier(..., subsample_samples=...)`) is not supported since the
-weight columns would no longer align to a single set of training rows.
+(`TabPFNClassifier(..., inference_config={"SUBSAMPLE_SAMPLES": ...})`) is not
+supported since the weight columns would no longer align to a single set of
+training rows; `get_decoder_readout` raises `NotImplementedError` if it detects
+subsampling is active.
 
 See `examples/interpretability/decoder_readout_example.py`, which projects the
 model's training embeddings to 2D and draws, for queries spanning the confidence
