@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   example_strict:
@@ -70,6 +71,8 @@ jobs:
 
       # Sequential on purpose: the examples share one GPU, and parallel workers
       # would distort per-example runtimes against the strict timeout.
+      # `tee` captures output for the failure-issue body while still streaming
+      # to the log; pipefail preserves pytest's exit code through the pipe.
       - name: Run examples to completion (strict)
         env:
           CUDA_VISIBLE_DEVICES: "0"
@@ -78,4 +81,54 @@ jobs:
           TABPFN_EXCLUDE_DEVICES: "cpu,cpu:0,mps"
           EXAMPLE_STRICT: "1"
         run: |
-          uv run --no-sync pytest tests/test_examples.py --run-examples -v
+          set -o pipefail
+          uv run --no-sync pytest tests/test_examples.py --run-examples -v 2>&1 \
+            | tee pytest_output.txt
+
+      # Scheduled-run failures don't notify anyone by default (GitHub only
+      # emails whoever last edited the cron line), so track them as an issue.
+      # Repeat failures comment on the open issue instead of filing new ones.
+      - name: Open or update tracking issue on failure
+        if: failure() && github.event_name != 'pull_request'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require("fs");
+            let failedLines = "(no FAILED lines parsed; see logs)";
+            try {
+              const text = fs.readFileSync("pytest_output.txt", "utf-8");
+              const lines = text.split("\n").filter(l => l.startsWith("FAILED "));
+              if (lines.length > 0) failedLines = lines.join("\n");
+            } catch (e) { /* output file missing -- fall through to default */ }
+
+            const title = "Scheduled example full run (GPU) failed";
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: ["nightly-failure"],
+            });
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/` +
+              `${context.repo.repo}/actions/runs/${context.runId}`;
+            const body =
+              `Run: ${runUrl}\n\n` +
+              `\`\`\`\n${failedLines}\n\`\`\`\n\n` +
+              `See logs for full output.`;
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["nightly-failure"],
+              });
+            }
