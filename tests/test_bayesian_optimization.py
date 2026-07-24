@@ -8,6 +8,7 @@ bo = pytest.importorskip(
     reason="bayesian_optimization requires the full TabPFN package",
 )
 
+from conftest import TEST_DEVICE  # noqa: E402
 from tabpfn import TabPFNRegressor  # noqa: E402
 
 if not hasattr(TabPFNRegressor, "fit_with_differentiable_input"):
@@ -23,7 +24,7 @@ DIM = 3
 @pytest.fixture(scope="module")
 def train_data():
     torch.manual_seed(0)
-    train_x = torch.rand(8, DIM)
+    train_x = torch.rand(8, DIM, device=TEST_DEVICE)
     train_y = train_x.sum(dim=1)
     return train_x, train_y
 
@@ -31,7 +32,7 @@ def train_data():
 def make_regressor() -> TabPFNRegressor:
     return TabPFNRegressor(
         n_estimators=1,
-        device="cpu",
+        device=TEST_DEVICE,
         random_state=0,
         inference_precision=torch.float32,
         differentiable_input=True,
@@ -43,7 +44,7 @@ def test_expected_improvement_is_nonnegative_and_differentiable(train_data):
     reg = make_regressor()
     reg.fit_with_differentiable_input(train_x, train_y)
 
-    x = torch.rand(4, DIM, requires_grad=True)
+    x = torch.rand(4, DIM, device=TEST_DEVICE, requires_grad=True)
     ei = bo.expected_improvement(reg, x, train_y.max().item())
 
     assert ei.shape == (4,)

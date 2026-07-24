@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pytest
 
+from conftest import TEST_DEVICE
 from tabpfn_extensions.pval_crt import tabpfn_crt
 
 FAST_TEST_MODE = os.environ.get("FAST_TEST_MODE", "0") == "1"
@@ -27,7 +28,7 @@ def test_crt_detects_relevant_feature():
         j=1,
         B=40,
         test_size=0.3,
-        device="cpu",
+        device=TEST_DEVICE,
         seed=0,
     )
 
@@ -53,7 +54,7 @@ def test_crt_handles_irrelevant_feature():
         j=2,
         B=40,
         test_size=0.3,
-        device="cpu",
+        device=TEST_DEVICE,
         seed=0,
     )
 
@@ -72,7 +73,7 @@ def test_crt_output_contract():
 
     # Structure-only check, so a few permutations suffice.
     B = 5 if FAST_TEST_MODE else 40
-    res = tabpfn_crt(X, y, j=1, B=B, test_size=0.3, device="cpu", seed=0)
+    res = tabpfn_crt(X, y, j=1, B=B, test_size=0.3, device=TEST_DEVICE, seed=0)
 
     assert "p_value" in res
     assert "reject_null" in res
@@ -90,6 +91,6 @@ def test_crt_detects_obvious_signal():
 
     # p-value floor is 1/(B+1), so B must stay >=20 to keep it under 0.05.
     B = 30 if FAST_TEST_MODE else 40
-    res = tabpfn_crt(X, y, j=1, B=B, test_size=0.3, device="cpu", seed=0)
+    res = tabpfn_crt(X, y, j=1, B=B, test_size=0.3, device=TEST_DEVICE, seed=0)
 
     assert res["p_value"] < 0.05

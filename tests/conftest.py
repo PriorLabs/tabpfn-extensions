@@ -20,11 +20,20 @@ from __future__ import annotations
 import os
 
 import pytest
+import torch
 
 # Test configuration settings
 FAST_TEST_MODE = (
     os.environ.get("FAST_TEST_MODE", "0") == "1"
 )  # Skip slow tests by default
+
+# Device for tests that construct their own TabPFN estimators or tensors:
+# cuda when available, so the GPU CI job actually exercises the extensions'
+# cuda code paths; cpu otherwise. mps is never picked -- CI excludes it via
+# TABPFN_EXCLUDE_DEVICES, and auto-selection would silently switch local
+# macOS runs to a different backend. Tests that *require* cpu (e.g. exact
+# fp32 comparisons) keep an explicit device="cpu" pin instead.
+TEST_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 SMALL_TEST_SIZE = 25  # Number of samples to use in fast test mode
 DEFAULT_TEST_SIZE = 40  # Number of samples to use in regular mode
 # Larger sizes for specific tests that require more samples
