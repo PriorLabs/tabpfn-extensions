@@ -86,8 +86,11 @@ jobs:
       # Scheduled-run failures don't notify anyone by default (GitHub only
       # emails whoever last edited the cron line), so track them as an issue.
       # Repeat failures comment on the open issue instead of filing new ones.
+      # cancelled() covers the job-timeout case: exceeding timeout-minutes
+      # cancels the steps rather than failing them, so failure() alone would
+      # stay silent exactly when the run hangs.
       - name: Open or update tracking issue on failure
-        if: failure() && github.event_name != 'pull_request'
+        if: (failure() || cancelled()) && github.event_name != 'pull_request'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
