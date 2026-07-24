@@ -9,9 +9,7 @@ except PackageNotFoundError:
 from tabpfn_common_utils.telemetry.interactive import opt_in
 
 from .embedding import TabPFNEmbedding
-from .hpo import TunedTabPFNClassifier, TunedTabPFNRegressor
 from .many_class import ManyClassClassifier
-from .post_hoc_ensembles import AutoTabPFNClassifier, AutoTabPFNRegressor
 from .unsupervised import TabPFNUnsupervisedModel
 
 # Import utilities and wrapped TabPFN classes
@@ -24,10 +22,6 @@ __all__ = [
     "TabPFNEmbedding",
     "ManyClassClassifier",
     "TabPFNUnsupervisedModel",
-    "AutoTabPFNClassifier",
-    "AutoTabPFNRegressor",
-    "TunedTabPFNClassifier",
-    "TunedTabPFNRegressor",
 ]
 
 # Prompt the user to opt in for our newsletter
