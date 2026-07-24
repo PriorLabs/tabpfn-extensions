@@ -40,8 +40,6 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
 - **pval_crt**: Statistical feature relevance testing (p-values)
 - **bayesian_optimization**: Bayesian optimization with TabPFN as the surrogate model and differentiable Expected Improvement
-- **post_hoc_ensembles** *(deprecated)*: `AutoTabPFN*` — improve performance with model combination via AutoGluon. Scheduled for removal in a future release.
-- **hpo** *(deprecated)*: `TunedTabPFN*` — automatic hyperparameter tuning for TabPFN via Hyperopt. Scheduled for removal in a future release.
 
 See the [Documentation](#documentation) section below for guides, examples, and per-extension READMEs.
 
@@ -61,7 +59,7 @@ Many TabPFN Extensions works with two TabPFN implementations:
 
 Choose the backend that fits your needs - most extensions work with either option!
 
-Exceptions to this are **post_hoc_ensembles** *(deprecated)*, **embedding**, and **bayesian_optimization**, which only work with the local `tabpfn` package.
+Exceptions to this are **embedding** and **bayesian_optimization**, which only work with the local `tabpfn` package.
 
 ## Documentation
 
@@ -80,8 +78,6 @@ Runnable scripts and notebooks for extensions and general use cases live in the 
 - [`survival/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/survival) — survival analysis
 - [`tabebm/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/tabebm) — data augmentation via TabEBM
 - [`unsupervised/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/unsupervised) — data generation, imputation, and outlier detection
-- [`hpo/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/hpo) *(deprecated)* — `TunedTabPFN*` automatic hyperparameter tuning
-- [`phe/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/phe) *(deprecated)* — `AutoTabPFN*` post-hoc ensembles
 
 ### TabPFN Docs pages
 
@@ -96,8 +92,6 @@ Some extensions ship a dedicated README alongside their source code:
 - [`interpretability/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/interpretability/README.md)
 - [`pval_crt/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/pval_crt/README.md)
 - [`tabebm/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/tabebm/README.md)
-- [`hpo/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/hpo/README.md) *(deprecated)*
-- [`post_hoc_ensembles/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/post_hoc_ensembles/README.md) *(deprecated)*
 
 ### Interactive notebook
 

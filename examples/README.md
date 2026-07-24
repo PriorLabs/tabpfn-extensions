@@ -14,9 +14,7 @@ examples/
 ├── pval_crt/          # Statistical feature relevance testing
 ├── survival/          # Survival analysis
 ├── tabebm/            # Data augmentation via TabEBM
-├── unsupervised/      # Data generation, imputation, outlier detection
-├── hpo/               # (deprecated) TunedTabPFN* hyperparameter tuning
-└── phe/               # (deprecated) AutoTabPFN* post-hoc ensembles
+└── unsupervised/      # Data generation, imputation, outlier detection
 ```
 
 ## Running Examples
