@@ -1,0 +1,81 @@
+name: Example full run (GPU)
+run-name: "Example full run (strict) on ${{ github.ref_name }}"
+
+# Runs every example to completion at full size on a GPU runner
+# (EXAMPLE_STRICT=1: FAST_TEST_MODE is stripped, a timeout is a failure).
+# Complements the per-PR CPU smoke gate in pull_request.yml, which only
+# asserts that each example starts and runs without crashing.
+
+on:
+  # TEMPORARY -- remove before merge. Lets the run be exercised on the PR that
+  # introduces this workflow (schedule/workflow_dispatch only fire once the
+  # file exists on the default branch).
+  pull_request:
+    paths:
+      - ".github/workflows/example_full_run.yml"
+  schedule:
+    # Every other day; a full run costs ~40-50 GPU-minutes.
+    - cron: "0 3 */2 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  example_strict:
+    name: Example strict run (GPU)
+    runs-on: ubuntu-22.04-4core-gpu
+    # Full sequential run measured ~40-50 min on a Tesla T4 incl. setup;
+    # generous headroom below the 900s-per-example cap x 17 examples.
+    timeout-minutes: 90
+
+    env:
+      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+
+      # Highest resolution on purpose: examples are user-facing tutorials, so we
+      # test them against the deps a fresh install gets. The "examples" group
+      # adds shap (used only by shap_example.py for plotting).
+      - name: Install dependencies
+        run: uv sync --all-extras --group examples --group ci
+
+      - name: Restore model cache
+        id: restore-model-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/model_cache
+          # This cache read will always fail as the model_cache directory is empty.
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          restore-keys: |
+            model-cache-
+          enableCrossOsArchive: true
+
+      - name: Download models from Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
+        run: uv run --no-sync python scripts/download_all_models.py
+
+      # Sequential on purpose: the examples share one GPU, and parallel workers
+      # would distort per-example runtimes against the strict timeout.
+      - name: Run examples to completion (strict)
+        env:
+          CUDA_VISIBLE_DEVICES: "0"
+          # Exclude cpu/mps so TabPFN selects the GPU. The cpu code paths are
+          # already covered by the per-PR smoke gate.
+          TABPFN_EXCLUDE_DEVICES: "cpu,cpu:0,mps"
+          EXAMPLE_STRICT: "1"
+        run: |
+          uv run --no-sync pytest tests/test_examples.py --run-examples -v
