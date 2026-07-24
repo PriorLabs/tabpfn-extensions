@@ -1,5 +1,39 @@
 # TabPFN Interpretability
 
+## TabPFN Decoder-Head Readout
+
+TabPFN classifies with an attention-based retrieval head (`ManyClassDecoder`):
+each test row attends to the training rows and predicts the attention-weighted
+average of their labels. `get_decoder_readout` recovers those per-training-row
+attention weights, so a prediction can be read as a label-vote over training
+points — `P(class c)` is the sum of a row's weights over training rows of class
+`c`.
+
+```python
+from tabpfn_extensions import TabPFNClassifier
+from tabpfn_extensions.interpretability import get_decoder_readout, class_vote
+
+clf = TabPFNClassifier().fit(X_train, y_train)
+
+# weights: (n_test, n_train), each row sums to 1 (averaged over heads and the
+# ensemble). train_indices maps the columns back to the fitted training rows.
+weights, train_indices = get_decoder_readout(clf, X_test)
+
+# Collapse by training label; averaged over the ensemble this reproduces
+# predict_proba up to the head's log-clamping.
+votes, classes = class_vote(weights, y_train)
+```
+
+Only the local `tabpfn` backend is supported (the client/API backend does not
+expose the model internals), and row subsampling
+(`TabPFNClassifier(..., subsample_samples=...)`) is not supported since the
+weight columns would no longer align to a single set of training rows.
+
+See `examples/interpretability/decoder_readout_example.py`, which projects the
+model's training embeddings to 2D and draws, for queries spanning the confidence
+range, the lines from each query to its most-attended training rows (colored by
+class, scaled by vote weight).
+
 ## TabPFN Partial Dependence Plots
 
 ``partial_dependence_plots`` provides a way to visualize how one or two features
