@@ -5,68 +5,9 @@ import pandas as pd
 import pytest
 from sklearn.impute import SimpleImputer
 
-try:
-    from hyperopt import hp
-
-    HYPEROPT_AVAILABLE = True
-except ImportError:
-    HYPEROPT_AVAILABLE = False
-
 #######################
 # Testing Utilities
 #######################
-
-
-def get_small_test_search_space():
-    """Create a minimal search space for testing purposes.
-
-    This provides a much faster search space for HPO tests and post-hoc ensembles.
-    """
-    if not HYPEROPT_AVAILABLE:
-        return None
-
-    return {
-        # Simplified model config options
-        "model_type": hp.choice(
-            "model_type",
-            ["single"],
-        ),  # Only use single model (not dt_pfn)
-        "n_estimators": hp.choice(
-            "n_estimators",
-            [1],
-        ),  # Minimal ensemble repeats
-        # Model hyperparameters - only test minimal options
-        "average_before_softmax": hp.choice("average_before_softmax", [True]),
-        "softmax_temperature": hp.choice("softmax_temperature", [0.9]),
-        # Simplified preprocessing options
-        "inference_config/FINGERPRINT_FEATURE": hp.choice(
-            "FINGERPRINT_FEATURE",
-            [False],
-        ),
-        "inference_config/PREPROCESS_TRANSFORMS": hp.choice(
-            "PREPROCESS_TRANSFORMS",
-            [
-                [
-                    {
-                        # Use "name" parameter as expected by TabPFN PreprocessorConfig
-                        "name": "none",
-                        "global_transformer_name": None,
-                        "categorical_name": "none",
-                        "append_original": False,
-                    },
-                ],
-            ],
-        ),
-        "inference_config/POLYNOMIAL_FEATURES": hp.choice(
-            "POLYNOMIAL_FEATURES",
-            ["no"],  # Use "no" to match the TabPFN 2.0.6 expected values
-        ),
-        "inference_config/OUTLIER_REMOVAL_STD": hp.choice(
-            "OUTLIER_REMOVAL_STD",
-            [None],
-        ),
-        "inference_config/SUBSAMPLE_SAMPLES": hp.choice("SUBSAMPLE_SAMPLES", [None]),
-    }
 
 
 class DatasetGenerator:
