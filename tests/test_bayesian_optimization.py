@@ -3,13 +3,18 @@ from __future__ import annotations
 import pytest
 import torch
 
+from conftest import TEST_DEVICE
+
 bo = pytest.importorskip(
     "tabpfn_extensions.bayesian_optimization",
     reason="bayesian_optimization requires the full TabPFN package",
 )
-
-from conftest import TEST_DEVICE  # noqa: E402
-from tabpfn import TabPFNRegressor  # noqa: E402
+# Not a plain import: on client-only setups (no full tabpfn) the module must
+# skip, not fail collection.
+TabPFNRegressor = pytest.importorskip(
+    "tabpfn",
+    reason="bayesian_optimization requires the full TabPFN package",
+).TabPFNRegressor
 
 if not hasattr(TabPFNRegressor, "fit_with_differentiable_input"):
     pytest.skip(
