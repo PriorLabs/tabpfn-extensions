@@ -70,8 +70,7 @@ interpretability = [
     "xgboost>=2.1.0; python_version >= '3.12'",
     "lightgbm>=4.3.0; python_version >= '3.12'",
     "seaborn>=0.12.2",
-    # decoder_readout.plot_decoder_readout draws with matplotlib. Floor is 3.6.0:
-    # the first release with cp311 wheels, which the lowest-direct CI job needs.
+    # decoder_readout.plot_decoder_readout draws with matplotlib.
     "matplotlib>=3.6.0",
 ]
 # Install scikit-survival manually if you need SurvivalTabPFN

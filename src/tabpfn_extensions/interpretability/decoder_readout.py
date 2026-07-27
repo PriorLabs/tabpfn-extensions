@@ -198,7 +198,16 @@ def class_vote(
     return votes, classes
 
 
-_NEG_COLOR, _POS_COLOR = "#2c7fb8", "#d6404e"  # negative / positive class
+_DEFAULT_CLASS_COLORS = [
+    "#2a78d6",  # blue
+    "#eb6834",  # orange
+    "#1baf7a",  # aqua
+    "#4a3aa7",  # violet
+    "#e87ba4",  # magenta
+    "#008300",  # green
+    "#eda100",  # yellow
+    "#e34948",  # red
+]
 
 
 def _project_2d(
@@ -237,26 +246,26 @@ def plot_decoder_readout(
     y_test: np.ndarray | None = None,
     embeddings: tuple[np.ndarray, np.ndarray] | None = None,
     query_titles: list[str] | None = None,
+    colors: list[str] | None = None,
     title: str = "TabPFN decoder-head readout",
     top_k: int = 20,
 ) -> Figure:
-    """Draw the binary decoder readout for a set of queries over a 2D projection.
+    """Draw the decoder readout for a set of queries over a 2D projection.
 
     Each panel places one query and its ``top_k`` most-attended training rows on a
     2D projection of the rows, drawing a line from the query to each attended row
-    colored by the row's class and scaled by its vote weight. The projection uses
-    ``embeddings`` (a ``(train_vecs, test_vecs)`` pair, e.g. TabPFN's
+    colored by the row's class and scaled by its vote weight; the query star is
+    colored by the predicted class (``argmax`` of the class votes). The projection
+    uses ``embeddings`` (a ``(train_vecs, test_vecs)`` pair, e.g. TabPFN's
     target-conditioned embeddings from ``get_embeddings``) when given, else UMAP
     (falling back to PCA) over the raw ``train_features``/``test_features``.
     Contrasting the two shows what the head keys on: distance in the embedding
     space, where votes concentrate on the query's own class, versus the raw feature
     space, where that locality is weaker.
 
-    All test-row arrays (``weights``, ``test_features``, the test vectors in
-    ``embeddings``, ``y_test``) span the full test set; ``queries`` indexes into
-    them to select the rows to draw.
-
-    Binary classification only; ``class_names[1]`` is treated as the positive class.
+    Works for any number of classes. All test-row arrays (``weights``,
+    ``test_features``, the test vectors in ``embeddings``, ``y_test``) span the full
+    test set; ``queries`` indexes into them to select the rows to draw.
 
     Args:
         weights: Readout weights ``(n_test, n_train)`` from ``get_decoder_readout``.
@@ -265,12 +274,14 @@ def plot_decoder_readout(
         test_features: Raw test features ``(n_test, n_features)``; the queried rows
             are selected internally.
         y_train: Training labels aligned to the weight columns, ``(n_train,)``.
-        class_names: ``[negative_name, positive_name]``.
+        class_names: Class names, where ``class_names[c]`` names class label ``c``.
         y_test: Optional test labels ``(n_test,)``; when given, each panel is
             annotated with the query's true class.
         embeddings: Optional ``(train_vecs, test_vecs)`` with ``test_vecs`` spanning
             the full test set, projected instead of the raw features.
         query_titles: Optional per-panel labels, aligned to ``queries``.
+        colors: Optional per-class colors, aligned to the sorted class labels.
+            Defaults to a colorblind-validated categorical palette.
         title: Figure title; the projection name is appended.
         top_k: Number of top-voting training rows to draw per query.
 
@@ -278,22 +289,30 @@ def plot_decoder_readout(
         The Matplotlib figure.
     """
     import matplotlib.pyplot as plt
+    from matplotlib.colors import LinearSegmentedColormap
     from scipy.stats import gaussian_kde
 
     train_vecs, test_vecs = (
         embeddings if embeddings is not None else (train_features, test_features)
     )
     Z_train, Z_query, proj_name = _project_2d(train_vecs, test_vecs[queries])
-    p_pos = class_vote(weights, y_train)[0][:, 1]  # readout P(positive class)
+    votes, classes = class_vote(weights, y_train)  # (n_test, n_classes)
+
+    if colors is None:
+        colors = (
+            _DEFAULT_CLASS_COLORS
+            if len(classes) <= len(_DEFAULT_CLASS_COLORS)
+            else [plt.cm.tab20(i % 20) for i in range(len(classes))]
+        )
+    color_of = dict(zip(classes, colors, strict=False))
 
     def class_density(ax: plt.Axes, xx: np.ndarray, yy: np.ndarray) -> None:
-        """Soft KDE background, one contour set per class."""
-        for label, cmap in ((0, "Blues"), (1, "Reds")):
-            pts = Z_train[y_train == label]
-            density = gaussian_kde(pts.T)(np.vstack([xx.ravel(), yy.ravel()]))
-            ax.contourf(
-                xx, yy, density.reshape(xx.shape), levels=6, cmap=cmap, alpha=0.18
-            )
+        """Soft KDE background, one white-to-class-color contour set per class."""
+        grid = np.vstack([xx.ravel(), yy.ravel()])
+        for c in classes:
+            cmap = LinearSegmentedColormap.from_list("", ["white", color_of[c]])
+            density = gaussian_kde(Z_train[y_train == c].T)(grid).reshape(xx.shape)
+            ax.contourf(xx, yy, density, levels=5, cmap=cmap, alpha=0.12)
 
     pad = 0.08 * np.ptp(Z_train, axis=0)
     lo, hi = Z_train.min(axis=0) - pad, Z_train.max(axis=0) + pad
@@ -312,16 +331,16 @@ def plot_decoder_readout(
     for pos, q in enumerate(queries):
         ax = axes[pos]
         class_density(ax, xx, yy)
-        for label, color in ((0, _NEG_COLOR), (1, _POS_COLOR)):
-            m = y_train == label
-            ax.scatter(*Z_train[m].T, s=12, color=color, alpha=0.35, linewidths=0)
+        for c in classes:
+            m = y_train == c
+            ax.scatter(*Z_train[m].T, s=12, color=color_of[c], alpha=0.35, linewidths=0)
 
         w = weights[q]
         top = np.argsort(w)[-top_k:]
         w_max = w[top].max()
         qx, qy = Z_query[pos]
         for j in top:
-            color = _POS_COLOR if y_train[j] == 1 else _NEG_COLOR
+            color = color_of[y_train[j]]
             frac = w[j] / w_max
             ax.plot(
                 [qx, Z_train[j, 0]],
@@ -340,20 +359,20 @@ def plot_decoder_readout(
                 zorder=3,
             )
 
-        pred = int(p_pos[q] >= 0.5)
+        pred = classes[int(np.argmax(votes[q]))]
         ax.scatter(
             qx,
             qy,
             marker="*",
             s=650,
-            color=(_POS_COLOR if pred else "#dddddd"),
+            color=color_of[pred],
             edgecolor="black",
             linewidths=1.6,
             zorder=4,
         )
         ax.set(xticks=[], yticks=[])
 
-        parts = [f"readout P({class_names[1]}) = Σ(vote) = {p_pos[q]:.2f}"]
+        parts = [f"pred = {class_names[pred]} (p = {votes[q].max():.2f})"]
         if y_test is not None:
             parts.append(f"true = {class_names[y_test[q]]}")
         parts.append(f"top-{top_k} hold {w[top].sum():.0%} of the vote")
@@ -361,26 +380,18 @@ def plot_decoder_readout(
         ax.set_title(prefix + "  ·  ".join(parts), fontsize=11)
 
     handles = [
-        plt.Line2D([], [], color=_POS_COLOR, lw=4, label=f"{class_names[1]} vote"),
-        plt.Line2D([], [], color=_NEG_COLOR, lw=4, label=f"{class_names[0]} vote"),
         plt.Line2D(
             [],
             [],
             marker="o",
             color="w",
-            markerfacecolor=_POS_COLOR,
+            markerfacecolor=color_of[c],
             markersize=10,
-            label=f"{class_names[1]} sample",
-        ),
-        plt.Line2D(
-            [],
-            [],
-            marker="o",
-            color="w",
-            markerfacecolor=_NEG_COLOR,
-            markersize=10,
-            label=f"{class_names[0]} sample",
-        ),
+            label=class_names[c],
+        )
+        for c in classes
+    ]
+    handles.append(
         plt.Line2D(
             [],
             [],
@@ -390,12 +401,12 @@ def plot_decoder_readout(
             markeredgecolor="black",
             markersize=18,
             label="query",
-        ),
-    ]
+        )
+    )
     fig.legend(
         handles=handles,
         loc="lower center",
-        ncol=5,
+        ncol=len(handles),
         frameon=False,
         bbox_to_anchor=(0.5, -0.01),
     )

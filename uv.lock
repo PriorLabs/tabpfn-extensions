@@ -22,7 +22,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-07-17T09:18:55.986747Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
@@ -3564,7 +3564,6 @@ all = [
     { name = "botorch", version = "0.16.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "botorch", version = "0.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "lightgbm", marker = "python_full_version >= '3.12'" },
-    { name = "llvmlite" },
     { name = "matplotlib" },
     { name = "seaborn" },
     { name = "shapiq", version = "1.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -3611,8 +3610,7 @@ examples = [
 requires-dist = [
     { name = "botorch", marker = "extra == 'bayesian-optimization'", specifier = ">=0.12.0" },
     { name = "lightgbm", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=4.3.0" },
-    { name = "llvmlite", marker = "extra == 'post-hoc-ensembles'", specifier = ">=0.43.0" },
-    { name = "matplotlib", marker = "extra == 'interpretability'", specifier = ">=3.5.0" },
+    { name = "matplotlib", marker = "extra == 'interpretability'", specifier = ">=3.6.0" },
     { name = "pandas", specifier = ">=2.2.2" },
     { name = "scikit-learn", specifier = ">=1.6.0" },
     { name = "scipy", specifier = ">=1.11.1" },
