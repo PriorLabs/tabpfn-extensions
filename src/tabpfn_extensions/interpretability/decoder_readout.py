@@ -27,6 +27,7 @@ weight columns would no longer align to a single set of training rows.
 from __future__ import annotations
 
 import math
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -34,6 +35,7 @@ import torch
 from sklearn.utils.validation import check_is_fitted
 
 if TYPE_CHECKING:
+    from matplotlib.figure import Figure
     from sklearn.base import BaseEstimator
 
 
@@ -149,6 +151,15 @@ def get_decoder_readout(
             "attention weights.",
         )
 
+    if any(w.shape[-2] != len(X) for w in captured):
+        raise NotImplementedError(
+            "get_decoder_readout does not support test-row chunking: the decoder "
+            "ran on partial test batches (e.g. fit_mode='fit_with_cache' with more "
+            "than max_batched_test_rows rows), so the captured weights no longer "
+            "map to a single (n_test, n_train) matrix. Predict on fewer rows or "
+            "refit with fit_mode='fit_preprocessors'.",
+        )
+
     weights = np.concatenate(captured, axis=0)  # (n_estimators, n_test, n_train)
     train_indices = np.arange(weights.shape[-1])
     if average_over_estimators:
@@ -185,3 +196,204 @@ def class_vote(
         classes = np.unique(y_train)
     votes = np.stack([weights[:, y_train == c].sum(axis=1) for c in classes], axis=1)
     return votes, classes
+
+
+_NEG_COLOR, _POS_COLOR = "#2c7fb8", "#d6404e"  # negative / positive class
+
+
+def _project_2d(
+    train_vecs: np.ndarray,
+    query_vecs: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, str]:
+    """Project train and query vectors to 2D (UMAP, falling back to PCA)."""
+    try:
+        from umap import UMAP
+
+        reducer = UMAP(n_components=2, random_state=0)
+        name = "UMAP"
+    except ImportError:
+        from sklearn.decomposition import PCA
+
+        warnings.warn(
+            "umap-learn is not installed; falling back to PCA for the 2D "
+            "projection. Install umap-learn for a projection that better "
+            "separates the classes.",
+            stacklevel=2,
+        )
+        reducer = PCA(n_components=2)
+        name = "PCA"
+
+    return reducer.fit_transform(train_vecs), reducer.transform(query_vecs), name
+
+
+def plot_decoder_readout(
+    weights: np.ndarray,
+    queries: list[int],
+    train_features: np.ndarray,
+    query_features: np.ndarray,
+    y_train: np.ndarray,
+    class_names: list[str],
+    *,
+    y_test: np.ndarray | None = None,
+    embeddings: tuple[np.ndarray, np.ndarray] | None = None,
+    query_titles: list[str] | None = None,
+    title: str = "TabPFN decoder-head readout",
+    top_k: int = 20,
+) -> Figure:
+    """Draw the binary decoder readout for a set of queries over a 2D projection.
+
+    Each panel places one query and its ``top_k`` most-attended training rows on a
+    2D projection of the rows, drawing a line from the query to each attended row
+    colored by the row's class and scaled by its vote weight. The projection uses
+    ``embeddings`` (a ``(train_vecs, query_vecs)`` pair, e.g. TabPFN's
+    target-conditioned embeddings from ``get_embeddings``) when given, else UMAP
+    (falling back to PCA) over the raw ``train_features``/``query_features``.
+    Contrasting the two shows what the head keys on: distance in the embedding
+    space, where votes concentrate on the query's own class, versus the raw feature
+    space, where that locality is weaker.
+
+    Binary classification only; ``class_names[1]`` is treated as the positive class.
+
+    Args:
+        weights: Readout weights ``(n_test, n_train)`` from ``get_decoder_readout``.
+        queries: Indices of the test rows to draw, one per panel.
+        train_features: Raw training features ``(n_train, n_features)``.
+        query_features: Raw features of the query rows ``(len(queries), n_features)``.
+        y_train: Training labels aligned to the weight columns, ``(n_train,)``.
+        class_names: ``[negative_name, positive_name]``.
+        y_test: Optional test labels; when given, each panel is annotated with the
+            query's true class.
+        embeddings: Optional ``(train_vecs, query_vecs)`` to project instead of the
+            raw features.
+        query_titles: Optional per-panel labels, aligned to ``queries``.
+        title: Figure title; the projection name is appended.
+        top_k: Number of top-voting training rows to draw per query.
+
+    Returns:
+        The Matplotlib figure.
+    """
+    import matplotlib.pyplot as plt
+    from scipy.stats import gaussian_kde
+
+    train_vecs, query_vecs = (
+        embeddings if embeddings is not None else (train_features, query_features)
+    )
+    Z_train, Z_query, proj_name = _project_2d(train_vecs, query_vecs)
+    p_pos = class_vote(weights, y_train)[0][:, 1]  # readout P(positive class)
+
+    def class_density(ax: plt.Axes, xx: np.ndarray, yy: np.ndarray) -> None:
+        """Soft KDE background, one contour set per class."""
+        for label, cmap in ((0, "Blues"), (1, "Reds")):
+            pts = Z_train[y_train == label]
+            density = gaussian_kde(pts.T)(np.vstack([xx.ravel(), yy.ravel()]))
+            ax.contourf(
+                xx, yy, density.reshape(xx.shape), levels=6, cmap=cmap, alpha=0.18
+            )
+
+    pad = 0.08 * np.ptp(Z_train, axis=0)
+    lo, hi = Z_train.min(axis=0) - pad, Z_train.max(axis=0) + pad
+    xx, yy = np.meshgrid(np.linspace(lo[0], hi[0], 200), np.linspace(lo[1], hi[1], 200))
+
+    n = len(queries)
+    ncols = min(2, n)
+    nrows = math.ceil(n / ncols)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(7.5 * ncols, 6.5 * nrows), squeeze=False
+    )
+    axes = axes.ravel()
+    for ax in axes[n:]:
+        ax.axis("off")
+
+    for pos, q in enumerate(queries):
+        ax = axes[pos]
+        class_density(ax, xx, yy)
+        for label, color in ((0, _NEG_COLOR), (1, _POS_COLOR)):
+            m = y_train == label
+            ax.scatter(*Z_train[m].T, s=12, color=color, alpha=0.35, linewidths=0)
+
+        w = weights[q]
+        top = np.argsort(w)[-top_k:]
+        w_max = w[top].max()
+        qx, qy = Z_query[pos]
+        for j in top:
+            color = _POS_COLOR if y_train[j] == 1 else _NEG_COLOR
+            frac = w[j] / w_max
+            ax.plot(
+                [qx, Z_train[j, 0]],
+                [qy, Z_train[j, 1]],
+                color=color,
+                lw=1 + 6 * frac,
+                alpha=0.25 + 0.6 * frac,
+                zorder=2,
+            )
+            ax.scatter(
+                *Z_train[j],
+                s=90,
+                color=color,
+                edgecolor="white",
+                linewidths=0.8,
+                zorder=3,
+            )
+
+        pred = int(p_pos[q] >= 0.5)
+        ax.scatter(
+            qx,
+            qy,
+            marker="*",
+            s=650,
+            color=(_POS_COLOR if pred else "#dddddd"),
+            edgecolor="black",
+            linewidths=1.6,
+            zorder=4,
+        )
+        ax.set(xticks=[], yticks=[])
+
+        parts = [f"readout P({class_names[1]}) = Σ(vote) = {p_pos[q]:.2f}"]
+        if y_test is not None:
+            parts.append(f"true = {class_names[y_test[q]]}")
+        parts.append(f"top-{top_k} hold {w[top].sum():.0%} of the vote")
+        prefix = "" if query_titles is None else f"{query_titles[pos]}\n"
+        ax.set_title(prefix + "  ·  ".join(parts), fontsize=11)
+
+    handles = [
+        plt.Line2D([], [], color=_POS_COLOR, lw=4, label=f"{class_names[1]} vote"),
+        plt.Line2D([], [], color=_NEG_COLOR, lw=4, label=f"{class_names[0]} vote"),
+        plt.Line2D(
+            [],
+            [],
+            marker="o",
+            color="w",
+            markerfacecolor=_POS_COLOR,
+            markersize=10,
+            label=f"{class_names[1]} sample",
+        ),
+        plt.Line2D(
+            [],
+            [],
+            marker="o",
+            color="w",
+            markerfacecolor=_NEG_COLOR,
+            markersize=10,
+            label=f"{class_names[0]} sample",
+        ),
+        plt.Line2D(
+            [],
+            [],
+            marker="*",
+            color="w",
+            markerfacecolor="#999999",
+            markeredgecolor="black",
+            markersize=18,
+            label="query",
+        ),
+    ]
+    fig.legend(
+        handles=handles,
+        loc="lower center",
+        ncol=5,
+        frameon=False,
+        bbox_to_anchor=(0.5, -0.01),
+    )
+    fig.suptitle(f"{title} ({proj_name})", fontsize=15, fontweight="bold")
+    fig.tight_layout(rect=(0, 0.03, 1, 0.97))
+    return fig

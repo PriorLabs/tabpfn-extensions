@@ -3817,6 +3817,7 @@ all = [
     { name = "hyperopt" },
     { name = "lightgbm", marker = "python_full_version >= '3.12'" },
     { name = "llvmlite" },
+    { name = "matplotlib" },
     { name = "seaborn" },
     { name = "setuptools" },
     { name = "shapiq", version = "1.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -3833,6 +3834,7 @@ hpo = [
 ]
 interpretability = [
     { name = "lightgbm", marker = "python_full_version >= '3.12'" },
+    { name = "matplotlib" },
     { name = "seaborn" },
     { name = "shapiq", version = "1.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "shapiq", version = "1.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -3875,6 +3877,7 @@ requires-dist = [
     { name = "hyperopt", marker = "extra == 'post-hoc-ensembles'", specifier = ">=0.2.7" },
     { name = "lightgbm", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=4.3.0" },
     { name = "llvmlite", marker = "extra == 'post-hoc-ensembles'", specifier = ">=0.43.0" },
+    { name = "matplotlib", marker = "extra == 'interpretability'", specifier = ">=3.5.0" },
     { name = "pandas", specifier = ">=2.2.2" },
     { name = "scikit-learn", specifier = ">=1.6.0" },
     { name = "scipy", specifier = ">=1.11.1" },

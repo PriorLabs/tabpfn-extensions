@@ -52,6 +52,30 @@ def test_per_estimator_axis(fitted_clf_split):
 
 
 @pytest.mark.local_compatible
+def test_test_row_chunking_raises(classification_data, monkeypatch):
+    """Test-row chunking is rejected rather than silently mislabeling axes.
+
+    With ``fit_mode="fit_with_cache"`` and more than ``max_batched_test_rows`` test
+    rows, TabPFN runs the decoder once per chunk, so the captured weights no longer
+    map to a single ``(n_test, n_train)`` matrix.
+    """
+    from tabpfn.settings import settings
+
+    X, y = classification_data
+    n_train = 2 * len(X) // 3
+    X_train, X_test = X[:n_train], X[n_train:]
+    y_train = y[:n_train]
+    clf = TabPFNClassifier(
+        device="cpu", n_estimators=2, random_state=0, fit_mode="fit_with_cache"
+    )
+    clf.fit(X_train, y_train)
+
+    monkeypatch.setattr(settings.tabpfn, "max_batched_test_rows", 1)
+    with pytest.raises(NotImplementedError, match="test-row chunking"):
+        get_decoder_readout(clf, X_test)
+
+
+@pytest.mark.local_compatible
 def test_class_vote_matches_predict_proba(fitted_clf_split):
     """The label-collapsed readout reproduces predict_proba (bar log-clamping)."""
     clf, _, X_test, y_train, _ = fitted_clf_split

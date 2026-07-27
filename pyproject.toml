@@ -70,6 +70,8 @@ interpretability = [
     "xgboost>=2.1.0; python_version >= '3.12'",
     "lightgbm>=4.3.0; python_version >= '3.12'",
     "seaborn>=0.12.2",
+    # decoder_readout.plot_decoder_readout draws with matplotlib
+    "matplotlib>=3.5.0",
 ]
 post_hoc_ensembles = [
     "llvmlite>=0.43.0",
