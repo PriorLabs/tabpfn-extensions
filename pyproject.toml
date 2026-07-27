@@ -68,7 +68,11 @@ interpretability = [
     # both fall back to a weaker DecisionTree. Only needed where those estimators
     # exist (shapiq>=1.6.0, i.e. Python>=3.12).
     "xgboost>=2.1.0; python_version >= '3.12'",
-    "lightgbm>=4.3.0; python_version >= '3.12'",
+    # Capped below 4.7.0: that release switched to PEP 639 license metadata and
+    # PyPI reports no license for it, so the CI license check sees an empty
+    # license and fails. Revisit once PyPI or licensecheck surfaces its MIT
+    # license again, and drop the cap.
+    "lightgbm>=4.3.0,<4.7.0; python_version >= '3.12'",
     "seaborn>=0.12.2",
 ]
 # Install scikit-survival manually if you need SurvivalTabPFN
