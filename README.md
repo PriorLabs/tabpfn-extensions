@@ -39,8 +39,7 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 - **embedding**: Get TabPFN's internal dense sample embeddings
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
 - **pval_crt**: Statistical feature relevance testing (p-values)
-- **post_hoc_ensembles** *(deprecated)*: `AutoTabPFN*` — improve performance with model combination via AutoGluon. Scheduled for removal in a future release.
-- **hpo** *(deprecated)*: `TunedTabPFN*` — automatic hyperparameter tuning for TabPFN via Hyperopt. Scheduled for removal in a future release.
+- **bayesian_optimization**: Bayesian optimization with TabPFN as the surrogate model and differentiable Expected Improvement
 
 See the [Documentation](#documentation) section below for guides, examples, and per-extension READMEs.
 
@@ -55,12 +54,12 @@ Many TabPFN Extensions works with two TabPFN implementations:
 
 2. **TabPFN Client** — Lightweight API client for cloud-based inference:
    ```bash
-   pip install tabpfn-client
+   pip install "tabpfn-client>=0.2.7"
    ```
 
 Choose the backend that fits your needs - most extensions work with either option!
 
-Exceptions to this are **post_hoc_ensembles** *(deprecated)* and **embedding**, which only work with the local `tabpfn` package.
+Exceptions to this are **embedding** and **bayesian_optimization**, which only work with the local `tabpfn` package.
 
 ## Documentation
 
@@ -70,6 +69,7 @@ Documentation for `tabpfn-extensions` is spread across several sources. If you a
 
 Runnable scripts and notebooks for extensions and general use cases live in the [`examples/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples) directory of this repository:
 
+- [`bayesian_optimization/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/bayesian_optimization) — Bayesian optimization with TabPFN as the surrogate and differentiable Expected Improvement
 - [`embedding/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding) — access TabPFN's internal dense sample embeddings
 - [`interpretability/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/interpretability) — SHAP values, partial dependence plots, feature selection
 - [`many_class/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/many_class) — classification with more classes than your checkpoint supports
@@ -78,8 +78,6 @@ Runnable scripts and notebooks for extensions and general use cases live in the 
 - [`survival/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/survival) — survival analysis
 - [`tabebm/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/tabebm) — data augmentation via TabEBM
 - [`unsupervised/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/unsupervised) — data generation, imputation, and outlier detection
-- [`hpo/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/hpo) *(deprecated)* — `TunedTabPFN*` automatic hyperparameter tuning
-- [`phe/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/phe) *(deprecated)* — `AutoTabPFN*` post-hoc ensembles
 
 ### TabPFN Docs pages
 
@@ -94,8 +92,6 @@ Some extensions ship a dedicated README alongside their source code:
 - [`interpretability/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/interpretability/README.md)
 - [`pval_crt/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/pval_crt/README.md)
 - [`tabebm/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/tabebm/README.md)
-- [`hpo/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/hpo/README.md) *(deprecated)*
-- [`post_hoc_ensembles/`](https://github.com/PriorLabs/tabpfn-extensions/blob/main/src/tabpfn_extensions/post_hoc_ensembles/README.md) *(deprecated)*
 
 ### Interactive notebook
 

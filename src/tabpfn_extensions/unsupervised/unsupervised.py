@@ -71,9 +71,14 @@ def _resolve_dag_order(
     """Topologically order ``all_features`` according to ``dag``.
 
     Returns ``(ordered, full_dag)`` where ``ordered`` is a permutation of
-    ``all_features`` consistent with the DAG, and ``full_dag`` is a copy of
-    ``dag`` with empty dependency lists filled in for any feature not present
-    as a key.
+    ``all_features`` consistent with the DAG, and ``full_dag`` is a defensive
+    copy of ``dag``.
+
+    ``dag`` must specify every feature in ``all_features`` as a key; a feature
+    without parents must be stated explicitly with an empty list. Silently
+    defaulting absent features to no parents would make them independent of
+    everything else, which is rarely what a caller passing a partial DAG
+    intends — so incomplete DAGs are rejected instead.
 
     The caller's ``dag`` is **not** mutated. On a cyclic graph we raise
     ``ValueError`` with the cycle path embedded in the message — easier for a
@@ -86,7 +91,14 @@ def _resolve_dag_order(
             f"DAG references unknown feature indices {sorted(unknown)}; "
             f"valid indices are {sorted(valid)}.",
         )
-    full_dag = {i: list(dag.get(i, [])) for i in all_features}
+    missing = valid - set(dag)
+    if missing:
+        raise ValueError(
+            f"DAG must specify every feature; features {sorted(missing)} are "
+            f"missing. Map a feature to an empty list (e.g. {{{min(missing)}: []}}) "
+            "to model it without parents (sampled marginally).",
+        )
+    full_dag = {i: list(dag[i]) for i in all_features}
     try:
         ordered = list(TopologicalSorter(full_dag).static_order())
     except CycleError as exc:
@@ -330,8 +342,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 list of parent column indices (i.e. the features it depends on).
                 When provided, columns are imputed in topological order and each
                 column is conditioned on exactly its DAG parents. Mutually
-                exclusive with ``condition_on_all_features=True``. Features
-                absent from the dict default to no dependencies.
+                exclusive with ``condition_on_all_features=True``. Every feature
+                must appear as a key; map a feature to an empty list to impute
+                it without conditioning.
             fast_mode: bool, default=False
                 Whether to use faster settings for testing
 
@@ -340,7 +353,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
 
         Raises:
             ValueError: If ``dag`` is combined with ``condition_on_all_features=True``,
-                or if ``dag`` contains a cycle.
+                contains a cycle, or does not specify every feature.
         """
         n_features = X.shape[1]
         all_features = list(range(n_features))
@@ -676,8 +689,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 Optional Directed Acyclic Graph mapping each column index to the
                 list of column indices it depends on. When provided, columns are
                 imputed in topological order and each column is conditioned on
-                its DAG parents instead of all other features. Useful for
-                causally-informed imputation.
+                its DAG parents instead of all other features. Every column must
+                appear as a key; map a column to an empty list to impute it
+                without conditioning. Useful for causally-informed imputation.
 
         Returns:
             torch.Tensor
@@ -905,7 +919,9 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 Optional Directed Acyclic Graph mapping each column index to the
                 list of column indices it depends on. When provided, columns are
                 generated in topological order and each column is conditioned on
-                its DAG parents only. Useful for causally-informed synthesis.
+                its DAG parents only. Every column must appear as a key; map a
+                column to an empty list to sample it marginally. Useful for
+                causally-informed synthesis.
 
         Returns:
             torch.Tensor:
@@ -914,6 +930,8 @@ class TabPFNUnsupervisedModel(BaseEstimator):
         Raises:
             AssertionError:
                 If the model is not fitted (self.X_ does not exist)
+            ValueError:
+                If ``dag`` contains a cycle or does not specify every feature
         """
         # TODO: Test generating one feature at a time, with train data only for that feature
         #       and previously generated features, similar to the outliers method

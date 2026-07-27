@@ -3,6 +3,19 @@
 
 This script replicates the functionality of the notebook but uses sklearn
 instead of TabCamel for data loading and preprocessing.
+
+.. warning::
+   TabEBM does not currently work with recent TabPFN versions: it relies on
+   ``tabpfn.config.ModelInterfaceConfig`` and ``PREPROCESS_TRANSFORMS`` to
+   disable preprocessing for SGLD sampling, both of which were removed/renamed
+   in TabPFN's ``inference_config`` API. Tracked in
+   https://github.com/PriorLabs/tabpfn-extensions/issues/225 -- this example
+   will fail to import until that is resolved.
+
+   As a workaround you can run it with the TabPFN version TabEBM was built
+   against, where ``tabpfn.config`` still exists::
+
+       pip install "tabpfn>=2.1.1,<3"
 """
 
 import warnings

@@ -1,0 +1,131 @@
+name: Example full run (GPU)
+run-name: "Example full run on ${{ github.ref_name }}"
+
+# Runs every example to completion at full size on a GPU runner
+# (EXAMPLE_FULL=1: FAST_TEST_MODE is stripped, a timeout is a failure).
+# Complements the per-PR CPU smoke gate in pull_request.yml, which only
+# asserts that each example starts and runs without crashing.
+
+on:
+  schedule:
+    # Every other day; a full run costs ~40-50 GPU-minutes.
+    - cron: "0 3 */2 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  example_full:
+    name: Example full run (GPU)
+    runs-on: ubuntu-22.04-4core-gpu
+    # Full sequential run measured ~40-50 min on a Tesla T4 incl. setup;
+    # generous headroom below the 900s-per-example cap x 17 examples.
+    timeout-minutes: 90
+
+    env:
+      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+
+      # Highest resolution on purpose: examples are user-facing tutorials, so we
+      # test them against the deps a fresh install gets. The "examples" group
+      # adds shap (used only by shap_example.py for plotting).
+      - name: Install dependencies
+        run: uv sync --all-extras --group examples --group ci
+
+      - name: Restore model cache
+        id: restore-model-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/model_cache
+          # This cache read will always fail as the model_cache directory is empty.
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          restore-keys: |
+            model-cache-
+          enableCrossOsArchive: true
+
+      - name: Download models from Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
+        run: uv run --no-sync python scripts/download_all_models.py
+
+      # Sequential on purpose: the examples share one GPU, and parallel workers
+      # would distort per-example runtimes against the per-example timeout.
+      # `tee` captures output for the failure-issue body while still streaming
+      # to the log; pipefail preserves pytest's exit code through the pipe.
+      - name: Run examples to completion (full)
+        env:
+          CUDA_VISIBLE_DEVICES: "0"
+          # Exclude cpu/mps so TabPFN selects the GPU. The cpu code paths are
+          # already covered by the per-PR smoke gate.
+          TABPFN_EXCLUDE_DEVICES: "cpu,cpu:0,mps"
+          EXAMPLE_FULL: "1"
+        run: |
+          set -o pipefail
+          uv run --no-sync pytest tests/test_examples.py --run-examples -v 2>&1 \
+            | tee pytest_output.txt
+
+      # Scheduled-run failures don't notify anyone by default (GitHub only
+      # emails whoever last edited the cron line), so track them as an issue.
+      # Repeat failures comment on the open issue instead of filing new ones.
+      # cancelled() covers the job-timeout case: exceeding timeout-minutes
+      # cancels the steps rather than failing them, so failure() alone would
+      # stay silent exactly when the run hangs.
+      - name: Open or update tracking issue on failure
+        if: failure() || cancelled()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require("fs");
+            let failedLines = "(no FAILED lines parsed; see logs)";
+            try {
+              const text = fs.readFileSync("pytest_output.txt", "utf-8");
+              const lines = text.split("\n").filter(l => l.startsWith("FAILED "));
+              if (lines.length > 0) failedLines = lines.join("\n");
+            } catch (e) { /* output file missing -- fall through to default */ }
+
+            const title = "Scheduled example full run (GPU) failed";
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: ["nightly-failure"],
+            });
+            const runUrl =
+              `${context.serverUrl}/${context.repo.owner}/` +
+              `${context.repo.repo}/actions/runs/${context.runId}`;
+            const body =
+              `Run: ${runUrl}\n\n` +
+              `\`\`\`\n${failedLines}\n\`\`\`\n\n` +
+              `See logs for full output.`;
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["nightly-failure"],
+              });
+            }
