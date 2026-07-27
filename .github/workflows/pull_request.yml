@@ -101,10 +101,14 @@ jobs:
         if: runner.os == 'MacOS' && matrix.dependency-set == 'lowest-direct'
         shell: bash
         run: |
+          # lightgbm is MIT but declares it via the PEP 639 `License-Expression`
+          # field with an empty legacy `License`/classifiers, which licensecheck
+          # 2025.1.0 (the latest) can't read, so it reports an empty license and
+          # flags the package. Ignore it until licensecheck learns License-Expression.
           uv run --no-sync licensecheck \
             --requirements-paths pyproject.toml \
             --only-licenses APACHE MIT BSD ISC PYTHON UNLICENSE UNKNOWN \
-            --ignore-packages certifi "tabpfn*" \
+            --ignore-packages certifi lightgbm "tabpfn*" \
             --show-only-failing \
             -0
 
