@@ -22,12 +22,15 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-07-17T09:18:55.986747Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
 tabpfn = false
 torch = false
+
+[manifest]
+constraints = [{ name = "lightgbm", specifier = "<4.7.0" }]
 
 [[package]]
 name = "annotated-doc"
@@ -3589,7 +3592,7 @@ examples = [
 [package.metadata]
 requires-dist = [
     { name = "botorch", marker = "extra == 'bayesian-optimization'", specifier = ">=0.12.0" },
-    { name = "lightgbm", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=4.3.0" },
+    { name = "lightgbm", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=4.3.0,<4.7.0" },
     { name = "pandas", specifier = ">=2.2.2" },
     { name = "scikit-learn", specifier = ">=1.6.0" },
     { name = "scipy", specifier = ">=1.11.1" },
