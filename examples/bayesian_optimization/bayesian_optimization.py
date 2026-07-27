@@ -45,13 +45,15 @@ TOP_K = 4  # candidates refined by gradient ascent on EI
 N_REFINE_STEPS = 8  # gradient steps on the candidate coordinates
 REFINE_LR = 0.05
 
-# Hartmann-6: a classic 6D benchmark on [0, 1]^6 where random search does
-# poorly. EI maximizes, so we negate it; the optimum becomes +3.32237.
-objective = Hartmann(dim=6, negate=True)
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
 torch.manual_seed(0)
 print(f"Device: {device}")
+
+# Hartmann-6: a classic 6D benchmark on [0, 1]^6 where random search does
+# poorly. EI maximizes, so we negate it; the optimum becomes +3.32237.
+# Moved to the evaluation device: its bounds buffer must live where the
+# candidate tensors do, or input validation fails on a device mismatch.
+objective = Hartmann(dim=6, negate=True).to(device)
 print(f"Objective optimum: {objective.optimal_value:.4f}\n")
 
 reg = TabPFNRegressor(

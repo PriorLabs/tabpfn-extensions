@@ -1,12 +1,20 @@
 """Run the example files in ``examples/`` and check they work.
 
-Each example is executed as a subprocess with a fixed per-example timeout. An
-example that *errors* fails the test; one that simply doesn't finish in time
-*passes* -- we only assert it starts and runs without crashing. This is a fast,
-cheap smoke guard against broken example scripts and import errors.
+Each example is executed as a subprocess with a fixed per-example timeout.
+There are two run modes:
 
-A regularly scheduled full run -- every example run to completion, where a
-timeout *is* a failure -- is tracked separately in PRI-330.
+* **Smoke** (default): an example that *errors* fails the test; one that simply
+  doesn't finish in time *passes* -- we only assert it starts and runs without
+  crashing. Examples run with ``FAST_TEST_MODE=1`` so those that support it
+  (directly, or via library code that reads the flag) shrink their workload.
+  This is the fast, cheap per-PR guard against broken example scripts and
+  import errors.
+* **Full** (``EXAMPLE_FULL=1``): every example must run *to completion*,
+  and a timeout is a failure. ``FAST_TEST_MODE`` is stripped, so examples run
+  at full size -- exactly as a user would run them. This is the scheduled GPU
+  full run. The switch is an environment variable rather than a pytest CLI
+  option so that command-line arguments cannot flip the pass/fail semantics of
+  a run.
 
 An example is **skipped** (not failed) when:
 
@@ -17,6 +25,7 @@ An example is **skipped** (not failed) when:
 
 Usage:
     uv run --no-sync pytest tests/test_examples.py --run-examples
+    EXAMPLE_FULL=1 uv run --no-sync pytest tests/test_examples.py --run-examples
 """
 
 from __future__ import annotations
@@ -30,13 +39,17 @@ from pathlib import Path
 import pytest
 import torch
 
-# Enable test mode so examples shrink their workload where they support it.
-os.environ["TEST_MODE"] = "1"
+# Full run: every example runs at full size to completion; a timeout is a
+# failure. Used by the scheduled GPU full run. In the default smoke mode a
+# timeout still passes -- we only assert the example starts and runs without
+# crashing.
+FULL_RUN = os.environ.get("EXAMPLE_FULL", "0") == "1"
 
-# Per-example smoke timeout. An example that doesn't finish within this budget
-# still passes (we only assert it starts and runs without crashing); running
-# every example to completion is the job of the scheduled full run (PRI-330).
-EXAMPLE_TIMEOUT_SECONDS = 120
+# Per-example timeout. The smoke budget is short since a timeout passes anyway;
+# the full-run budget is sized so it only bites on genuine hangs or regressions
+# (the slowest full-size example measured ~504s on a Tesla T4, leaving ~45%
+# headroom for runner variance).
+EXAMPLE_TIMEOUT_SECONDS = 900 if FULL_RUN else 120
 
 # Directories whose examples need the full TabPFN package (won't work with the
 # TabPFN client).
@@ -153,9 +166,24 @@ def test_example(request, example_file):
 
     # Examples are top-to-bottom scripts; run each in its own process so a hang
     # can be killed cleanly and state never leaks between examples. The example
-    # inherits TEST_MODE/FAST_TEST_MODE/TABPFN_EXCLUDE_DEVICES from this process.
+    # inherits TABPFN_EXCLUDE_DEVICES from this process.
     env = dict(os.environ)
-    env["TEST_MODE"] = "1"
+    if FULL_RUN:
+        # Full size, exactly as a user would run the example. Stripped rather
+        # than inherited so the CI job env (which sets FAST_TEST_MODE for the
+        # unit suite) or a stray local setting can't quietly shrink what the
+        # full run verifies -- the flag is read by the examples themselves
+        # and by library code paths they call.
+        env.pop("FAST_TEST_MODE", None)
+    else:
+        # Shrink the workload where the example supports it, so it can
+        # complete within the smoke budget.
+        env["FAST_TEST_MODE"] = "1"
+    # Headless plotting: an example calling plt.show() must never block on a
+    # GUI window (on a machine with a display, the interactive backend blocks
+    # until the window is closed -- fatal in strict mode, where that reads as
+    # a timeout).
+    env.setdefault("MPLBACKEND", "Agg")
 
     try:
         proc = subprocess.run(  # noqa: S603 - trusted, repo-local example scripts
@@ -168,8 +196,13 @@ def test_example(request, example_file):
             check=False,
         )
     except subprocess.TimeoutExpired:
+        if FULL_RUN:
+            pytest.fail(
+                f"Example {name} did not complete within "
+                f"{EXAMPLE_TIMEOUT_SECONDS}s (full run: a timeout is a failure)",
+            )
         # Not a failure: the example started and ran without crashing, which is
-        # all this smoke gate asserts. Completion is checked by the scheduled run.
+        # all the smoke gate asserts. Completion is checked by the full run.
         print(
             f"{name}: ran {EXAMPLE_TIMEOUT_SECONDS}s without error "
             f"(smoke mode; completion not verified)",
