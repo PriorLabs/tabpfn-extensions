@@ -29,6 +29,9 @@ exclude-newer-span = "P7D"
 tabpfn = false
 torch = false
 
+[manifest]
+constraints = [{ name = "lightgbm", specifier = "<4.7.0" }]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.4"
