@@ -69,9 +69,9 @@ p_pos = votes[:, 1]  # readout P(positive class)
 
 queries = pick_queries(p_pos)
 
-# TabPFN's target-conditioned training/query embeddings, averaged over the ensemble.
+# TabPFN's target-conditioned train/test embeddings, averaged over the ensemble.
 train_emb = clf.get_embeddings(X_test, data_source="train").mean(axis=0)
-query_emb = clf.get_embeddings(X_test[queries], data_source="test").mean(axis=0)
+test_emb = clf.get_embeddings(X_test, data_source="test").mean(axis=0)
 
 # Raw feature space: the head's votes spread across classes because nearby rows
 # are not cleanly separated.
@@ -79,7 +79,7 @@ fig_features = plot_decoder_readout(
     weights,
     queries,
     X_train,
-    X_test[queries],
+    X_test,
     y_train,
     class_names,
     y_test=y_test,
@@ -94,11 +94,11 @@ fig_embeddings = plot_decoder_readout(
     weights,
     queries,
     X_train,
-    X_test[queries],
+    X_test,
     y_train,
     class_names,
     y_test=y_test,
-    embeddings=(train_emb, query_emb),
+    embeddings=(train_emb, test_emb),
     query_titles=QUERY_TITLES,
     title="TabPFN decoder-head readout over target-conditioned embeddings",
 )

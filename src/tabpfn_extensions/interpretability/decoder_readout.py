@@ -230,7 +230,7 @@ def plot_decoder_readout(
     weights: np.ndarray,
     queries: list[int],
     train_features: np.ndarray,
-    query_features: np.ndarray,
+    test_features: np.ndarray,
     y_train: np.ndarray,
     class_names: list[str],
     *,
@@ -245,26 +245,31 @@ def plot_decoder_readout(
     Each panel places one query and its ``top_k`` most-attended training rows on a
     2D projection of the rows, drawing a line from the query to each attended row
     colored by the row's class and scaled by its vote weight. The projection uses
-    ``embeddings`` (a ``(train_vecs, query_vecs)`` pair, e.g. TabPFN's
+    ``embeddings`` (a ``(train_vecs, test_vecs)`` pair, e.g. TabPFN's
     target-conditioned embeddings from ``get_embeddings``) when given, else UMAP
-    (falling back to PCA) over the raw ``train_features``/``query_features``.
+    (falling back to PCA) over the raw ``train_features``/``test_features``.
     Contrasting the two shows what the head keys on: distance in the embedding
     space, where votes concentrate on the query's own class, versus the raw feature
     space, where that locality is weaker.
+
+    All test-row arrays (``weights``, ``test_features``, the test vectors in
+    ``embeddings``, ``y_test``) span the full test set; ``queries`` indexes into
+    them to select the rows to draw.
 
     Binary classification only; ``class_names[1]`` is treated as the positive class.
 
     Args:
         weights: Readout weights ``(n_test, n_train)`` from ``get_decoder_readout``.
-        queries: Indices of the test rows to draw, one per panel.
+        queries: Indices into the test set of the rows to draw, one per panel.
         train_features: Raw training features ``(n_train, n_features)``.
-        query_features: Raw features of the query rows ``(len(queries), n_features)``.
+        test_features: Raw test features ``(n_test, n_features)``; the queried rows
+            are selected internally.
         y_train: Training labels aligned to the weight columns, ``(n_train,)``.
         class_names: ``[negative_name, positive_name]``.
-        y_test: Optional test labels; when given, each panel is annotated with the
-            query's true class.
-        embeddings: Optional ``(train_vecs, query_vecs)`` to project instead of the
-            raw features.
+        y_test: Optional test labels ``(n_test,)``; when given, each panel is
+            annotated with the query's true class.
+        embeddings: Optional ``(train_vecs, test_vecs)`` with ``test_vecs`` spanning
+            the full test set, projected instead of the raw features.
         query_titles: Optional per-panel labels, aligned to ``queries``.
         title: Figure title; the projection name is appended.
         top_k: Number of top-voting training rows to draw per query.
@@ -275,10 +280,10 @@ def plot_decoder_readout(
     import matplotlib.pyplot as plt
     from scipy.stats import gaussian_kde
 
-    train_vecs, query_vecs = (
-        embeddings if embeddings is not None else (train_features, query_features)
+    train_vecs, test_vecs = (
+        embeddings if embeddings is not None else (train_features, test_features)
     )
-    Z_train, Z_query, proj_name = _project_2d(train_vecs, query_vecs)
+    Z_train, Z_query, proj_name = _project_2d(train_vecs, test_vecs[queries])
     p_pos = class_vote(weights, y_train)[0][:, 1]  # readout P(positive class)
 
     def class_density(ax: plt.Axes, xx: np.ndarray, yy: np.ndarray) -> None:
