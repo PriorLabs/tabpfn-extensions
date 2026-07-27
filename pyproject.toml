@@ -73,16 +73,6 @@ interpretability = [
     # decoder_readout.plot_decoder_readout draws with matplotlib
     "matplotlib>=3.5.0",
 ]
-post_hoc_ensembles = [
-    "llvmlite>=0.43.0",
-    "hyperopt>=0.2.7",
-    "autogluon.tabular>=1.5.0,<1.6"
-]
-hpo = [
-    "hyperopt>=0.2.7",
-    # https://discuss.python.org/t/pkg-resources-removal-how-to-go-from-there/106079
-    "setuptools>=67.0.0,<84",
-]
 # Install scikit-survival manually if you need SurvivalTabPFN
 # `pip install scikit-survival`. Excluded due to GPL.
 survival = []
@@ -96,7 +86,7 @@ bayesian_optimization = [
 # Meta-package that installs all extensions
 all = [
     # scikit-survival not included; install manually if you need SurvivalTabPFN.
-    "tabpfn-extensions[interpretability,post_hoc_ensembles,hpo,survival,bayesian_optimization]",
+    "tabpfn-extensions[interpretability,survival,bayesian_optimization]",
 ]
 
 [dependency-groups]
