@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tabpfn-extensions"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
     "torch>=2.1",
     "pandas>=2.2.2",
@@ -68,7 +68,9 @@ interpretability = [
     # both fall back to a weaker DecisionTree. Only needed where those estimators
     # exist (shapiq>=1.6.0, i.e. Python>=3.12).
     "xgboost>=2.1.0; python_version >= '3.12'",
-    "lightgbm>=4.3.0; python_version >= '3.12'",
+    # Capped below 4.7.0 to match the resolution-wide constraint in [tool.uv];
+    # see the note there. Worth revisiting once that cap can be dropped.
+    "lightgbm>=4.3.0,<4.7.0; python_version >= '3.12'",
     "seaborn>=0.12.2",
     # decoder_readout.plot_decoder_readout draws with matplotlib.
     "matplotlib>=3.8.4",
@@ -120,6 +122,12 @@ examples = [
 ]
 
 [tool.uv]
+# lightgbm 4.7.0 switched to PEP 639 license metadata and PyPI reports no license
+# at all for that release, so the CI license check sees an empty license and fails.
+# tabpfn itself depends on lightgbm>=3.0, so the cap has to be a resolution-wide
+# constraint; bounding it in the interpretability extra alone does not reach the
+# transitive copy. Worth revisiting once PyPI reports its MIT license again.
+constraint-dependencies = ["lightgbm<4.7.0"]
 exclude-newer = "7 days"
 exclude-newer-package = {torch = false, tabpfn = false}
 

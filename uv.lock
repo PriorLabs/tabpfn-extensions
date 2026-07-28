@@ -29,6 +29,9 @@ exclude-newer-span = "P7D"
 tabpfn = false
 torch = false
 
+[manifest]
+constraints = [{ name = "lightgbm", specifier = "<4.7.0" }]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.4"
@@ -3547,7 +3550,7 @@ wheels = [
 
 [[package]]
 name = "tabpfn-extensions"
-version = "0.4.3"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "pandas" },
@@ -3609,7 +3612,7 @@ examples = [
 [package.metadata]
 requires-dist = [
     { name = "botorch", marker = "extra == 'bayesian-optimization'", specifier = ">=0.12.0" },
-    { name = "lightgbm", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=4.3.0" },
+    { name = "lightgbm", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=4.3.0,<4.7.0" },
     { name = "matplotlib", marker = "extra == 'interpretability'", specifier = ">=3.8.4" },
     { name = "pandas", specifier = ">=2.2.2" },
     { name = "scikit-learn", specifier = ">=1.6.0" },

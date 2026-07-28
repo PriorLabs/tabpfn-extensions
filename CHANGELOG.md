@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-28
+
+### Breaking Changes
+
+- The `dag` argument of `TabPFNUnsupervisedModel.generate_synthetic_data()` and `impute()` must now specify every feature as a key; parentless features are declared explicitly with an empty list (`{i: []}`). Partial DAGs previously gave unlisted features an empty parent list silently, sampling them marginally (independent of everything else) — rarely what a caller constraining a subset of features intends. An incomplete DAG now raises `ValueError` naming the missing features. ([#348](https://github.com/PriorLabs/tabpfn-extensions/pull/348))
+- Removed the deprecated `AutoTabPFNClassifier`/`AutoTabPFNRegressor` (`post_hoc_ensembles`) and `TunedTabPFNClassifier`/`TunedTabPFNRegressor` (`hpo`) extensions, including their extras. Both had been deprecated since the v3 release. ([#361](https://github.com/PriorLabs/tabpfn-extensions/pull/361))
+
+### Added
+
+- Example scripts in `examples/` are now exercised in CI via a fast per-PR smoke test (path-filtered to example changes), guarding against examples that stop running. ([#327](https://github.com/PriorLabs/tabpfn-extensions/pull/327))
+- Add a `bayesian_optimization` extension using TabPFN as the surrogate model, following the PFNs4BO approach (Mueller et al., ICML 2023): `expected_improvement` computes EI in closed form from TabPFN's predicted bar distribution (no Gaussian assumption), and `propose_next_point` screens random candidates and refines the best ones by gradient ascent on EI via `differentiable_input=True`. Ships with an end-to-end example on the Hartmann-6 benchmark and a new `bayesian_optimization` optional-dependency extra (`tabpfn>=8.1.0`; `botorch` for the example's benchmark objective). ([#343](https://github.com/PriorLabs/tabpfn-extensions/pull/343))
+- Add a full run mode (`EXAMPLE_FULL=1`) to the example tests — every example runs at full size (`FAST_TEST_MODE` stripped) to completion, and a timeout is a failure — plus a scheduled GPU workflow (`test_examples_full.yml`) that runs it every two days. The slow `feature_selection`, `pdp_example`, and `pval_crt_demo` examples now shrink under `FAST_TEST_MODE=1` so the PR smoke gate verifies them to completion. ([#360](https://github.com/PriorLabs/tabpfn-extensions/pull/360))
+
+### Changed
+
+- Document the `bayesian_optimization` extension in the README: listed under Available Extensions, linked its runnable example, and noted it requires the local `tabpfn` package. ([#352](https://github.com/PriorLabs/tabpfn-extensions/pull/352))
+- Cap the optional `lightgbm` dependency below 4.7.0, which reports no license on PyPI and fails the CI license check. ([#366](https://github.com/PriorLabs/tabpfn-extensions/pull/366))
+
+### Fixed
+
+- Repaired example scripts that had stopped running: raised the `interpretability` extra's `shapiq` floor to `>=1.2.0` (needed for `class_index` and `TabPFNExplainer`) so the SHAP/shapiq examples work again, and fixed the `unsupervised.experiments` import in the DAG example. ([#327](https://github.com/PriorLabs/tabpfn-extensions/pull/327))
+- Fixed `ClientTabPFNRegressor.predict(..., output_type="full")` raising on `tabpfn>=8.1`: the wrapper imported the removed `tabpfn.model.bar_distribution` module before calling the client, discarding the compatible `criterion` tabpfn-client already returns. The wrapper's `predict` override is removed entirely — tabpfn-client (>= 0.2.7, the version that started attaching the criterion itself) now handles all output types, un-breaking e.g. `TabPFNUnsupervisedModel.outliers()` on the client backend and forwarding output types such as `output_type="quantiles"` instead of silently returning means. The version floor is enforced: constructing `ClientTabPFNRegressor` with an older tabpfn-client raises an `ImportError` asking to upgrade, instead of failing much later with a bare `KeyError: 'criterion'`. Note that `predict(X, output_type=None)` is no longer accepted on the client backend; omit the argument for the default (mean) prediction, matching the local `tabpfn` API. ([#354](https://github.com/PriorLabs/tabpfn-extensions/pull/354))
+- Bayesian optimization now works on CUDA machines: `expected_improvement` moves the raw-space bar distribution to the logits' device (TabPFN builds it on cpu, crashing EI with a device mismatch), and the example moves its botorch benchmark objective to the evaluation device so the bounds buffer matches the candidate tensors. ([#360](https://github.com/PriorLabs/tabpfn-extensions/pull/360))
+- The GPU CI job now actually exercises the Bayesian optimization and CRT extensions on cuda: their tests select the device via the shared `TEST_DEVICE` (cuda when available) instead of pinning `device="cpu"`. ([#364](https://github.com/PriorLabs/tabpfn-extensions/pull/364))
+
+
 ## [0.4.3] - 2026-07-17
 
 ### Breaking Changes
