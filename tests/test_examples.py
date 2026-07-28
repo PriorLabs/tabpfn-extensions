@@ -60,7 +60,6 @@ REQUIRES_TABPFN_DIRS = ["embedding/", "bayesian_optimization/"]
 REQUIRES_TABPFN_FILES = {
     # get_decoder_readout reads model_ internals the client backend doesn't expose.
     "decoder_readout_example.py",
-    "decoder_readout_multiclass_example.py",
 }
 
 # Examples needing a module that is intentionally never installed, so they skip
