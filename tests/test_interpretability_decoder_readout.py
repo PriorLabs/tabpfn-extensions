@@ -4,7 +4,10 @@ Local-only: the readout reads TabPFN's ``ManyClassDecoder`` internals via the
 ``model_`` handle, which the client backend does not expose. The key check is an
 end-to-end identity: collapsing the recovered attention weights by training label
 and averaging over the ensemble reproduces ``predict_proba`` up to the head's
-log-clamping. If row alignment or the attention math were wrong, this would break.
+log-clamping. That identity only holds at ``softmax_temperature=1.0`` (the library
+default 0.9 sharpens the vote by ``** (1 / T)`` downstream of the readout), so the
+fixtures fit at 1.0 and the check runs tight. If row alignment or the attention
+math were wrong, this would break.
 """
 
 from __future__ import annotations
@@ -16,14 +19,23 @@ from tabpfn_extensions.interpretability import class_vote, get_decoder_readout
 from tabpfn_extensions.utils import TabPFNClassifier
 
 
-@pytest.fixture
-def fitted_clf_split(classification_data):
-    """A fitted local classifier plus the held-out test split it was not fit on."""
-    X, y = classification_data
+@pytest.fixture(params=["classification_data", "multiclass_data"])
+def fitted_clf_split(request):
+    """A fitted local classifier plus the held-out test split it was not fit on.
+
+    Parametrized over a binary and a 5-class dataset. Fit at
+    ``softmax_temperature=1.0`` so the label-collapsed readout matches
+    ``predict_proba`` up to log-clamping alone; at the library default 0.9 the
+    temperature sharpens the vote (``∝ vote ** (1 / T)``) and the gap grows with
+    the class count.
+    """
+    X, y = request.getfixturevalue(request.param)
     n_train = 2 * len(X) // 3
     X_train, X_test = X[:n_train], X[n_train:]
     y_train, y_test = y[:n_train], y[n_train:]
-    clf = TabPFNClassifier(device="cpu", n_estimators=2, random_state=0)
+    clf = TabPFNClassifier(
+        device="cpu", n_estimators=2, random_state=0, softmax_temperature=1.0
+    )
     clf.fit(X_train, y_train)
     return clf, X_train, X_test, y_train, y_test
 
@@ -77,11 +89,17 @@ def test_test_row_chunking_raises(classification_data, monkeypatch):
 
 @pytest.mark.local_compatible
 def test_class_vote_matches_predict_proba(fitted_clf_split):
-    """The label-collapsed readout reproduces predict_proba (bar log-clamping)."""
+    """The label-collapsed readout reproduces predict_proba (bar log-clamping).
+
+    The fixture fits at ``softmax_temperature=1.0``, so only the head's
+    log-clamping separates the vote from ``predict_proba`` and ``atol=1e-3`` is
+    tight enough to catch a regression in the attention math. Runs for both the
+    binary and the 5-class dataset.
+    """
     clf, _, X_test, y_train, _ = fitted_clf_split
     weights, _ = get_decoder_readout(clf, X_test)
     votes, classes = class_vote(weights, y_train)
 
     np.testing.assert_array_equal(classes, clf.classes_)
     np.testing.assert_allclose(votes.sum(axis=1), 1.0, atol=1e-4)
-    np.testing.assert_allclose(votes, clf.predict_proba(X_test), atol=0.05)
+    np.testing.assert_allclose(votes, clf.predict_proba(X_test), atol=1e-3)

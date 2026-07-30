@@ -20,9 +20,11 @@ clf = TabPFNClassifier().fit(X_train, y_train)
 weights, train_indices = get_decoder_readout(clf, X_test)
 
 # Collapse by training label; averaged over the ensemble this reproduces
-# predict_proba up to the head's log-clamping, at the default
-# softmax_temperature=0.9 and balance_probabilities=False (both are applied
-# downstream of this readout, so non-default values widen the gap).
+# predict_proba up to the head's log-clamping when softmax_temperature=1.0 and
+# balance_probabilities=False. Both are applied downstream of this readout, so at
+# the library default softmax_temperature=0.9 the vote is sharpened (per estimator,
+# predict_proba is proportional to vote ** (1 / T)), differing by up to ~2
+# percentage points for binary and ~6 at 10 classes.
 votes, classes = class_vote(weights, y_train)
 ```
 

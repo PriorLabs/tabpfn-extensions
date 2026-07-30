@@ -12,11 +12,13 @@ weights over the training rows whose label is ``c``.
 can see *which* training points drive a prediction and by how much. For each test
 row the weights sum to 1 (averaged over the decoder's attention heads and over the
 ensemble members). Collapsing them by training label with ``class_vote`` reproduces
-the model's ``predict_proba`` up to the head's log-clamping, at the classifier's
-default ``softmax_temperature=0.9`` and ``balance_probabilities=False``. Both
-settings are applied to the decoder's logits *after* this readout, so a
-non-default ``softmax_temperature`` or ``balance_probabilities=True`` will make
-``class_vote`` diverge further from ``predict_proba``.
+the model's ``predict_proba`` up to the head's log-clamping when
+``softmax_temperature=1.0`` and ``balance_probabilities=False``. Both are applied to
+the decoder's logits *after* this readout, so at the library default
+``softmax_temperature=0.9`` the temperature sharpens the vote (per estimator,
+``predict_proba`` ∝ ``vote ** (1 / T)``); ``predict_proba`` then differs from the
+vote by up to ~2 percentage points for binary and ~6 at 10 classes, and
+``balance_probabilities=True`` widens it further.
 
 Only the local ``tabpfn`` backend is supported: the client/API backend does not
 expose the model internals this reads from. Row subsampling
@@ -176,10 +178,12 @@ def class_vote(
 
     Sums the attention weights within each training label, turning the readout
     into a class distribution. Averaged over the ensemble, this reproduces the
-    model's ``predict_proba`` up to the head's log-clamping, at the classifier's
-    default ``softmax_temperature=0.9`` and ``balance_probabilities=False``
-    (both are applied downstream of this readout, so non-default values widen
-    the gap to ``predict_proba``).
+    model's ``predict_proba`` up to the head's log-clamping when
+    ``softmax_temperature=1.0`` and ``balance_probabilities=False``. Both are
+    applied downstream of this readout, so at the library default
+    ``softmax_temperature=0.9`` the vote is sharpened (per estimator,
+    ``predict_proba`` ∝ ``vote ** (1 / T)``), differing by up to ~2 percentage
+    points for binary and ~6 at 10 classes.
 
     Args:
         weights: Readout weights ``(n_test, n_train)`` from ``get_decoder_readout``.
@@ -274,7 +278,10 @@ def plot_decoder_readout(
         test_features: Raw test features ``(n_test, n_features)``; the queried rows
             are selected internally.
         y_train: Training labels aligned to the weight columns, ``(n_train,)``.
-        class_names: Class names, where ``class_names[c]`` names class label ``c``.
+        class_names: Per-class names, aligned to the sorted class labels (same
+            order as ``colors``), so ``class_names[i]`` names the ``i``-th class
+            in ``sorted(unique(y_train))`` rather than the label whose value is
+            ``i``. This keeps string and non-0-indexed integer labels working.
         y_test: Optional test labels ``(n_test,)``; when given, each panel is
             annotated with the query's true class.
         embeddings: Optional ``(train_vecs, test_vecs)`` with ``test_vecs`` spanning
@@ -305,6 +312,7 @@ def plot_decoder_readout(
             else [plt.cm.tab20(i % 20) for i in range(len(classes))]
         )
     color_of = dict(zip(classes, colors, strict=False))
+    name_of = dict(zip(classes, class_names, strict=False))
 
     def class_density(ax: plt.Axes, xx: np.ndarray, yy: np.ndarray) -> None:
         """Soft KDE background, one white-to-class-color contour set per class."""
@@ -372,9 +380,9 @@ def plot_decoder_readout(
         )
         ax.set(xticks=[], yticks=[])
 
-        parts = [f"pred = {class_names[pred]} (p = {votes[q].max():.2f})"]
+        parts = [f"pred = {name_of[pred]} (p = {votes[q].max():.2f})"]
         if y_test is not None:
-            parts.append(f"true = {class_names[y_test[q]]}")
+            parts.append(f"true = {name_of[y_test[q]]}")
         parts.append(f"top-{top_k} hold {w[top].sum():.0%} of the vote")
         prefix = "" if query_titles is None else f"{query_titles[pos]}\n"
         ax.set_title(prefix + "  ·  ".join(parts), fontsize=11)
@@ -387,7 +395,7 @@ def plot_decoder_readout(
             color="w",
             markerfacecolor=color_of[c],
             markersize=10,
-            label=class_names[c],
+            label=name_of[c],
         )
         for c in classes
     ]
