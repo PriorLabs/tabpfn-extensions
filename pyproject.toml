@@ -70,7 +70,7 @@ interpretability = [
     "xgboost>=2.1.0; python_version >= '3.12'",
     # Capped below 4.7.0 to match the resolution-wide constraint in [tool.uv];
     # see the note there. Worth revisiting once that cap can be dropped.
-    "lightgbm>=4.3.0,<4.7.0; python_version >= '3.12'",
+    "lightgbm>=4.3.0,<4.8.0; python_version >= '3.12'",
     "seaborn>=0.12.2",
     # decoder_readout.plot_decoder_readout draws with matplotlib.
     "matplotlib>=3.8.4",
