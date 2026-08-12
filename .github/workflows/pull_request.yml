@@ -97,9 +97,6 @@ jobs:
           TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
         run: uv run --no-sync python scripts/download_all_models.py
 
-      # The allow-list and the ignored packages live in [tool.licensecheck] in
-      # pyproject.toml. Passing them here as flags would override that table rather
-      # than add to it.
       - name: Check for forbidden licenses
         if: runner.os == 'MacOS' && matrix.dependency-set == 'lowest-direct'
         shell: bash

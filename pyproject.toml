@@ -131,20 +131,10 @@ constraint-dependencies = ["lightgbm<4.7.0"]
 exclude-newer = "7 days"
 exclude-newer-package = {torch = false, tabpfn = false}
 
-# Policy for the CI license check (see .github/workflows/pull_request.yml). Kept
-# here rather than in the workflow's flags so `uv run licensecheck` locally checks
-# what CI checks; note licensecheck's CLI flags replace these keys instead of
-# merging with them, so the workflow must not repeat them.
 [tool.licensecheck]
 only_licenses = ["APACHE", "MIT", "BSD", "ISC", "PYTHON", "UNLICENSE", "UNKNOWN"]
 ignore_packages = [
     "certifi",
-    # BSD-3-Clause, declared only through the PEP 639 `License-Expression` metadata
-    # field. licensecheck reads that field as `License_Expression` (underscore) and
-    # so sees no license at all; the fix landed in 2026.0.6, which needs Python
-    # >=3.12 while this project supports 3.10, so no installable version can read
-    # it. Drop this once the check runs on 3.12+.
-    # https://github.com/fsspec/filesystem_spec/blob/master/LICENSE
     "fsspec",
     "tabpfn*",
 ]
