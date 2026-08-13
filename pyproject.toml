@@ -131,6 +131,14 @@ constraint-dependencies = ["lightgbm<4.7.0"]
 exclude-newer = "7 days"
 exclude-newer-package = {torch = false, tabpfn = false}
 
+[tool.licensecheck]
+only_licenses = ["APACHE", "MIT", "BSD", "ISC", "PYTHON", "UNLICENSE", "UNKNOWN"]
+ignore_packages = [
+    "certifi",
+    "fsspec",
+    "tabpfn*",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]  # Where the tests are located
 minversion = "8.0"
