@@ -9,12 +9,15 @@ weighted vote, and ``P(class c)`` for a test row is the sum of its attention
 weights over the training rows whose label is ``c``.
 
 ``get_decoder_readout`` recovers those per-training-row attention weights, so you
-can see *which* training points drive a prediction and by how much. For each test
-row the weights sum to 1 (averaged over the decoder's attention heads and over the
-ensemble members). Collapsing them by training label with ``class_vote`` reproduces
-the model's ``predict_proba`` up to the head's log-clamping when
-``softmax_temperature=1.0`` and ``balance_probabilities=False``. Both are applied to
-the decoder's logits *after* this readout, so at the library default
+can see *which* training points drive a prediction and by how much. The weights come
+from the head's own ``ManyClassDecoder.attention_weights`` (``tabpfn>=8.3.0``), read
+off a forward pre-hook during ``predict``; ``forward`` itself fuses the attention
+into a single kernel and never materializes them. For each test row the weights sum
+to 1 (averaged over the decoder's attention heads and over the ensemble members).
+Collapsing them by training label with ``class_vote`` reproduces the model's
+``predict_proba`` up to the head's log-clamping when ``softmax_temperature=1.0`` and
+``balance_probabilities=False``. Both are applied to the decoder's logits *after*
+this readout, so at the library default
 ``softmax_temperature=0.9`` the temperature sharpens the vote (per estimator,
 ``predict_proba`` ∝ ``vote ** (1 / T)``); ``predict_proba`` then differs from the
 vote by up to ~2 percentage points for binary and ~6 at 10 classes, and
@@ -50,35 +53,6 @@ def _find_decoder(model: torch.nn.Module) -> torch.nn.Module:
         "No ManyClassDecoder found in the model. get_decoder_readout only "
         "supports TabPFN classification models.",
     )
-
-
-def _row_attention_weights(
-    decoder: torch.nn.Module,
-    train_embeddings: torch.Tensor,  # (B, N, E)
-    test_embeddings: torch.Tensor,  # (B, M, E)
-) -> torch.Tensor:
-    """Per-train-row attention weights (B, M, N), averaged over heads.
-
-    Replays the decoder's query/key projection, optional softmax scaling and
-    scaled-dot-product softmax over the training rows. Mirrors the internal
-    forward pass but returns the attention distribution itself rather than the
-    label-weighted average, so ``weights[..., n]`` is the vote mass on train row
-    ``n`` and rows sum to 1.
-    """
-    B, M, _ = test_embeddings.shape
-    N = train_embeddings.shape[1]
-    head_dim, num_heads = decoder.head_dim, decoder.num_heads
-
-    q = decoder.q_projection(test_embeddings).view(B, M, num_heads, head_dim)
-    if train_embeddings.dtype != q.dtype:
-        train_embeddings = train_embeddings.to(q.dtype)
-    k = decoder.k_projection(train_embeddings).view(B, N, num_heads, head_dim)
-    if decoder.softmax_scaling_layer is not None:
-        q = decoder.softmax_scaling_layer(q, N)
-
-    scores = torch.einsum("bmhd,bnhd->bhmn", q, k).float() / math.sqrt(head_dim)
-    attn = torch.softmax(scores, dim=-1)
-    return attn.mean(dim=1)  # average over heads -> (B, M, N)
 
 
 def get_decoder_readout(
@@ -137,8 +111,7 @@ def get_decoder_readout(
     captured: list[np.ndarray] = []
 
     def hook(module: torch.nn.Module, args: tuple) -> None:
-        train_embeddings, test_embeddings = args[0], args[1]
-        weights = _row_attention_weights(module, train_embeddings, test_embeddings)
+        weights = module.attention_weights(args[0], args[1])
         captured.append(weights.detach().to(torch.float32).cpu().numpy())
 
     handle = decoder.register_forward_pre_hook(hook)
