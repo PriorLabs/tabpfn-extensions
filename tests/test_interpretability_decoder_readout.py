@@ -1,13 +1,15 @@
 """Tests for the decoder-head readout (``get_decoder_readout`` / ``class_vote``).
 
 Local-only: the readout reads TabPFN's ``ManyClassDecoder`` internals via the
-``model_`` handle, which the client backend does not expose. The key check is an
-end-to-end identity: collapsing the recovered attention weights by training label
-and averaging over the ensemble reproduces ``predict_proba`` up to the head's
-log-clamping. That identity only holds at ``softmax_temperature=1.0`` (the library
-default 0.9 sharpens the vote by ``** (1 / T)`` downstream of the readout), so the
-fixtures fit at 1.0 and the check runs tight. If row alignment or the attention
-math were wrong, this would break.
+``model_`` handle, which the client backend does not expose. The weights come from
+the head's own ``attention_weights`` method, so these tests are mostly an
+upstream-contract guard: the key check is an end-to-end identity where collapsing
+the recovered attention weights by training label and averaging over the ensemble
+reproduces ``predict_proba`` up to the head's log-clamping. That identity only holds
+at ``softmax_temperature=1.0`` (the library default 0.9 sharpens the vote by
+``** (1 / T)`` downstream of the readout), so the fixtures fit at 1.0 and the check
+runs tight. If our row alignment were wrong, or if upstream's ``attention_weights``
+drifted from what its fused ``forward`` computes, this would break.
 """
 
 from __future__ import annotations
