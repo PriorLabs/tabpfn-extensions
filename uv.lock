@@ -3500,7 +3500,7 @@ wheels = [
 
 [[package]]
 name = "tabpfn"
-version = "8.1.0"
+version = "8.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "einops" },
@@ -3522,9 +3522,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d9/51/b56849eee53641a54337057dda9bb4f1a8188adf686dd822025e32b8f164/tabpfn-8.1.0.tar.gz", hash = "sha256:eab8b5b7c258cc374e4d7c1c614fea9d71d446ae271ad93c748efe92b6fdbfc1", size = 763933, upload-time = "2026-07-13T09:26:50.589Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/4f/4c6c44f530c100e1ea73782d332154a6976643622c98e668754ee14cef7a/tabpfn-8.3.0.tar.gz", hash = "sha256:69d969747eed7a7b1f82522a0e742c402e2e69062f2cb265fab4306f82b982bc", size = 789703, upload-time = "2026-08-13T08:12:13.444Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ee/da/579550955d8380d8c5d50dfb039963122798421d332c5fd9c742b9bf627a/tabpfn-8.1.0-py3-none-any.whl", hash = "sha256:127bfdecd4ecfd3054b45f5c292702ed5e4a7e3e47b6f0b989e91fc55d56d374", size = 727932, upload-time = "2026-07-13T09:26:48.92Z" },
+    { url = "https://files.pythonhosted.org/packages/93/57/a99f50efeb9f604a552cb87e676cef0d1ddbf7376d5ad36d48b299b3fa4e/tabpfn-8.3.0-py3-none-any.whl", hash = "sha256:650f16b7bc8df2e3218d47a221216c93bc3b6aca7bb2aeb6ea1ab05405768ddc", size = 748130, upload-time = "2026-08-13T08:12:11.662Z" },
 ]
 
 [[package]]
@@ -3612,7 +3612,7 @@ examples = [
 [package.metadata]
 requires-dist = [
     { name = "botorch", marker = "extra == 'bayesian-optimization'", specifier = ">=0.12.0" },
-    { name = "lightgbm", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=4.3.0,<4.7.0" },
+    { name = "lightgbm", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=4.3.0,<4.8.0" },
     { name = "matplotlib", marker = "extra == 'interpretability'", specifier = ">=3.8.4" },
     { name = "pandas", specifier = ">=2.2.2" },
     { name = "scikit-learn", specifier = ">=1.6.0" },
@@ -3620,7 +3620,7 @@ requires-dist = [
     { name = "seaborn", marker = "extra == 'interpretability'", specifier = ">=0.12.2" },
     { name = "shapiq", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=1.6.0" },
     { name = "shapiq", marker = "python_full_version < '3.12' and extra == 'interpretability'", specifier = ">=1.4.0" },
-    { name = "tabpfn", specifier = ">=8.1.0" },
+    { name = "tabpfn", specifier = ">=8.3.0" },
     { name = "tabpfn-common-utils", extras = ["telemetry-interactive"], specifier = ">=0.2.13" },
     { name = "tabpfn-extensions", extras = ["interpretability", "survival", "bayesian-optimization"], marker = "extra == 'all'" },
     { name = "torch", specifier = ">=2.1" },
