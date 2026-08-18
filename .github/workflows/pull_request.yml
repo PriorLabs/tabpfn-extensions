@@ -60,8 +60,10 @@ jobs:
             dependency-set: highest
     runs-on: ${{ matrix.os }}
 
-    env:
-      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+    env: &data-cache-env
+      DATA_CACHE_DIR: ${{ github.workspace }}/.data-cache
+      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/.data-cache/tabpfn-models
+      SCIKIT_LEARN_DATA: ${{ github.workspace }}/.data-cache/sklearn
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -79,15 +81,16 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --group ci --resolution ${{ matrix.dependency-set }}
 
-      - name: Restore model cache
-        id: restore-model-cache
+      - &restore-data-cache
+        name: Restore data cache
+        id: restore-data-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ github.workspace }}/model_cache
-          # This cache read will always fail as the model_cache directory is empty.
-          key: model-cache-${{ hashFiles('model_cache/**') }}
+          path: ${{ env.DATA_CACHE_DIR }}
+          # This cache read will always fail as the .data-cache directory is empty.
+          key: data-cache-${{ hashFiles('.data-cache/**') }}
           restore-keys: |
-            model-cache-
+            data-cache-
           enableCrossOsArchive: true
 
       # Download all models fails, if there is a missing model that can't be downloaded.
@@ -137,12 +140,15 @@ jobs:
           $env:FAST_TEST_MODE = 1
           uv run --no-sync pytest tests/
 
-      - name: Save model cache
-        if: github.ref == 'refs/heads/main'
+      - &save-data-cache
+        name: Save data cache
+        # Save the cache even when tests fail. This means that we save some datasets
+        # when being rate-limited, so can succeed the next time around.
+        if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
+          path: ${{ env.DATA_CACHE_DIR }}
+          key: data-cache-${{ hashFiles('.data-cache/**') }}
           enableCrossOsArchive: true
 
   test_gpu:
@@ -164,8 +170,7 @@ jobs:
 
     runs-on: ubuntu-22.04-4core-gpu
 
-    env:
-      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+    env: *data-cache-env
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -183,16 +188,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --group ci --resolution ${{ matrix.dependency-set }}
 
-      - name: Restore model cache
-        id: restore-model-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          # This cache read will always fail as the model_cache directory is empty.
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          restore-keys: |
-            model-cache-
-          enableCrossOsArchive: true
+      - *restore-data-cache
 
       # Download all models fails, if there is a missing model that can't be downloaded.
       - name: Download models from Hugging Face
@@ -210,13 +206,7 @@ jobs:
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/
 
-      - name: Save model cache
-        if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          enableCrossOsArchive: true
+      - *save-data-cache
 
   example_smoke:
     name: Example smoke (CPU)
@@ -228,8 +218,7 @@ jobs:
     # example to completion (timeout = failure) is the job of the scheduled full
     # run; see PRI-330.
     runs-on: ubuntu-latest
-    env:
-      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+    env: *data-cache-env
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -249,15 +238,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --group examples --group ci
 
-      - name: Restore model cache
-        id: restore-model-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          restore-keys: |
-            model-cache-
-          enableCrossOsArchive: true
+      - *restore-data-cache
 
       - name: Download models from Hugging Face
         env:
