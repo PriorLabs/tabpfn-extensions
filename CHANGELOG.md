@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-19
+
+### Added
+
+- Add `interpretability.get_decoder_readout`, which extracts TabPFN's classification-head (`ManyClassDecoder`) attention weights over the training rows for each test row (weights sum to 1), exposing the prediction as a label-vote over training points. A companion `class_vote` collapses the weights by training label to reproduce `predict_proba`, and `examples/interpretability/decoder_readout_example.py` visualizes the readout on a 2D projection of the model's embeddings. ([#363](https://github.com/PriorLabs/tabpfn-extensions/pull/363))
+
+### Changed
+
+- Bumped the `tabpfn` version to 8.3.0 ([#365](https://github.com/PriorLabs/tabpfn-extensions/pull/365))
+- `interpretability.get_decoder_readout` now reads the per-training-row attention weights from the classification head's own `ManyClassDecoder.attention_weights` (added in `tabpfn` 8.3.0) instead of re-deriving them by replaying the head's query/key projection, softmax scaling and scaled-dot-product softmax. The returned weights are unchanged, and the readout no longer has to track upstream changes to the head's attention math. ([#376](https://github.com/PriorLabs/tabpfn-extensions/pull/376))
+- Bumped the `tabpfn` version to 8.4.0 ([#380](https://github.com/PriorLabs/tabpfn-extensions/pull/380))
+
+
 ## [0.5.0] - 2026-07-28
 
 ### Breaking Changes
