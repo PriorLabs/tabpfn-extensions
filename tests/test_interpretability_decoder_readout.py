@@ -7,15 +7,17 @@ upstream-contract guard: the key check is an end-to-end identity where collapsin
 the recovered attention weights by training label and averaging over the ensemble
 reproduces ``predict_proba`` up to the head's log-clamping. That identity only holds
 at ``softmax_temperature=1.0`` (the library default 0.9 sharpens the vote by
-``** (1 / T)`` downstream of the readout), so the fixtures fit at 1.0 and the check
-runs tight. If our row alignment were wrong, or if upstream's ``attention_weights``
-drifted from what its fused ``forward`` computes, this would break.
+``** (1 / T)`` downstream of the readout) and in full precision, so the fixtures fit
+at 1.0 with ``inference_precision=torch.float32`` and the check runs tight. If our row
+alignment were wrong, or if upstream's ``attention_weights`` drifted from what its
+fused ``forward`` computes, this would break.
 """
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
+import torch
 
 from tabpfn_extensions.interpretability import class_vote, get_decoder_readout
 from tabpfn_extensions.utils import TabPFNClassifier
@@ -30,15 +32,30 @@ def fitted_clf_split(request):
     ``predict_proba`` up to log-clamping alone; at the library default 0.9 the
     temperature sharpens the vote (``∝ vote ** (1 / T)``) and the gap grows with
     the class count.
+
+    ``inference_precision`` is pinned to float32 because ``inference_precision="auto"``
+    (the default) turns on bf16 autocast on CPUs with native bf16 support (Intel
+    AMX / AVX512-BF16, AMD Zen 4+; see ``tabpfn.utils.infer_autocast_inference_mode``).
+    In bf16 the head's ``log(clamp(vote) + 3e-5)`` and the softmax that undoes it no
+    longer round-trip, so the identity below holds only to ~1e-2 relative rather than
+    to float32 noise. Leaving the precision to the machine made the tight check pass
+    or fail depending on which CPU a CI runner happened to land on.
     """
     X, y = request.getfixturevalue(request.param)
     n_train = 2 * len(X) // 3
     X_train, X_test = X[:n_train], X[n_train:]
     y_train, y_test = y[:n_train], y[n_train:]
     clf = TabPFNClassifier(
-        device="cpu", n_estimators=2, random_state=0, softmax_temperature=1.0
+        device="cpu",
+        n_estimators=2,
+        random_state=0,
+        softmax_temperature=1.0,
+        inference_precision=torch.float32,
     )
     clf.fit(X_train, y_train)
+    # Guards the pin: were a forced dtype ever to stop disabling autocast upstream,
+    # fail here rather than let the tight identity check flake by hardware again.
+    assert getattr(clf, "use_autocast_", False) is False
     return clf, X_train, X_test, y_train, y_test
 
 

@@ -156,7 +156,9 @@ def class_vote(
     applied downstream of this readout, so at the library default
     ``softmax_temperature=0.9`` the vote is sharpened (per estimator,
     ``predict_proba`` ∝ ``vote ** (1 / T)``), differing by up to ~2 percentage
-    points for binary and ~6 at 10 classes.
+    points for binary and ~6 at 10 classes. It is also exact only in full precision;
+    reduced precision costs ~1e-2 relative, so fit with
+    ``inference_precision=torch.float32`` for a tight match.
 
     Args:
         weights: Readout weights ``(n_test, n_train)`` from ``get_decoder_readout``.
