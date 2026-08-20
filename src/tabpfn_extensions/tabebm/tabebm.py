@@ -13,8 +13,12 @@ from sklearn.model_selection import train_test_split
 from tabpfn_common_utils.telemetry import set_extension
 from torch.utils.data import DataLoader
 
-from tabpfn.config import ModelInterfaceConfig, PreprocessorConfig
-from tabpfn.utils import meta_dataset_collator
+from tabpfn.architectures.interface import PerformanceOptions
+from tabpfn.finetuning.data_util import (
+    get_preprocessed_dataset_chunks,
+    meta_dataset_collator,
+)
+from tabpfn.inference_config import InferenceConfig, PreprocessorConfig
 from tabpfn_extensions.utils import TabPFNClassifier
 
 
@@ -85,7 +89,7 @@ class TabEBM:
         """
         # Configure TabPFN to disable preprocessing for gradient computation
         # This is crucial for SGLD sampling as we need gradients w.r.t. input features
-        no_preprocessing_inference_config = ModelInterfaceConfig(
+        no_preprocessing_inference_config = InferenceConfig(
             FINGERPRINT_FEATURE=False,
             FEATURE_SHIFT_METHOD=None,
             CLASS_SHIFT_METHOD=None,
@@ -372,6 +376,7 @@ class TabEBM:
             y_ebm_list,
             cat_ix=cat_ixs,
             configs=confs,
+            performance_options=PerformanceOptions(),
         )
 
         # Cache the fitted state
@@ -445,8 +450,16 @@ class TabEBM:
         y_cpu = y.cpu()
 
         # Get preprocessed datasets
-        batched_datasets = self.model.get_preprocessed_datasets(
-            X_cpu, y_cpu, splitter, max_data_size=self.max_data_size
+        batched_datasets = get_preprocessed_dataset_chunks(
+            self.model,
+            X_cpu,
+            y_cpu,
+            split_fn=splitter,
+            model_type="classifier",
+            max_data_size=self.max_data_size,
+            equal_split_size=True,
+            data_shuffle_seed=0,
+            preprocessing_random_state=0
         )
 
         # Create dataloader with minimal overhead
@@ -459,15 +472,14 @@ class TabEBM:
 
         # Extract first (and only) batch efficiently
         batch_data = next(iter(batch_dataloader))
-        X_train, X_val, y_train, y_val, cat_ixs, confs = batch_data
 
         return {
-            "X_train": X_train,
-            "X_val": X_val,
-            "y_train": y_train,
-            "y_val": y_val,
-            "cat_ixs": cat_ixs,
-            "confs": confs,
+            "X_train": batch_data.X_context,
+            "X_val": batch_data.X_query,
+            "y_train": batch_data.y_context,
+            "y_val": batch_data.y_query,
+            "cat_ixs": batch_data.cat_indices,
+            "confs": batch_data.configs,
         }
 
     def _perform_sgld_sampling(
@@ -714,7 +726,7 @@ class TabEBM:
             train_size=train_size,
             random_state=random_state,
             shuffle=shuffle,
-            stratify=stratify,
+            stratify=stratify if shuffle else None,
         )
 
         # Override with full data in full train mode
