@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tabpfn-extensions"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
     "torch>=2.1",
     "pandas>=2.2.2",
     "scikit-learn>=1.6.0",
     "scipy>=1.11.1",
-    "tabpfn>=8.3.0",
+    "tabpfn>=8.4.0",
     "tabpfn-common-utils[telemetry-interactive]>=0.2.13",
 ]
 

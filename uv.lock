@@ -3500,7 +3500,7 @@ wheels = [
 
 [[package]]
 name = "tabpfn"
-version = "8.3.0"
+version = "8.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "einops" },
@@ -3522,9 +3522,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/4f/4c6c44f530c100e1ea73782d332154a6976643622c98e668754ee14cef7a/tabpfn-8.3.0.tar.gz", hash = "sha256:69d969747eed7a7b1f82522a0e742c402e2e69062f2cb265fab4306f82b982bc", size = 789703, upload-time = "2026-08-13T08:12:13.444Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/40/4b5034d4694aedac5a999d1d89b877acb8f60c48e0884271bc4678ed72d7/tabpfn-8.4.0.tar.gz", hash = "sha256:a21d2e7b183829277e1a718eed5a894d075c43530648a9519cb1cf6728b76bda", size = 815317, upload-time = "2026-08-19T10:21:21.339Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/57/a99f50efeb9f604a552cb87e676cef0d1ddbf7376d5ad36d48b299b3fa4e/tabpfn-8.3.0-py3-none-any.whl", hash = "sha256:650f16b7bc8df2e3218d47a221216c93bc3b6aca7bb2aeb6ea1ab05405768ddc", size = 748130, upload-time = "2026-08-13T08:12:11.662Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/d1/6ac2bb454e59447c23924c2c49f0419d4a3015b26f2475446979c424d7e0/tabpfn-8.4.0-py3-none-any.whl", hash = "sha256:f292cc3c57ef02da0add323474c8ae85272c857a311efbc405eb7dd4aeb065b0", size = 762051, upload-time = "2026-08-19T10:21:19.667Z" },
 ]
 
 [[package]]
@@ -3620,7 +3620,7 @@ requires-dist = [
     { name = "seaborn", marker = "extra == 'interpretability'", specifier = ">=0.12.2" },
     { name = "shapiq", marker = "python_full_version >= '3.12' and extra == 'interpretability'", specifier = ">=1.6.0" },
     { name = "shapiq", marker = "python_full_version < '3.12' and extra == 'interpretability'", specifier = ">=1.4.0" },
-    { name = "tabpfn", specifier = ">=8.3.0" },
+    { name = "tabpfn", specifier = ">=8.4.0" },
     { name = "tabpfn-common-utils", extras = ["telemetry-interactive"], specifier = ">=0.2.13" },
     { name = "tabpfn-extensions", extras = ["interpretability", "survival", "bayesian-optimization"], marker = "extra == 'all'" },
     { name = "torch", specifier = ">=2.1" },
