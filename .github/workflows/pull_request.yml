@@ -133,7 +133,7 @@ jobs:
         name: Save data cache
         # Save the cache even when tests fail. This means that we save some datasets
         # when being rate-limited, so can succeed the next time around.
-        if: always()
+        if: ${{ !cancelled() }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.DATA_CACHE_DIR }}
@@ -243,6 +243,8 @@ jobs:
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/test_examples.py \
             --run-examples -n auto
+
+      - *save-data-cache
 
   build_verify:
     name: Build wheel + sdist
