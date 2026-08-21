@@ -97,6 +97,13 @@ jobs:
           TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
         run: uv run --no-sync python scripts/download_all_models.py
 
+      - name: Save model cache
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true
+
       - name: Check for forbidden licenses
         if: runner.os == 'MacOS' && matrix.dependency-set == 'lowest-direct'
         shell: bash
@@ -125,13 +132,6 @@ jobs:
         run: |
           $env:FAST_TEST_MODE = 1
           uv run --no-sync pytest tests/
-
-      - name: Save model cache
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          enableCrossOsArchive: true
 
   test_gpu:
     name: Test on GPU
@@ -189,6 +189,13 @@ jobs:
           TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
         run: uv run --no-sync python scripts/download_all_models.py
 
+      - name: Save model cache
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true
+
       - name: Run GPU Test Suite
         env:
           CUDA_VISIBLE_DEVICES: "0"
@@ -197,13 +204,6 @@ jobs:
           TABPFN_EXCLUDE_DEVICES: "cpu,cpu:0,mps"
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/
-
-      - name: Save model cache
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          enableCrossOsArchive: true
 
   example_smoke:
     name: Example smoke (CPU)
