@@ -25,9 +25,8 @@ jobs:
     timeout-minutes: 90
 
     env:
-      DATA_CACHE_DIR: ${{ github.workspace }}/.data-cache
-      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/.data-cache/tabpfn-models
-      SCIKIT_LEARN_DATA: ${{ github.workspace }}/.data-cache/sklearn
+      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+      SCIKIT_LEARN_DATA: ${{ github.workspace }}/sklearn_data_cache
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -48,15 +47,20 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --group examples --group ci
 
-      - name: Restore data cache
-        id: restore-data-cache
+      - name: Restore model cache
+        id: restore-model-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ env.DATA_CACHE_DIR }}
-          # This cache read will always fail as the .data-cache directory is empty.
-          key: data-cache-${{ hashFiles('.data-cache/**') }}
-          restore-keys: |
-            data-cache-
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-
+          enableCrossOsArchive: true
+
+      - name: Restore sklearn data cache
+        id: restore-sklearn-data-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SCIKIT_LEARN_DATA }}
+          key: sklearn-data-examples-cache-
           enableCrossOsArchive: true
 
       - name: Download models from Hugging Face
@@ -81,12 +85,19 @@ jobs:
           uv run --no-sync pytest tests/test_examples.py --run-examples -v 2>&1 \
             | tee pytest_output.txt
 
-      - name: Save data cache
-        if: ${{ !cancelled() }}
+      - name: Save model cache
+        if: github.ref == 'refs/heads/main'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ env.DATA_CACHE_DIR }}
-          key: data-cache-${{ hashFiles('.data-cache/**') }}
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true
+
+      - name: Save dataset cache
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SCIKIT_LEARN_DATA }}
+          key: sklearn-data-examples-cache-${{ hashFiles('sklearn_data_cache/**') }}
           enableCrossOsArchive: true
 
       # Scheduled-run failures don't notify anyone by default (GitHub only
