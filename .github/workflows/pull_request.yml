@@ -113,6 +113,17 @@ jobs:
         if: runner.os == 'MacOS'
         run: brew install libomp
 
+      # Disable AMX on Windows to avoid the tests crashing.
+      # The oneDNN library tries to use the AMX accelerator on newer Intel CPUs.
+      # However, this isn't enabled on the Windows runners, so the tests crash with
+      # "Windows fatal exception: code 0xc000001d". Instead, limit the instruction set
+      # to AVX512_CORE_FP16, which is the most recent one without AMX.
+      # See https://github.com/priorLabs/tabPFN/pull/1151 for more details.
+      - name: Cap oneDNN below AMX (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "ONEDNN_MAX_CPU_ISA=AVX512_CORE_FP16" >> "$GITHUB_ENV"
+
       - name: Run Tests (Unix)
         if: runner.os != 'Windows'
         env:
