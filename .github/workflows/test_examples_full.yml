@@ -38,7 +38,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          enable-cache: true
+          enable-cache: false
 
       # Highest resolution on purpose: examples are user-facing tutorials, so we
       # test them against the deps a fresh install gets. The "examples" group
