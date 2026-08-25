@@ -26,6 +26,7 @@ jobs:
 
     env:
       TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+      SCIKIT_LEARN_DATA: ${{ github.workspace }}/sklearn_data_cache
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -51,10 +52,15 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/model_cache
-          # This cache read will always fail as the model_cache directory is empty.
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          restore-keys: |
-            model-cache-
+          key: model-cache-
+          enableCrossOsArchive: true
+
+      - name: Restore sklearn data cache
+        id: restore-sklearn-data-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SCIKIT_LEARN_DATA }}
+          key: sklearn-data-examples-cache-
           enableCrossOsArchive: true
 
       - name: Download models from Hugging Face
@@ -78,6 +84,21 @@ jobs:
           set -o pipefail
           uv run --no-sync pytest tests/test_examples.py --run-examples -v 2>&1 \
             | tee pytest_output.txt
+
+      - name: Save model cache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true
+
+      - name: Save dataset cache
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SCIKIT_LEARN_DATA }}
+          key: sklearn-data-examples-cache-${{ hashFiles('sklearn_data_cache/**') }}
+          enableCrossOsArchive: true
 
       # Scheduled-run failures don't notify anyone by default (GitHub only
       # emails whoever last edited the cron line), so track them as an issue.

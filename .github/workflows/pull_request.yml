@@ -60,7 +60,7 @@ jobs:
             dependency-set: highest
     runs-on: ${{ matrix.os }}
 
-    env:
+    env: &cache-env
       TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
 
     steps:
@@ -79,19 +79,17 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --group ci --resolution ${{ matrix.dependency-set }}
 
-      - name: Restore model cache
+      - &restore-model-cache
+        name: Restore model cache
         id: restore-model-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/model_cache
-          # This cache read will always fail as the model_cache directory is empty.
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          restore-keys: |
-            model-cache-
+          key: model-cache-
           enableCrossOsArchive: true
 
-      # Download all models fails, if there is a missing model that can't be downloaded.
-      - name: Download models from Hugging Face
+      - &download-models
+        name: Download models from Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
@@ -137,7 +135,8 @@ jobs:
           $env:FAST_TEST_MODE = 1
           uv run --no-sync pytest tests/
 
-      - name: Save model cache
+      - &save-model-cache
+        name: Save model cache
         if: github.ref == 'refs/heads/main'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -164,8 +163,7 @@ jobs:
 
     runs-on: ubuntu-22.04-4core-gpu
 
-    env:
-      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+    env: *cache-env
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -183,23 +181,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --group ci --resolution ${{ matrix.dependency-set }}
 
-      - name: Restore model cache
-        id: restore-model-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          # This cache read will always fail as the model_cache directory is empty.
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          restore-keys: |
-            model-cache-
-          enableCrossOsArchive: true
-
-      # Download all models fails, if there is a missing model that can't be downloaded.
-      - name: Download models from Hugging Face
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
-        run: uv run --no-sync python scripts/download_all_models.py
+      - *restore-model-cache
+      - *download-models
 
       - name: Run GPU Test Suite
         env:
@@ -210,26 +193,19 @@ jobs:
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/
 
-      - name: Save model cache
-        if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          enableCrossOsArchive: true
+      - *save-model-cache
 
   example_smoke:
     name: Example smoke (CPU)
-    # A separate job (rather than part of test_compatibility) so the examples --
-    # which are comparatively slow -- run in parallel and don't block the normal
-    # test suite. Fast smoke gate: each example runs as a subprocess and fails
-    # only if it *errors*; one that doesn't finish within the timeout still passes,
-    # since we only assert it starts and runs without crashing. Running every
-    # example to completion (timeout = failure) is the job of the scheduled full
-    # run; see PRI-330.
+    # A separate job so that the examples, which are slow, run in parallel to the main
+    # test suite.
+    # We set FAST_TEST_MODE=1, which checks that the examples start without crashing,
+    # but does not run them to completion. test_examples_full.yml runs periodically to
+    # perform a full test.
     runs-on: ubuntu-latest
     env:
       TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+      SCIKIT_LEARN_DATA: ${{ github.workspace }}/sklearn_data_cache
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -249,21 +225,17 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --group examples --group ci
 
-      - name: Restore model cache
-        id: restore-model-cache
+      - *restore-model-cache
+
+      - name: Restore sklearn data cache
+        id: restore-sklearn-data-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          restore-keys: |
-            model-cache-
+          path: ${{ env.SCIKIT_LEARN_DATA }}
+          key: sklearn-data-examples-cache-
           enableCrossOsArchive: true
 
-      - name: Download models from Hugging Face
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
-        run: uv run --no-sync python scripts/download_all_models.py
+      - *download-models
 
       # -n auto runs the examples in parallel to keep wall-clock down. The
       # per-example timeout is fixed in tests/test_examples.py.
@@ -273,6 +245,15 @@ jobs:
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/test_examples.py \
             --run-examples -n auto
+
+      - *save-model-cache
+
+      - name: Save dataset cache
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SCIKIT_LEARN_DATA }}
+          key: sklearn-data-examples-cache-${{ hashFiles('sklearn_data_cache/**') }}
+          enableCrossOsArchive: true
 
   build_verify:
     name: Build wheel + sdist
