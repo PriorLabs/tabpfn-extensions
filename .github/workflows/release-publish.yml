@@ -47,7 +47,7 @@ jobs:
           PY
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
@@ -117,14 +117,14 @@ jobs:
         # ghcr.io/pypa/gh-action-pypi-publish:<ref>, and pypa publishes images
         # for version/branch refs only, not per-commit SHAs — a SHA pin fails
         # with "manifest unknown". v1.14.0 maps to the immutable :v1.14.0 image.
-        uses: pypa/gh-action-pypi-publish@v1.14.0
+        uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
           repository-url: https://test.pypi.org/legacy/
           print-hash: true
           skip-existing: true
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
@@ -197,7 +197,7 @@ jobs:
       - name: Publish to PyPI
         # See note on the TestPyPI publish step: pinned to the immutable
         # version tag v1.14.0 because this Docker action cannot be SHA-pinned.
-        uses: pypa/gh-action-pypi-publish@v1.14.0
+        uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
           print-hash: true
           skip-existing: true

@@ -60,7 +60,7 @@ jobs:
             dependency-set: highest
     runs-on: ${{ matrix.os }}
 
-    env:
+    env: &cache-env
       TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
 
     steps:
@@ -72,36 +72,35 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
       - name: Install dependencies
         run: uv sync --all-extras --group ci --resolution ${{ matrix.dependency-set }}
 
-      - name: Restore model cache
+      - &restore-model-cache
+        name: Restore model cache
         id: restore-model-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ github.workspace }}/model_cache
-          # This cache read will always fail as the model_cache directory is empty.
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          restore-keys: |
-            model-cache-
+          key: model-cache-
           enableCrossOsArchive: true
 
-      # Download all models fails, if there is a missing model that can't be downloaded.
-      - name: Download models from Hugging Face
+      - &download-models
+        name: Download models from Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
         run: uv run --no-sync python scripts/download_all_models.py
 
-      # Only main-ref runs, so the entry lands in the default-branch scope that
+      # Only save on main, so the entry lands in the default-branch scope that
       # every PR can restore from. A pull_request run would write a copy scoped to
       # refs/pull/<n>/merge, which no other PR can read and which counts against
       # the repo's cache budget, hastening eviction of the entry PRs need.
-      - name: Save model cache
+      - &save-model-cache
+        name: Save model cache
         if: github.ref == 'refs/heads/main'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -124,6 +123,17 @@ jobs:
       - name: Install libomp (macOS)
         if: runner.os == 'MacOS'
         run: brew install libomp
+
+      # Disable AMX on Windows to avoid the tests crashing.
+      # The oneDNN library tries to use the AMX accelerator on newer Intel CPUs.
+      # However, this isn't enabled on the Windows runners, so the tests crash with
+      # "Windows fatal exception: code 0xc000001d". Instead, limit the instruction set
+      # to AVX512_CORE_FP16, which is the most recent one without AMX.
+      # See https://github.com/priorLabs/tabPFN/pull/1151 for more details.
+      - name: Cap oneDNN below AMX (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "ONEDNN_MAX_CPU_ISA=AVX512_CORE_FP16" >> "$GITHUB_ENV"
 
       - name: Run Tests (Unix)
         if: runner.os != 'Windows'
@@ -157,8 +167,7 @@ jobs:
 
     runs-on: ubuntu-22.04-4core-gpu
 
-    env:
-      TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+    env: *cache-env
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -169,42 +178,16 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
       - name: Install dependencies
         run: uv sync --all-extras --group ci --resolution ${{ matrix.dependency-set }}
 
-      - name: Restore model cache
-        id: restore-model-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          # This cache read will always fail as the model_cache directory is empty.
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          restore-keys: |
-            model-cache-
-          enableCrossOsArchive: true
-
-      # Download all models fails, if there is a missing model that can't be downloaded.
-      - name: Download models from Hugging Face
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
-        run: uv run --no-sync python scripts/download_all_models.py
-
-      # Only main-ref runs, so the entry lands in the default-branch scope that
-      # every PR can restore from. A pull_request run would write a copy scoped to
-      # refs/pull/<n>/merge, which no other PR can read and which counts against
-      # the repo's cache budget, hastening eviction of the entry PRs need.
-      - name: Save model cache
-        if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          enableCrossOsArchive: true
+      - *restore-model-cache
+      - *download-models
+      - *save-model-cache
 
       - name: Run GPU Test Suite
         env:
@@ -217,16 +200,15 @@ jobs:
 
   example_smoke:
     name: Example smoke (CPU)
-    # A separate job (rather than part of test_compatibility) so the examples --
-    # which are comparatively slow -- run in parallel and don't block the normal
-    # test suite. Fast smoke gate: each example runs as a subprocess and fails
-    # only if it *errors*; one that doesn't finish within the timeout still passes,
-    # since we only assert it starts and runs without crashing. Running every
-    # example to completion (timeout = failure) is the job of the scheduled full
-    # run; see PRI-330.
+    # A separate job so that the examples, which are slow, run in parallel to the main
+    # test suite.
+    # We set FAST_TEST_MODE=1, which checks that the examples start without crashing,
+    # but does not run them to completion. test_examples_full.yml runs periodically to
+    # perform a full test.
     runs-on: ubuntu-latest
     env:
       TABPFN_MODEL_CACHE_DIR: ${{ github.workspace }}/model_cache
+      SCIKIT_LEARN_DATA: ${{ github.workspace }}/sklearn_data_cache
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -236,7 +218,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
 
@@ -246,21 +228,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --group examples --group ci
 
-      - name: Restore model cache
-        id: restore-model-cache
+      - *restore-model-cache
+
+      - name: Restore sklearn data cache
+        id: restore-sklearn-data-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          restore-keys: |
-            model-cache-
+          path: ${{ env.SCIKIT_LEARN_DATA }}
+          key: sklearn-data-examples-cache-
           enableCrossOsArchive: true
 
-      - name: Download models from Hugging Face
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
-        run: uv run --no-sync python scripts/download_all_models.py
+      - *download-models
+      - *save-model-cache
 
       # -n auto runs the examples in parallel to keep wall-clock down. The
       # per-example timeout is fixed in tests/test_examples.py.
@@ -270,6 +249,13 @@ jobs:
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/test_examples.py \
             --run-examples -n auto
+
+      - name: Save dataset cache
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SCIKIT_LEARN_DATA }}
+          key: sklearn-data-examples-cache-${{ hashFiles('sklearn_data_cache/**') }}
+          enableCrossOsArchive: true
 
   build_verify:
     name: Build wheel + sdist
@@ -283,7 +269,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
 
       - name: Build sdist + wheel
         run: uv build
