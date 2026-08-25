@@ -95,6 +95,19 @@ jobs:
           TABPFN_TOKEN: ${{ secrets.TABPFN_TOKEN }}
         run: uv run --no-sync python scripts/download_all_models.py
 
+      # Only save on main, so the entry lands in the default-branch scope that
+      # every PR can restore from. A pull_request run would write a copy scoped to
+      # refs/pull/<n>/merge, which no other PR can read and which counts against
+      # the repo's cache budget, hastening eviction of the entry PRs need.
+      - &save-model-cache
+        name: Save model cache
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/model_cache
+          key: model-cache-${{ hashFiles('model_cache/**') }}
+          enableCrossOsArchive: true
+
       - name: Check for forbidden licenses
         if: runner.os == 'MacOS' && matrix.dependency-set == 'lowest-direct'
         shell: bash
@@ -135,15 +148,6 @@ jobs:
           $env:FAST_TEST_MODE = 1
           uv run --no-sync pytest tests/
 
-      - &save-model-cache
-        name: Save model cache
-        if: github.ref == 'refs/heads/main'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/model_cache
-          key: model-cache-${{ hashFiles('model_cache/**') }}
-          enableCrossOsArchive: true
-
   test_gpu:
     name: Test on GPU
     # Gate only on linting so this runs in parallel with test_compatibility.
@@ -183,6 +187,7 @@ jobs:
 
       - *restore-model-cache
       - *download-models
+      - *save-model-cache
 
       - name: Run GPU Test Suite
         env:
@@ -192,8 +197,6 @@ jobs:
           TABPFN_EXCLUDE_DEVICES: "cpu,cpu:0,mps"
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/
-
-      - *save-model-cache
 
   example_smoke:
     name: Example smoke (CPU)
@@ -236,6 +239,7 @@ jobs:
           enableCrossOsArchive: true
 
       - *download-models
+      - *save-model-cache
 
       # -n auto runs the examples in parallel to keep wall-clock down. The
       # per-example timeout is fixed in tests/test_examples.py.
@@ -245,8 +249,6 @@ jobs:
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/test_examples.py \
             --run-examples -n auto
-
-      - *save-model-cache
 
       - name: Save dataset cache
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
