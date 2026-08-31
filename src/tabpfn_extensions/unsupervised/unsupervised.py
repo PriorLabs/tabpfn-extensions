@@ -765,13 +765,18 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 log_pred = torch.log(pred)
             else:
                 pred = model.predict(X_predict, output_type="full")
+                # Proper tensor construction to avoid warnings
                 logits = pred["logits"]
-                logits_tensor = logits.clone().detach()
+                logits_tensor = (
+                    logits.clone().detach()
+                    if torch.is_tensor(logits)
+                    else torch.as_tensor(logits)
+                )
                 # Match logits dtype/device: MPS rejects float64, and sklearn
                 # inputs arrive as float64, so cast before moving to the device.
                 y_tensor = y_predict.detach().to(
-                    dtype=logits.dtype,
-                    device=logits.device,
+                    dtype=logits_tensor.dtype,
+                    device=logits_tensor.device,
                 )
                 # criterion.forward returns the NLL, so -forward is log p_θ directly.
                 log_pred = (
