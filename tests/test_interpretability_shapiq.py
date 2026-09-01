@@ -3,14 +3,18 @@
 Focused on ``get_tabpfn_inf_explainer``, which masks absent features with
 ``+inf`` and relies on TabPFN's opt-in ``PASSTHROUGH_INF`` inference config.
 
-These are local-only: ``inference_config``/``PASSTHROUGH_INF`` is a local-tabpfn
-feature not exposed by the client backend. They run on CPU (fp32), where the
+The end-to-end cases are local-only, not because the feature is: the remote
+backends forward ``inference_config``/``PASSTHROUGH_INF`` to the TabPFN they
+run, and ``TestInfPassthroughDetection`` covers them with stubs. They run on
+CPU (fp32), where the
 value function is deterministic and the Shapley efficiency identity is tight —
 so we can compare the imputer's masking against hand-built masked predictions
 exactly, rather than merely asserting the pipeline "runs".
 """
 
 from __future__ import annotations
+
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -165,3 +169,58 @@ def test_inf_explainer_handles_string_column(classification_data_with_text):
     expected_row = x0.astype(object).copy()
     expected_row[text_col] = np.inf
     assert np.allclose(got, predict_fn(clf, expected_row.reshape(1, -1)), atol=1e-5)
+
+
+class TestInfPassthroughDetection:
+    """Which backends may use the +inf masking path.
+
+    The flag lives in one of two places: a local model resolves it into
+    ``get_inference_config()``, while a remote backend only forwards the
+    ``inference_config`` constructor argument. Stubs stand in for the client
+    estimators, which are not a test dependency here.
+    """
+
+    class _Remote:
+        """Shaped like any tabpfn-client estimator: no resolvable config."""
+
+        def __init__(self, inference_config=None):
+            self.inference_config = inference_config
+
+    @pytest.mark.local_compatible
+    @pytest.mark.client_compatible
+    def test_remote_backend_with_the_flag_is_accepted(self):
+        """Both the managed API and a self-hosted endpoint honour the flag."""
+        model = self._Remote(inference_config={"PASSTHROUGH_INF": True})
+        assert tpe_shapiq._model_has_inf_passthrough(model)
+
+    @pytest.mark.local_compatible
+    @pytest.mark.client_compatible
+    def test_remote_backend_without_the_flag_is_rejected(self):
+        assert not tpe_shapiq._model_has_inf_passthrough(self._Remote())
+        assert not tpe_shapiq._model_has_inf_passthrough(
+            self._Remote(inference_config={"PASSTHROUGH_INF": False}),
+        )
+
+    @pytest.mark.local_compatible
+    @pytest.mark.client_compatible
+    def test_remote_backend_without_the_flag_raises(self, classification_data):
+        X, _ = classification_data
+        with pytest.raises(ValueError, match="PASSTHROUGH_INF"):
+            tpe_shapiq.get_tabpfn_inf_explainer(model=self._Remote(), data=X)
+
+    @pytest.mark.local_compatible
+    @pytest.mark.client_compatible
+    def test_local_model_still_uses_its_resolved_config(self):
+        """A local model's resolved config wins; its raw argument is not read."""
+
+        class _Local:
+            inference_config: ClassVar[dict] = {"PASSTHROUGH_INF": True}
+
+            def __init__(self, *, resolved: bool):
+                self._resolved = resolved
+
+            def get_inference_config(self):
+                return type("Cfg", (), {"PASSTHROUGH_INF": self._resolved})()
+
+        assert tpe_shapiq._model_has_inf_passthrough(_Local(resolved=True))
+        assert not tpe_shapiq._model_has_inf_passthrough(_Local(resolved=False))
