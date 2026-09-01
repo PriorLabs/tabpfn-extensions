@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-01
+
+### Fixed
+
+- `interpretability.class_vote` reproduces `predict_proba` exactly only in full precision; the docstring now says so, and the test covering that identity pins `inference_precision=torch.float32` instead of flaking on CPUs where TabPFN enables bf16 autocast. ([#382](https://github.com/PriorLabs/tabpfn-extensions/pull/382))
+- Outlier detection no longer fails with `'numpy.ndarray' object has no attribute 'clone'` when the unsupervised model runs on the TabPFN client. ([#390](https://github.com/PriorLabs/tabpfn-extensions/pull/390))
+- `get_tabpfn_inf_explainer` now works with the remote backends: a model built with `inference_config={"PASSTHROUGH_INF": True}` is accepted instead of being rejected as unsupported, so inf-masking SHAP is no longer limited to local models. ([#391](https://github.com/PriorLabs/tabpfn-extensions/pull/391))
+
+
 ## [0.6.0] - 2026-08-19
 
 ### Added
