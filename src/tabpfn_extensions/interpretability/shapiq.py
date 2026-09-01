@@ -351,14 +351,16 @@ def _model_has_inf_passthrough(
     """Whether ``model`` is configured to pass ``+/-inf`` through to TabPFN.
 
     Returns ``True`` only if we can positively confirm the ``PASSTHROUGH_INF``
-    inference-config flag is enabled. For estimators we can't introspect (e.g.
-    the tabpfn-client backend, which has no ``get_inference_config``) this
-    returns ``False`` — we simply can't vouch for inf support.
+    inference-config flag is enabled, from either of the two places a backend
+    keeps it: a local model resolves it into ``get_inference_config()``, while
+    a remote one forwards the ``inference_config`` constructor argument to the
+    server, where the flag takes effect exactly as it does locally.
     """
     get_inference_config = getattr(model, "get_inference_config", None)
-    if get_inference_config is None:
-        return False
-    return bool(getattr(get_inference_config(), "PASSTHROUGH_INF", False))
+    if get_inference_config is not None:
+        return bool(getattr(get_inference_config(), "PASSTHROUGH_INF", False))
+    config = getattr(model, "inference_config", None)
+    return bool(isinstance(config, dict) and config.get("PASSTHROUGH_INF"))
 
 
 @set_extension("interpretability")
@@ -395,7 +397,8 @@ def get_tabpfn_inf_explainer(
     ``inference_config={"PASSTHROUGH_INF": True}`` (available in
     ``tabpfn>=8.1.0``). Without it, TabPFN rejects non-finite inputs at
     validation and this function raises ``ValueError`` up front rather than
-    letting every coalition evaluation fail later.
+    letting every coalition evaluation fail later. The remote backends forward
+    the flag to the TabPFN they run, so this path works there too.
 
     Args:
         model: The TabPFN model to explain. Must be constructed with

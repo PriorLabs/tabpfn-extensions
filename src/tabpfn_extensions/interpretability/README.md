@@ -83,7 +83,9 @@ We expose three adapters:
   is fixed, so the KV cache applies. It requires the model to be built with
   ``inference_config={"PASSTHROUGH_INF": True}`` (``tabpfn>=8.1.0``) so ``+inf`` reaches
   the model instead of being rejected at validation; unlike ``NaN``, which TabPFN's
-  preprocessing transforms before it reaches the model, ``+inf`` is carried through:
+  preprocessing transforms before it reaches the model, ``+inf`` is carried through.
+  This works with a local model and with the remote backends, which forward the flag
+  to the TabPFN they run:
 
   ```python
   clf = TabPFNClassifier(
