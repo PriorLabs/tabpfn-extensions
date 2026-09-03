@@ -38,7 +38,9 @@ def warn_if_no_kv_cache(model: Any, *, context: str = "This operation") -> None:
     set runs on every predict and these extensions can be 10-100x slower
     than necessary.
 
-    Two conditions need to hold for the cache fast path:
+    What has to hold depends on the backend. An endpoint-backed estimator
+    (self-hosted container, SageMaker, Foundry) needs ``use_kv_cache=True``,
+    which is the only condition. A local model needs both:
         1. ``model`` was constructed with ``fit_mode="fit_with_cache"``
            (a constructor argument, must be set BEFORE ``.fit()``).
         2. ``model.executor_.keep_cache_on_device`` is ``True`` (set AFTER
@@ -54,12 +56,28 @@ def warn_if_no_kv_cache(model: Any, *, context: str = "This operation") -> None:
             SHAP"``, ``"Sequential feature selection"``). Defaults to a
             generic ``"This operation"``.
     """
-    # tabpfn-client doesn't expose fit_mode and doesn't (yet) support the KV
-    # cache — recommend switching to the local tabpfn package instead of
-    # firing the generic "set fit_mode='fit_with_cache'" message that would
-    # TypeError on the client. Walk the MRO because tabpfn-extensions wraps
-    # the client base classes in tabpfn_extensions.utils, so the *immediate*
-    # class' __module__ is "tabpfn_extensions.utils" and won't match.
+    # The endpoint-backed backends (self-hosted container, SageMaker, Foundry)
+    # do support the cache, through a `use_kv_cache` constructor flag. Their
+    # classes live under tabpfn_client, so this has to be checked before the
+    # MRO test below, which would otherwise call them unsupported.
+    if hasattr(model, "use_kv_cache"):
+        if not model.use_kv_cache:
+            warnings.warn(
+                f"{context} issues many predictions against a single fit, but "
+                "this estimator was built without `use_kv_cache=True`, so the "
+                "endpoint re-fits on every call. Pass `use_kv_cache=True` to "
+                "reuse the fitted model between predictions.",
+                UserWarning,
+                stacklevel=3,
+            )
+        return
+
+    # The managed API backend has no endpoint-side cache to reuse, and doesn't
+    # expose fit_mode — recommend the local package rather than firing the
+    # generic "set fit_mode='fit_with_cache'" message, which would TypeError on
+    # it. Walk the MRO because tabpfn-extensions wraps the client base classes
+    # in tabpfn_extensions.utils, so the *immediate* class' __module__ is
+    # "tabpfn_extensions.utils" and won't match.
     mro_modules = (getattr(cls, "__module__", "") for cls in type(model).__mro__)
     if any("tabpfn_client" in m for m in mro_modules):
         warnings.warn(
