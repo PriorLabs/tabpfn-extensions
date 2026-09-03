@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-03
+
+### Fixed
+
+- Support the KV cache advice for endpoint-backed models: a self-hosted, SageMaker or Foundry estimator is no longer told its backend cannot cache, and is instead pointed at `use_kv_cache=True` when the cache is off. ([#393](https://github.com/PriorLabs/tabpfn-extensions/pull/393))
+
+
 ## [0.6.1] - 2026-09-01
 
 ### Fixed
