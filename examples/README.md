@@ -7,6 +7,7 @@ This directory contains examples for using TabPFN extensions. Each extension has
 ```
 examples/
 ├── embedding/         # Access TabPFN's internal dense sample embeddings
+├── image/             # Pictures as columns: frozen DINOv3 embeddings for TabPFN
 ├── interpretability/  # SHAP, partial dependence, feature selection
 ├── many_class/        # More classes than the checkpoint supports
 ├── multioutput/       # Multi-output regression + multi-label classification (sklearn wrapper)

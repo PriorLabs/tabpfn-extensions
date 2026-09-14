@@ -246,6 +246,10 @@ jobs:
       - name: Run example smoke tests
         env:
           TABPFN_EXCLUDE_DEVICES: mps
+          # The image example's encoder is gated on the Hugging Face Hub, and its
+          # kagglehub archive lands inside the dataset cache restored above.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          KAGGLEHUB_CACHE: ${{ env.SCIKIT_LEARN_DATA }}/kagglehub
         run: |
           FAST_TEST_MODE=1 uv run --no-sync pytest tests/test_examples.py \
             --run-examples -n auto

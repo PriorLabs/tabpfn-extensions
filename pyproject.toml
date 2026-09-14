@@ -84,11 +84,17 @@ bayesian_optimization = [
     # Only needed for the benchmark objective in the example.
     "botorch>=0.12.0",
 ]
+# Image columns: transformers loads the DINOv3 encoder, pillow decodes the images.
+# 4.57.0, the first release with DINOv3, is yanked on PyPI; 4.57.1 is the floor.
+image = [
+    "transformers>=4.57.1",
+    "pillow>=10.4",
+]
 
 # Meta-package that installs all extensions
 all = [
     # scikit-survival not included; install manually if you need SurvivalTabPFN.
-    "tabpfn-extensions[interpretability,survival,bayesian_optimization]",
+    "tabpfn-extensions[interpretability,survival,bayesian_optimization,image]",
 ]
 
 [dependency-groups]
@@ -119,6 +125,8 @@ examples = [
     # Only used by interpretability/decoder_readout_example.py for the 2D
     # embedding projection; the example falls back to PCA when it is absent.
     "umap-learn>=0.5.0",
+    # Only used by image/tabpfn_with_images.py to fetch the MulTaBench archive.
+    "kagglehub>=0.3.0",
 ]
 
 [tool.uv]
