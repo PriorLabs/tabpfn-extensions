@@ -37,6 +37,7 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 - **many_class**: Handle classification problems with more classes than your TabPFN checkpoint supports
 - **unsupervised**: Data generation and outlier detection
 - **embedding**: Get TabPFN's internal dense sample embeddings
+- **image**: Put pictures in the table: declared base64 image columns become frozen DINOv3 features before TabPFN sees them
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
 - **pval_crt**: Statistical feature relevance testing (p-values)
 - **bayesian_optimization**: Bayesian optimization with TabPFN as the surrogate model and differentiable Expected Improvement
@@ -71,6 +72,7 @@ Runnable scripts and notebooks for extensions and general use cases live in the 
 
 - [`bayesian_optimization/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/bayesian_optimization) — Bayesian optimization with TabPFN as the surrogate and differentiable Expected Improvement
 - [`embedding/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding) — access TabPFN's internal dense sample embeddings
+- [`image/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/image) — pictures as columns, embedded by a frozen DINOv3 and reduced by PCA
 - [`interpretability/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/interpretability) — SHAP values, partial dependence plots, feature selection
 - [`many_class/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/many_class) — classification with more classes than your checkpoint supports
 - [`predictive_distribution/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/predictive_distribution) — visualize the full predictive distribution from `TabPFNRegressor` and derive point estimates / credible intervals
