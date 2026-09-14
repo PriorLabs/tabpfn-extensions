@@ -88,6 +88,10 @@ jobs:
           # already covered by the per-PR smoke gate.
           TABPFN_EXCLUDE_DEVICES: "cpu,cpu:0,mps"
           EXAMPLE_FULL: "1"
+          # The image example's encoder is gated on the Hugging Face Hub, and its
+          # kagglehub archive lands inside the dataset cache restored above.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          KAGGLEHUB_CACHE: ${{ env.SCIKIT_LEARN_DATA }}/kagglehub
         run: |
           set -o pipefail
           uv run --no-sync pytest tests/test_examples.py --run-examples -v 2>&1 \
