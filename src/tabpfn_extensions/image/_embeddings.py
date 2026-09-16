@@ -15,7 +15,7 @@ from tabpfn_extensions.utils import infer_device
 
 if TYPE_CHECKING:
     from PIL.Image import Image
-    from transformers import DINOv3ViTImageProcessorFast, DINOv3ViTModel
+    from transformers import DINOv3ViTImageProcessor, DINOv3ViTModel
 
 IMAGE_ENCODER_MODEL = "facebook/dinov3-vits16-pretrain-lvd1689m"
 """The one encoder: a DINOv3 ViT-S/16; its CLS token is an image's embedding."""
@@ -26,7 +26,7 @@ class DinoEncoder(NamedTuple):
     """The frozen encoder and the image processor that prepares its input."""
 
     model: DINOv3ViTModel
-    processor: DINOv3ViTImageProcessorFast
+    processor: DINOv3ViTImageProcessor
 
 
 _ENCODER: DinoEncoder | None = None
@@ -78,9 +78,7 @@ def get_dino_encoder(device: torch.device) -> DinoEncoder:
 
         try:
             model = AutoModel.from_pretrained(IMAGE_ENCODER_MODEL).eval()
-            processor = AutoImageProcessor.from_pretrained(
-                IMAGE_ENCODER_MODEL, use_fast=True
-            )
+            processor = AutoImageProcessor.from_pretrained(IMAGE_ENCODER_MODEL)
         except OSError as e:
             # transformers folds the Hub's `GatedRepoError` into an `OSError`.
             if "gated" in str(e).lower():
