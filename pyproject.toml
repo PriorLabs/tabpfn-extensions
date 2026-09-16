@@ -84,9 +84,11 @@ bayesian_optimization = [
     # Only needed for the benchmark objective in the example.
     "botorch>=0.12.0",
 ]
-# Image columns: transformers loads the DINOv3 encoder, pillow decodes the images.
+# Image columns: transformers loads the DINOv3 encoder and its image processor,
+# which is torchvision-backed; pillow decodes the images.
 image = [
     "transformers>=4.57.1",
+    "torchvision>=0.20",
     "pillow>=10.4",
 ]
 
