@@ -80,17 +80,14 @@ def open_images(sources: Sequence[bytes | Image]) -> list[Image]:
     """Each source as an RGB PIL image no larger than `MAX_IMAGE_SIDE`.
 
     Bytes are decoded; a PIL image is copied, so the caller's is left untouched.
-    An EXIF orientation tag, as phones write it, is applied, so the encoder sees
-    the picture the way a viewer shows it. A palette image goes through RGBA so
-    its transparency survives; any other mode, grayscale included, converts to
-    RGB directly.
+    A palette image goes through RGBA so its transparency survives; any other
+    mode, grayscale included, converts to RGB directly.
 
     Raises:
         ValueError: Naming the row whose bytes PIL cannot read as an image.
     """
     _raise_if_no_pil()
     import PIL.Image
-    import PIL.ImageOps
 
     images = []
     for row, source in enumerate(sources):
@@ -107,7 +104,6 @@ def open_images(sources: Sequence[bytes | Image]) -> list[Image]:
                 PIL.Image.DecompressionBombError,
             ) as e:
                 raise ValueError(f"row {row}: {e}") from e
-        image = PIL.ImageOps.exif_transpose(image)
         if image.mode == "P":
             image = image.convert("RGBA")
         image = image.convert("RGB")

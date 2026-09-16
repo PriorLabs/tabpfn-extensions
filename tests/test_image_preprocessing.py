@@ -73,19 +73,6 @@ def test__open_images__takes_pil_images_and_leaves_them_untouched() -> None:
     assert (image.mode, image.size) == ("L", (600, 8))
 
 
-def test__open_images__applies_the_exif_orientation() -> None:
-    Image = pytest.importorskip("PIL.Image")
-    exif = Image.Exif()
-    exif[0x0112] = 6  # stored landscape, to be shown rotated by 90 degrees
-    buffer = io.BytesIO()
-    Image.new("RGB", (40, 20)).save(buffer, format="JPEG", exif=exif.tobytes())
-
-    out = _preprocessing.open_images([buffer.getvalue()])[0]
-
-    assert out.size == (20, 40)
-    assert out.getexif().get(0x0112) is None
-
-
 def test__open_images__refuses_bytes_that_are_not_an_image() -> None:
     with pytest.raises(ValueError, match="row 1"):
         _preprocessing.open_images([_png_bytes(), b"not an image"])
