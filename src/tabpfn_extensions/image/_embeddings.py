@@ -14,6 +14,7 @@ from tabpfn_extensions.image._preprocessing import open_images
 from tabpfn_extensions.utils import infer_device
 
 if TYPE_CHECKING:
+    from PIL.Image import Image
     from transformers import DINOv3ViTImageProcessorFast, DINOv3ViTModel
 
 IMAGE_ENCODER_MODEL = "facebook/dinov3-vits16-pretrain-lvd1689m"
@@ -89,20 +90,23 @@ def get_dino_encoder(device: torch.device) -> DinoEncoder:
     return DinoEncoder(_ENCODER.model.to(device), _ENCODER.processor)
 
 
-def encode_image_bytes(
-    payloads: Sequence[bytes], *, device: Any, batch_size: int = DEFAULT_BATCH_SIZE
+def encode_images(
+    sources: Sequence[bytes | Image],
+    *,
+    device: Any,
+    batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> np.ndarray:
-    """The CLS embedding of every image, as `(len(payloads), hidden_size)` float32.
+    """The CLS embedding of every image, as `(len(sources), hidden_size)` float32.
 
     Args:
-        payloads: The image files' bytes, one per row.
+        sources: One image per row, as an image file's bytes or as a PIL image.
         device: Where the encoder runs, as TabPFN's `device` argument.
         batch_size: Images per forward pass.
 
     Raises:
         ValueError: Naming the row whose bytes are not an image.
     """
-    images = open_images(payloads)
+    images = open_images(sources)
     torch_device = _torch_device(device)
     model, processor = get_dino_encoder(torch_device)
     chunks = []

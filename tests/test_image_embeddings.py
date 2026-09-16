@@ -100,15 +100,18 @@ class TestEncoderLoading:
 
 
 @pytest.mark.slow
-def test__encode_image_bytes__separates_two_colours() -> None:
+def test__encode_images__separates_two_colours() -> None:
     """The real encoder on the CPU, when its dependencies and license are in place:
-    same-colour squares embed alike, different colours apart.
+    same-colour squares embed alike, as bytes or as a PIL image, different colours
+    apart.
     """
     pytest.importorskip("transformers")
+    Image = pytest.importorskip("PIL.Image")
     red, blue = _png_bytes((255, 0, 0)), _png_bytes((0, 0, 255))
+    red_image = Image.open(io.BytesIO(red))
 
     try:
-        out = _embeddings.encode_image_bytes([red, blue, red], device="cpu")
+        out = _embeddings.encode_images([red, blue, red_image], device="cpu")
     except GatedEncoderError as e:
         pytest.skip(str(e))
 

@@ -21,14 +21,15 @@ its own input size: a cap on memory for high-resolution inputs, with no effect o
 the embedding."""
 
 
-def cell_to_bytes(cell: object) -> bytes | None:
-    """The image bytes one cell holds, or `None` for a missing cell.
+def cell_to_image_source(cell: object) -> bytes | Image | None:
+    """What one cell holds: an image file's bytes, a PIL image, or `None` if missing.
 
     A `str` is base64, optionally behind a `data:...;base64,` prefix and with
-    whitespace removed; `bytes` are the image file itself.
+    whitespace removed; `bytes` are the image file itself; a PIL image is taken
+    as is.
 
     Raises:
-        ValueError: On a value that is neither, or a string that is not base64.
+        ValueError: On a value that is none of these, or a string that is not base64.
     """
     if isinstance(cell, bytes | bytearray | memoryview):
         return bytes(cell)
@@ -44,7 +45,17 @@ def cell_to_bytes(cell: object) -> bytes | None:
             raise ValueError(f"not base64: {e}") from e
     if cell is None or (pd.api.types.is_scalar(cell) and pd.isna(cell)):
         return None
+    if _is_pil_image(cell):
+        return cell
     raise ValueError(f"unsupported cell type {type(cell).__name__}")
+
+
+def _is_pil_image(cell: object) -> bool:
+    try:
+        import PIL.Image
+    except ImportError:
+        return False
+    return isinstance(cell, PIL.Image.Image)
 
 
 def image_to_bytes(image: Image, format: str = "PNG") -> bytes:
@@ -65,11 +76,12 @@ def _raise_if_no_pil() -> None:
         ) from e
 
 
-def open_images(payloads: Sequence[bytes]) -> list[Image]:
-    """Decode each payload to an RGB PIL image no larger than `MAX_IMAGE_SIDE`.
+def open_images(sources: Sequence[bytes | Image]) -> list[Image]:
+    """Each source as an RGB PIL image no larger than `MAX_IMAGE_SIDE`.
 
-    A palette image goes through RGBA so its transparency survives the
-    conversion; any other mode, grayscale included, converts to RGB directly.
+    Bytes are decoded; a PIL image is copied, so the caller's is left untouched.
+    A palette image goes through RGBA so its transparency survives; any other
+    mode, grayscale included, converts to RGB directly.
 
     Raises:
         ValueError: Naming the row whose bytes PIL cannot read as an image.
@@ -78,17 +90,20 @@ def open_images(payloads: Sequence[bytes]) -> list[Image]:
     import PIL.Image
 
     images = []
-    for row, payload in enumerate(payloads):
-        try:
-            image = PIL.Image.open(io.BytesIO(payload))
-            image.load()
-        except (
-            OSError,
-            ValueError,
-            SyntaxError,
-            PIL.Image.DecompressionBombError,
-        ) as e:
-            raise ValueError(f"row {row}: {e}") from e
+    for row, source in enumerate(sources):
+        if isinstance(source, PIL.Image.Image):
+            image = source
+        else:
+            try:
+                image = PIL.Image.open(io.BytesIO(source))
+                image.load()
+            except (
+                OSError,
+                ValueError,
+                SyntaxError,
+                PIL.Image.DecompressionBombError,
+            ) as e:
+                raise ValueError(f"row {row}: {e}") from e
         if image.mode == "P":
             image = image.convert("RGBA")
         image = image.convert("RGB")
