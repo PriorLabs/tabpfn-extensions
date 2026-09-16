@@ -104,7 +104,7 @@ class TestEncoderLoading:
 def test__encode_images__rejects_a_batch_size_that_is_not_a_power_of_two(
     batch_size: int,
 ) -> None:
-    with pytest.raises(ValueError, match="positive power of two"):
+    with pytest.raises(ValueError, match="power of two"):
         _embeddings.encode_images(
             [b"never decoded"], device="cpu", batch_size=batch_size
         )

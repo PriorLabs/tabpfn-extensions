@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -102,13 +103,11 @@ def encode_images(
         batch_size: Images per forward pass, a power of two.
 
     Raises:
-        ValueError: When `batch_size` is not a positive power of two, or naming
-            the row whose bytes are not an image.
+        ValueError: When `batch_size` is not a power of two, or naming the row
+            whose bytes are not an image.
     """
-    if batch_size < 1 or batch_size & (batch_size - 1):
-        raise ValueError(
-            f"`batch_size` must be a positive power of two, got {batch_size}."
-        )
+    if batch_size < 1 or not math.log2(batch_size).is_integer():
+        raise ValueError(f"`batch_size` must be a power of two, got {batch_size}.")
     images = open_images(sources)
     torch_device = _torch_device(device)
     model, processor = get_dino_encoder(torch_device)
