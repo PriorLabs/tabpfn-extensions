@@ -99,11 +99,16 @@ def encode_images(
     Args:
         sources: One image per row, as an image file's bytes or as a PIL image.
         device: Where the encoder runs, as TabPFN's `device` argument.
-        batch_size: Images per forward pass.
+        batch_size: Images per forward pass, a power of two.
 
     Raises:
-        ValueError: Naming the row whose bytes are not an image.
+        ValueError: When `batch_size` is not a positive power of two, or naming
+            the row whose bytes are not an image.
     """
+    if batch_size < 1 or batch_size & (batch_size - 1):
+        raise ValueError(
+            f"`batch_size` must be a positive power of two, got {batch_size}."
+        )
     images = open_images(sources)
     torch_device = _torch_device(device)
     model, processor = get_dino_encoder(torch_device)

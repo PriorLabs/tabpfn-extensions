@@ -100,6 +100,16 @@ class TestEncoderLoading:
         assert loaded == [IMAGE_ENCODER_MODEL, IMAGE_ENCODER_MODEL]
 
 
+@pytest.mark.parametrize("batch_size", [0, -1, 3, 48])
+def test__encode_images__rejects_a_batch_size_that_is_not_a_power_of_two(
+    batch_size: int,
+) -> None:
+    with pytest.raises(ValueError, match="positive power of two"):
+        _embeddings.encode_images(
+            [b"never decoded"], device="cpu", batch_size=batch_size
+        )
+
+
 @pytest.mark.slow
 def test__encode_images__separates_two_colours() -> None:
     """The real encoder on the CPU, when its dependencies and license are in place:
