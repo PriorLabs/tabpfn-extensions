@@ -25,6 +25,17 @@ def _png_bytes(colour: tuple[int, int, int], size: tuple[int, int] = (32, 32)) -
     return buffer.getvalue()
 
 
+def _stub_encoder_dependencies(monkeypatch: pytest.MonkeyPatch, auto: type) -> None:
+    """Stand in for transformers and torchvision, so no test needs the image extra."""
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        types.SimpleNamespace(AutoModel=auto, AutoImageProcessor=auto),
+    )
+    monkeypatch.setitem(sys.modules, "torchvision", types.SimpleNamespace())
+    monkeypatch.setattr(_embeddings, "_ENCODER", None)
+
+
 class TestTorchDevice:
     def test__specs__resolve_to_torch_devices(self) -> None:
         assert _embeddings._torch_device("cpu") == torch.device("cpu")
@@ -54,12 +65,7 @@ class TestEncoderLoading:
                 del kwargs
                 raise OSError(f"You are trying to access a gated repo. {name}")
 
-        monkeypatch.setitem(
-            sys.modules,
-            "transformers",
-            types.SimpleNamespace(AutoModel=GatedAuto, AutoImageProcessor=GatedAuto),
-        )
-        monkeypatch.setattr(_embeddings, "_ENCODER", None)
+        _stub_encoder_dependencies(monkeypatch, GatedAuto)
 
         with pytest.raises(GatedEncoderError, match="huggingface.co/facebook/dinov3"):
             _embeddings.get_dino_encoder(torch.device("cpu"))
@@ -84,12 +90,7 @@ class TestEncoderLoading:
                 loaded.append(name)
                 return FakeModel()
 
-        monkeypatch.setitem(
-            sys.modules,
-            "transformers",
-            types.SimpleNamespace(AutoModel=FakeAuto, AutoImageProcessor=FakeAuto),
-        )
-        monkeypatch.setattr(_embeddings, "_ENCODER", None)
+        _stub_encoder_dependencies(monkeypatch, FakeAuto)
 
         first_model, first_processor = _embeddings.get_dino_encoder(torch.device("cpu"))
         model, processor = _embeddings.get_dino_encoder(torch.device("cpu"))
