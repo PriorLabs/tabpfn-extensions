@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import sys
 import types
+from collections.abc import Iterator
 from typing import Any
 
 import numpy as np
@@ -25,6 +26,14 @@ def _png_bytes(colour: tuple[int, int, int], size: tuple[int, int] = (32, 32)) -
     return buffer.getvalue()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_encoder_cache() -> Iterator[None]:
+    """Each test loads its own encoder and leaves none behind for the next."""
+    _embeddings._load_encoder.cache_clear()
+    yield
+    _embeddings._load_encoder.cache_clear()
+
+
 def _stub_encoder_dependencies(monkeypatch: pytest.MonkeyPatch, auto: type) -> None:
     """Stand in for transformers and torchvision, so no test needs the image extra."""
     monkeypatch.setitem(
@@ -33,7 +42,6 @@ def _stub_encoder_dependencies(monkeypatch: pytest.MonkeyPatch, auto: type) -> N
         types.SimpleNamespace(AutoModel=auto, AutoImageProcessor=auto),
     )
     monkeypatch.setitem(sys.modules, "torchvision", types.SimpleNamespace())
-    monkeypatch.setattr(_embeddings, "_ENCODER", None)
 
 
 class TestTorchDevice:
@@ -51,7 +59,6 @@ class TestEncoderLoading:
         self, monkeypatch: pytest.MonkeyPatch, module: str
     ) -> None:
         monkeypatch.setitem(sys.modules, module, None)
-        monkeypatch.setattr(_embeddings, "_ENCODER", None)
 
         with pytest.raises(ImportError, match=r"tabpfn-extensions\[image\]"):
             _embeddings.get_dino_encoder(torch.device("cpu"))

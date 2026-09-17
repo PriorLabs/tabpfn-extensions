@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import functools
 import math
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple
@@ -28,11 +29,6 @@ class DinoEncoder(NamedTuple):
 
     model: DINOv3ViTModel
     processor: DINOv3ViTImageProcessor
-
-
-_ENCODER: DinoEncoder | None = None
-"""Loaded once per process and kept here, not on a transformer, so fitted
-transformers pickle without the weights."""
 
 
 class GatedEncoderError(OSError):
@@ -65,28 +61,36 @@ def _raise_if_no_encoder_dependencies() -> None:
         ) from e
 
 
-def get_dino_encoder(device: torch.device) -> DinoEncoder:
-    """The encoder on `device` and its image processor, loaded once per process.
+@functools.cache
+def _load_encoder() -> DinoEncoder:
+    """The encoder and its image processor, fetched once per process.
+
+    Cached here, not on a transformer, so fitted transformers pickle without the
+    weights. A failed load is not cached, so a retry once the extra is installed or
+    the license accepted goes through.
 
     Raises:
         GatedEncoderError: When the license has not been accepted, or no token is
             available.
     """
-    global _ENCODER
-    if _ENCODER is None:
-        _raise_if_no_encoder_dependencies()
-        from transformers import AutoImageProcessor, AutoModel
+    _raise_if_no_encoder_dependencies()
+    from transformers import AutoImageProcessor, AutoModel
 
-        try:
-            model = AutoModel.from_pretrained(IMAGE_ENCODER_MODEL).eval()
-            processor = AutoImageProcessor.from_pretrained(IMAGE_ENCODER_MODEL)
-        except OSError as e:
-            # transformers folds the Hub's `GatedRepoError` into an `OSError`.
-            if "gated" in str(e).lower():
-                raise GatedEncoderError from e
-            raise
-        _ENCODER = DinoEncoder(model, processor)
-    return DinoEncoder(_ENCODER.model.to(device), _ENCODER.processor)
+    try:
+        model = AutoModel.from_pretrained(IMAGE_ENCODER_MODEL).eval()
+        processor = AutoImageProcessor.from_pretrained(IMAGE_ENCODER_MODEL)
+    except OSError as e:
+        # transformers folds the Hub's `GatedRepoError` into an `OSError`.
+        if "gated" in str(e).lower():
+            raise GatedEncoderError from e
+        raise
+    return DinoEncoder(model, processor)
+
+
+def get_dino_encoder(device: torch.device) -> DinoEncoder:
+    """The encoder moved to `device`, and its image processor."""
+    encoder = _load_encoder()
+    return DinoEncoder(encoder.model.to(device), encoder.processor)
 
 
 def encode_images(
