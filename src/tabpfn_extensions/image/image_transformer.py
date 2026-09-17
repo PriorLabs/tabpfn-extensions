@@ -37,7 +37,9 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
     """Replaces each declared image column of a DataFrame by numeric features.
 
     Args:
-        image_features_indices: Positions in `X` whose cells hold images.
+        image_features_indices: Positions in `X` whose cells hold images: an
+            object or string column of base64 strings or image file paths, of the
+            files' bytes, or of PIL images.
         n_components: Features an image column is expanded into.
         device: Where the encoder runs, as TabPFN's `device` argument.
         batch_size: Images per encoder forward pass.
