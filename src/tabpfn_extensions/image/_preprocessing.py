@@ -96,12 +96,19 @@ def _raise_if_no_pil() -> None:
         ) from e
 
 
-def open_images(sources: Sequence[bytes | Path | Image]) -> list[Image]:
+def open_images(
+    sources: Sequence[bytes | Path | Image], *, first_row: int = 0
+) -> list[Image]:
     """Each source as an RGB PIL image no larger than `MAX_IMAGE_SIDE`.
 
     Bytes are decoded, a path is read, and a PIL image is copied, so the caller's
     is left untouched. A palette image goes through RGBA so its transparency
     survives; any other mode, grayscale included, converts to RGB directly.
+
+    Args:
+        sources: The images, one per row.
+        first_row: The row the first source sits at, when the sources are one
+            batch of a column.
 
     Raises:
         ValueError: Naming the row whose bytes or file PIL cannot read as an image.
@@ -124,7 +131,7 @@ def open_images(sources: Sequence[bytes | Path | Image]) -> list[Image]:
                 SyntaxError,
                 PIL.Image.DecompressionBombError,
             ) as e:
-                raise ValueError(f"row {row}: {e}") from e
+                raise ValueError(f"row {first_row + row}: {e}") from e
         if image.mode == "P":
             image = image.convert("RGBA")
         image = image.convert("RGB")

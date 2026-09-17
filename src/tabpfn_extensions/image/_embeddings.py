@@ -112,14 +112,13 @@ def encode_images(
     """
     if batch_size < 1 or not math.log2(batch_size).is_integer():
         raise ValueError(f"`batch_size` must be a power of two, got {batch_size}.")
-    images = open_images(sources)
     torch_device = _torch_device(device)
     model, processor = get_dino_encoder(torch_device)
     chunks = []
-    for start in range(0, len(images), batch_size):
-        inputs = processor(
-            images=images[start : start + batch_size], return_tensors="pt"
-        )
+    for start in range(0, len(sources), batch_size):
+        # Decoded one batch at a time, so a long column never holds every image.
+        images = open_images(sources[start : start + batch_size], first_row=start)
+        inputs = processor(images=images, return_tensors="pt")
         with torch.no_grad():
             hidden = model(**inputs.to(torch_device)).last_hidden_state
         chunks.append(hidden[:, 0, :].float().cpu().numpy())

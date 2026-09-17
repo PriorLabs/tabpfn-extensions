@@ -117,6 +117,68 @@ def test__encode_images__rejects_a_batch_size_that_is_not_a_power_of_two(
         )
 
 
+class _Batch(dict):
+    """What the processor hands the model: a mapping that moves to a device."""
+
+    def to(self, device: torch.device) -> _Batch:
+        del device
+        return self
+
+
+def _fake_encoder(device: torch.device) -> _embeddings.DinoEncoder:
+    """A processor that numbers the images of its batch, and a model whose CLS
+    token is that number, so the output tells which batch a row came from.
+    """
+    del device
+
+    class Processor:
+        def __call__(self, images: list[Any], return_tensors: str) -> _Batch:
+            del return_tensors
+            return _Batch(pixel_values=torch.arange(len(images), dtype=torch.float32))
+
+    class Model:
+        config = types.SimpleNamespace(hidden_size=3)
+
+        def __call__(self, pixel_values: torch.Tensor) -> Any:
+            hidden = pixel_values[:, None, None].expand(-1, 2, 3)
+            return types.SimpleNamespace(last_hidden_state=hidden)
+
+    return _embeddings.DinoEncoder(Model(), Processor())  # type: ignore[arg-type]
+
+
+def test__encode_images__decodes_one_batch_at_a_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each batch is decoded right before its forward pass, its rows numbered
+    within the column, and the batches' embeddings come back in row order.
+    """
+    decoded: list[tuple[int, int]] = []
+
+    def open_images(sources: list[Any], *, first_row: int = 0) -> list[Any]:
+        decoded.append((first_row, len(sources)))
+        return list(sources)
+
+    monkeypatch.setattr(_embeddings, "open_images", open_images)
+    monkeypatch.setattr(_embeddings, "get_dino_encoder", _fake_encoder)
+
+    out = _embeddings.encode_images([b"image"] * 5, device="cpu", batch_size=2)
+
+    assert decoded == [(0, 2), (2, 2), (4, 1)]
+    assert (out.shape, out.dtype) == ((5, 3), np.float32)
+    np.testing.assert_array_equal(out[:, 0], [0, 1, 0, 1, 0])
+    assert _embeddings.encode_images([], device="cpu").shape == (0, 3)
+
+
+def test__encode_images__names_the_row_of_a_bad_image_within_the_column(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_embeddings, "get_dino_encoder", _fake_encoder)
+    sources = [_png_bytes((0, 0, 0)), _png_bytes((0, 0, 0)), b"not an image"]
+
+    with pytest.raises(ValueError, match="row 2"):
+        _embeddings.encode_images(sources, device="cpu", batch_size=2)
+
+
 @pytest.mark.slow
 def test__encode_images__separates_two_colours() -> None:
     """The real encoder on the CPU, when its dependencies and license are in place:
