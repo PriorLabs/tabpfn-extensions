@@ -228,7 +228,8 @@ class TestExpansion:
     def test__two_declared_columns_with_one_label__get_distinct_features(
         self,
     ) -> None:
-        X = pd.DataFrame([[_b64(0), _b64(1)]] * 5, columns=["pic", "pic"])
+        rows = [[_b64(i), _b64(100 + i)] for i in range(5)]
+        X = pd.DataFrame(rows, columns=["pic", "pic"])
 
         out = ImageTransformer([0, 1], n_components=2).fit_transform(X)
 

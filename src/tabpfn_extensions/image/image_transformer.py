@@ -194,7 +194,9 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
         """
         kept = X.iloc[:, [i for i in range(X.shape[1]) if i not in blocks]]
         features = [pd.DataFrame(block, dtype=np.float32) for block in blocks.values()]
-        out = pd.concat([kept.reset_index(drop=True), *features], axis=1)
+        # Left out when every column is an image: concat deprecates empty parts.
+        parts = [kept.reset_index(drop=True)] if kept.shape[1] else []
+        out = pd.concat([*parts, *features], axis=1)
         image = self._image_feature_names(list(self.feature_names_in_), blocks)
         names = [*map(str, kept.columns), *image]
         return out.set_axis(names, axis=1).set_axis(X.index, axis=0)
