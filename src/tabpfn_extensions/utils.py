@@ -152,7 +152,24 @@ class FakeTorchDevice:
     type: str
 
 
+def _tabpfn_device(device: Any) -> torch.device:
+    """TabPFN's own reading of its `device` argument; needs the local package."""
+    try:
+        # tabpfn < 2.1.4
+        from tabpfn.utils import infer_device_and_type
+
+        return infer_device_and_type(device)
+    except ImportError:
+        pass
+
+    # tabpfn >= 2.1.4
+    from tabpfn.utils import infer_devices
+
+    return infer_devices(device)[0]
+
+
 def infer_device(device: DeviceSpecification) -> torch.device | FakeTorchDevice:
+    """Where TabPFN itself runs: a CPU stand-in when the client serves the model."""
     if importlib.util.find_spec("tabpfn") is None:
         # If tabpfn is not installed then prediction will use the API client, thus we
         # just return "cpu". We use a fake device because PyTorch may also not be
@@ -167,18 +184,34 @@ def infer_device(device: DeviceSpecification) -> torch.device | FakeTorchDevice:
             )
         return FakeTorchDevice(type="cpu")
 
-    try:
-        # tabpfn < 2.1.4
-        from tabpfn.utils import infer_device_and_type
+    return _tabpfn_device(device)
 
-        return infer_device_and_type(device)
-    except ImportError:
-        pass
 
-    # tabpfn >= 2.1.4
-    from tabpfn.utils import infer_devices
+def infer_torch_device(device: Any) -> torch.device:
+    """Where torch work of this process runs, with or without the local `tabpfn`.
 
-    return infer_devices(device)[0]
+    With `tabpfn` installed this is TabPFN's own reading of `device`. Without it,
+    the same rule on torch directly: for `"auto"`, CUDA, else MPS, else the CPU,
+    minus what `TABPFN_EXCLUDE_DEVICES` names; anything else is parsed as a torch
+    device, the first of several.
+    """
+    if importlib.util.find_spec("tabpfn") is not None:
+        return _tabpfn_device(device)
+
+    import torch
+
+    if isinstance(device, str) and device == "auto":
+        excluded = {
+            d.strip() for d in os.getenv("TABPFN_EXCLUDE_DEVICES", "").split(",")
+        }
+        if "cuda" not in excluded and torch.cuda.is_available():
+            return torch.device("cuda")
+        if "mps" not in excluded and torch.backends.mps.is_available():
+            return torch.device("mps")
+        return torch.device("cpu")
+    if isinstance(device, list | tuple):
+        device = device[0]
+    return torch.device(device)
 
 
 USE_TABPFN_LOCAL = os.getenv("USE_TABPFN_LOCAL", "true").lower() == "true"
