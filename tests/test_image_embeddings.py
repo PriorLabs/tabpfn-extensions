@@ -1,4 +1,4 @@
-"""Tests for the DINOv3 encoder: loading it, its device, and the embeddings."""
+"""Tests for the DINOv3 encoder: loading it and the embeddings."""
 
 from __future__ import annotations
 
@@ -42,28 +42,6 @@ def _stub_encoder_dependencies(monkeypatch: pytest.MonkeyPatch, auto: type) -> N
         types.SimpleNamespace(AutoModel=auto, AutoImageProcessor=auto),
     )
     monkeypatch.setitem(sys.modules, "torchvision", types.SimpleNamespace())
-
-
-class TestTorchDevice:
-    """The encoder's device is read from torch, whether TabPFN runs locally or not."""
-
-    def test__specs__resolve_to_torch_devices(self) -> None:
-        assert _embeddings._torch_device("cpu") == torch.device("cpu")
-        assert _embeddings._torch_device(torch.device("cpu")) == torch.device("cpu")
-        assert _embeddings._torch_device(["cpu", "cpu"]) == torch.device("cpu")
-        assert _embeddings._torch_device(None) == _embeddings._torch_device("auto")
-        assert isinstance(_embeddings._torch_device("auto"), torch.device)
-
-    def test__auto__prefers_cuda_unless_excluded(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
-        monkeypatch.delenv("TABPFN_EXCLUDE_DEVICES", raising=False)
-
-        assert _embeddings._torch_device("auto") == torch.device("cuda")
-
-        monkeypatch.setenv("TABPFN_EXCLUDE_DEVICES", "cuda, mps")
-        assert _embeddings._torch_device("auto") == torch.device("cpu")
 
 
 class TestEncoderLoading:

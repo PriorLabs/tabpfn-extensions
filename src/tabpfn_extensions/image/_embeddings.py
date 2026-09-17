@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import functools
 import math
-import os
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -14,6 +13,7 @@ import numpy as np
 import torch
 
 from tabpfn_extensions.image._preprocessing import open_images
+from tabpfn_extensions.utils import infer_torch_device
 
 if TYPE_CHECKING:
     from PIL.Image import Image
@@ -41,29 +41,6 @@ class GatedEncoderError(OSError):
             f"{IMAGE_ENCODER_MODEL}, then log in with `hf auth login` or set "
             "`HF_TOKEN`."
         )
-
-
-def _torch_device(device: Any) -> torch.device:
-    """Where the encoder runs, read from torch.
-
-    The encoder runs in this process even when TabPFN itself runs through the
-    client, so the device is not where TabPFN runs. `"auto"` follows TabPFN's own
-    rule: CUDA if available, else MPS, else the CPU, minus the kinds named in
-    `TABPFN_EXCLUDE_DEVICES`. Of several devices the encoder takes the first;
-    anything else is parsed as a torch device.
-    """
-    if device is None or (isinstance(device, str) and device == "auto"):
-        excluded = {
-            d.strip() for d in os.getenv("TABPFN_EXCLUDE_DEVICES", "").split(",")
-        }
-        if "cuda" not in excluded and torch.cuda.is_available():
-            return torch.device("cuda")
-        if "mps" not in excluded and torch.backends.mps.is_available():
-            return torch.device("mps")
-        return torch.device("cpu")
-    if isinstance(device, list | tuple):
-        device = device[0]
-    return torch.device(device)
 
 
 def _raise_if_no_encoder_dependencies() -> None:
@@ -120,7 +97,9 @@ def encode_images(
 
     Args:
         sources: One image per row, as an image file's bytes or path, or a PIL image.
-        device: Where the encoder runs, as TabPFN's `device` argument.
+        device: Where the encoder runs, as TabPFN's `device` argument; `None`
+            means `"auto"`. The encoder runs in this process even when TabPFN
+            itself runs through the client.
         batch_size: Images per forward pass, a power of two.
 
     Raises:
@@ -129,7 +108,7 @@ def encode_images(
     """
     if batch_size < 1 or not math.log2(batch_size).is_integer():
         raise ValueError(f"`batch_size` must be a power of two, got {batch_size}.")
-    torch_device = _torch_device(device)
+    torch_device = infer_torch_device("auto" if device is None else device)
     model, processor = get_dino_encoder(torch_device)
     chunks = []
     for start in range(0, len(sources), batch_size):
