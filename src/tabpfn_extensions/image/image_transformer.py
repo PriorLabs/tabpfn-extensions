@@ -12,7 +12,8 @@ columns. A missing or undecodable cell is refused. Columns are handled by positi
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 import numpy as np
@@ -75,7 +76,14 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
     ) -> pd.DataFrame:
         """Fit every declared column and return the expanded frame."""
         del y, fit_params
+        _check_frame(X)
         positions = self._declared_positions(X.shape[1])
+        labels = [str(c) for c in X.columns]
+        # Checked before any image is encoded: a clash is the caller's to fix.
+        _check_feature_names_out(
+            kept=[label for i, label in enumerate(labels) if i not in positions],
+            image=_image_feature_names(labels, positions, self.n_components),
+        )
         reducers: dict[int, Pipeline] = {}
         blocks: dict[int, np.ndarray] = {}
         for position in positions:
@@ -91,12 +99,13 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
             blocks[position] = reducers[position].transform(embeddings)
         # Assigned together at the end, so a failed fit leaves no half-fitted state.
         self.reducers_ = reducers
-        self.feature_names_in_ = np.asarray([str(c) for c in X.columns], dtype=object)
+        self.feature_names_in_ = np.asarray(labels, dtype=object)
         return self._assemble(X, blocks)
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """Replace the declared columns of `X` by the features fit at training."""
         check_is_fitted(self)
+        _check_frame(X)
         if X.shape[1] != len(self.feature_names_in_):
             raise ValueError(
                 f"X has {X.shape[1]} columns, fitted on {len(self.feature_names_in_)}."
@@ -148,8 +157,6 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
 
     def _embed(self, X: pd.DataFrame, position: int) -> np.ndarray:
         """The encoder's embedding of every cell of the column."""
-        if not isinstance(X, pd.DataFrame):
-            raise TypeError(f"Image columns need a DataFrame, got {type(X).__name__}.")
         sources = []
         for row, cell in enumerate(X.iloc[:, position]):
             try:
@@ -162,11 +169,9 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
         return encode_images(sources, device=self.device, batch_size=self.batch_size)
 
     def _image_feature_names(self) -> list[str]:
-        return [
-            f"{self.feature_names_in_[i]}_img_{k}"
-            for i in self.reducers_
-            for k in range(self.n_components)
-        ]
+        return _image_feature_names(
+            list(self.feature_names_in_), self.reducers_, self.n_components
+        )
 
     def _assemble(self, X: pd.DataFrame, blocks: dict[int, np.ndarray]) -> pd.DataFrame:
         """Drop the image columns, append their features, keep the caller's index.
@@ -180,3 +185,30 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
         out = pd.concat([kept.reset_index(drop=True), *features], axis=1)
         names = [*map(str, kept.columns), *self._image_feature_names()]
         return out.set_axis(names, axis=1).set_axis(X.index, axis=0)
+
+
+def _check_frame(X: object) -> None:
+    if not isinstance(X, pd.DataFrame):
+        raise TypeError(f"Image columns need a DataFrame, got {type(X).__name__}.")
+
+
+def _image_feature_names(
+    labels: Sequence[str], positions: Iterable[int], n_components: int
+) -> list[str]:
+    """`<label>_img_<k>` for every declared column, in position order."""
+    return [f"{labels[i]}_img_{k}" for i in positions for k in range(n_components)]
+
+
+def _check_feature_names_out(*, kept: Sequence[str], image: Sequence[str]) -> None:
+    """Refuse an output frame in which an image feature's label appears twice.
+
+    A kept column may already be called `photo_img_0`, and two declared columns
+    may share a label, so their features would too; the estimator would then see
+    two columns under one name.
+    """
+    repeated = {name for name, count in Counter(image).items() if count > 1}
+    if clashes := sorted(repeated | (set(image) & set(kept))):
+        raise ValueError(
+            f"The image features would repeat the labels {clashes}; rename the "
+            "columns of X."
+        )

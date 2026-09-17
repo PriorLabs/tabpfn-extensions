@@ -208,6 +208,24 @@ class TestExpansion:
         assert out.shape == (40, 1 + N_COMPONENTS)
         assert out.columns[0] == "a"
 
+    def test__kept_column_named_like_an_image_feature__is_refused_before_encoding(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(images_module, "encode_images", _never_called)
+        X = _frame().assign(photo_img_0=1.0)
+
+        with pytest.raises(ValueError, match=r"repeat the labels \['photo_img_0'\]"):
+            _expander().fit(X)
+
+    def test__two_declared_columns_with_one_label__are_refused_before_encoding(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(images_module, "encode_images", _never_called)
+        X = pd.DataFrame([[_b64(0), _b64(1)]] * 5, columns=["pic", "pic"])
+
+        with pytest.raises(ValueError, match=r"\['pic_img_0', 'pic_img_1'\]"):
+            ImageTransformer([0, 1], n_components=2).fit(X)
+
     def test__two_declared_columns__are_both_expanded_in_order(self) -> None:
         X = pd.DataFrame(
             {
