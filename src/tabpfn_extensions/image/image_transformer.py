@@ -12,7 +12,6 @@ columns. A missing or undecodable cell is refused. Columns are handled by positi
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Iterable, Sequence
 from typing import Any
 
@@ -78,12 +77,6 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
         del y, fit_params
         _check_frame(X)
         positions = self._declared_positions(X.shape[1])
-        labels = [str(c) for c in X.columns]
-        # Checked before any image is encoded: a clash is the caller's to fix.
-        _check_feature_names_out(
-            kept=[label for i, label in enumerate(labels) if i not in positions],
-            image=_image_feature_names(labels, positions, self.n_components),
-        )
         reducers: dict[int, Pipeline] = {}
         blocks: dict[int, np.ndarray] = {}
         for position in positions:
@@ -99,7 +92,7 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
             blocks[position] = reducers[position].transform(embeddings)
         # Assigned together at the end, so a failed fit leaves no half-fitted state.
         self.reducers_ = reducers
-        self.feature_names_in_ = np.asarray(labels, dtype=object)
+        self.feature_names_in_ = np.asarray([str(c) for c in X.columns], dtype=object)
         return self._assemble(X, blocks)
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -119,7 +112,8 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
         check_is_fitted(self)
         names = self.feature_names_in_
         kept = [name for i, name in enumerate(names) if i not in self.reducers_]
-        return np.asarray([*kept, *self._image_feature_names()], dtype=object)
+        image = self._image_feature_names(list(names), self.reducers_)
+        return np.asarray([*kept, *image], dtype=object)
 
     def output_indices(
         self, indices: Sequence[int] | None, *, n_columns: int
@@ -168,10 +162,28 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
             sources.append(source)
         return encode_images(sources, device=self.device, batch_size=self.batch_size)
 
-    def _image_feature_names(self) -> list[str]:
-        return _image_feature_names(
-            list(self.feature_names_in_), self.reducers_, self.n_components
-        )
+    def _image_feature_names(
+        self, labels: Sequence[str], positions: Iterable[int]
+    ) -> list[str]:
+        """`<label>_img_<k>` per declared column and component, in position order.
+
+        A name a kept column or an earlier feature already bears, because a column
+        is called `photo_img_0` or two declared columns share a label, gets `_0`,
+        `_1`, ... appended until it is free.
+        """
+        positions = list(positions)
+        taken = {label for i, label in enumerate(labels) if i not in positions}
+        names = []
+        for i in positions:
+            for k in range(self.n_components):
+                name = base = f"{labels[i]}_img_{k}"
+                n = 0
+                while name in taken:
+                    name = f"{base}_{n}"
+                    n += 1
+                taken.add(name)
+                names.append(name)
+        return names
 
     def _assemble(self, X: pd.DataFrame, blocks: dict[int, np.ndarray]) -> pd.DataFrame:
         """Drop the image columns, append their features, keep the caller's index.
@@ -183,32 +195,11 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
         kept = X.iloc[:, [i for i in range(X.shape[1]) if i not in blocks]]
         features = [pd.DataFrame(block, dtype=np.float32) for block in blocks.values()]
         out = pd.concat([kept.reset_index(drop=True), *features], axis=1)
-        names = [*map(str, kept.columns), *self._image_feature_names()]
+        image = self._image_feature_names(list(self.feature_names_in_), blocks)
+        names = [*map(str, kept.columns), *image]
         return out.set_axis(names, axis=1).set_axis(X.index, axis=0)
 
 
 def _check_frame(X: object) -> None:
     if not isinstance(X, pd.DataFrame):
         raise TypeError(f"Image columns need a DataFrame, got {type(X).__name__}.")
-
-
-def _image_feature_names(
-    labels: Sequence[str], positions: Iterable[int], n_components: int
-) -> list[str]:
-    """`<label>_img_<k>` for every declared column, in position order."""
-    return [f"{labels[i]}_img_{k}" for i in positions for k in range(n_components)]
-
-
-def _check_feature_names_out(*, kept: Sequence[str], image: Sequence[str]) -> None:
-    """Refuse an output frame in which an image feature's label appears twice.
-
-    A kept column may already be called `photo_img_0`, and two declared columns
-    may share a label, so their features would too; the estimator would then see
-    two columns under one name.
-    """
-    repeated = {name for name, count in Counter(image).items() if count > 1}
-    if clashes := sorted(repeated | (set(image) & set(kept))):
-        raise ValueError(
-            f"The image features would repeat the labels {clashes}; rename the "
-            "columns of X."
-        )

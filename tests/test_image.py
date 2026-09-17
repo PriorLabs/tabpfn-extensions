@@ -208,23 +208,36 @@ class TestExpansion:
         assert out.shape == (40, 1 + N_COMPONENTS)
         assert out.columns[0] == "a"
 
-    def test__kept_column_named_like_an_image_feature__is_refused_before_encoding(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(images_module, "encode_images", _never_called)
-        X = _frame().assign(photo_img_0=1.0)
+    def test__feature_label_a_kept_column_bears__gets_a_free_suffix(self) -> None:
+        X = _frame().assign(photo_img_0=1.0, photo_img_0_0=2.0)
+        transformer = _expander(n_components=2)
 
-        with pytest.raises(ValueError, match=r"repeat the labels \['photo_img_0'\]"):
-            _expander().fit(X)
+        out = transformer.fit_transform(X)
 
-    def test__two_declared_columns_with_one_label__are_refused_before_encoding(
-        self, monkeypatch: pytest.MonkeyPatch
+        expected = [
+            "num",
+            "photo_img_0",
+            "photo_img_0_0",
+            "photo_img_0_1",
+            "photo_img_1",
+        ]
+        assert list(out.columns) == expected
+        assert list(transformer.get_feature_names_out()) == expected
+        assert list(transformer.transform(X).columns) == expected
+
+    def test__two_declared_columns_with_one_label__get_distinct_features(
+        self,
     ) -> None:
-        monkeypatch.setattr(images_module, "encode_images", _never_called)
         X = pd.DataFrame([[_b64(0), _b64(1)]] * 5, columns=["pic", "pic"])
 
-        with pytest.raises(ValueError, match=r"\['pic_img_0', 'pic_img_1'\]"):
-            ImageTransformer([0, 1], n_components=2).fit(X)
+        out = ImageTransformer([0, 1], n_components=2).fit_transform(X)
+
+        assert list(out.columns) == [
+            "pic_img_0",
+            "pic_img_1",
+            "pic_img_0_0",
+            "pic_img_1_0",
+        ]
 
     def test__two_declared_columns__are_both_expanded_in_order(self) -> None:
         X = pd.DataFrame(
