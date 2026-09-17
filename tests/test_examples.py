@@ -63,12 +63,14 @@ REQUIRES_TABPFN_FILES = {
 }
 
 # Examples needing a module that is intentionally never installed, so they skip
-# (rather than fail) when it is absent. Reserved for the GPL-excluded case:
-# scikit-survival is in no extra or group, so survival_example always skips unless
-# the user installs it manually. (Other example deps -- shapiq, shap, hyperopt, ... --
-# are installed via --all-extras / the "examples" group and are expected to be present.)
+# (rather than fail) when it is absent: scikit-survival is GPL and in no extra or
+# group; kagglehub fetches the image example's archive, and that example's encoder
+# is gated on the Hugging Face Hub too, so it runs only where both are set up by
+# hand. (Other example deps -- shapiq, shap, hyperopt, ... -- are installed via
+# --all-extras / the "examples" group and are expected to be present.)
 REQUIRES_MODULE = {
     "survival_example.py": "sksurv",
+    "tabpfn_with_images.py": "kagglehub",
 }
 
 # Examples that exceed TabPFN's CPU sample guard and only run on a GPU.
