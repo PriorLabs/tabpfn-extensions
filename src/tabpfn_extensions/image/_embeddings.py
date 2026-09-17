@@ -15,6 +15,8 @@ from tabpfn_extensions.image._preprocessing import open_images
 from tabpfn_extensions.utils import infer_torch_device
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from PIL.Image import Image
     from transformers import DINOv3ViTImageProcessor, DINOv3ViTModel
 
@@ -87,7 +89,7 @@ def get_dino_encoder(device: torch.device) -> DinoEncoder:
 
 
 def encode_images(
-    sources: Sequence[bytes | Image],
+    sources: Sequence[bytes | Path | Image],
     *,
     device: Any,
     batch_size: int = DEFAULT_BATCH_SIZE,
