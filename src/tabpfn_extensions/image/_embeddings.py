@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import functools
 import math
+import os
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -13,7 +14,6 @@ import numpy as np
 import torch
 
 from tabpfn_extensions.image._preprocessing import open_images
-from tabpfn_extensions.utils import infer_device
 
 if TYPE_CHECKING:
     from PIL.Image import Image
@@ -44,9 +44,26 @@ class GatedEncoderError(OSError):
 
 
 def _torch_device(device: Any) -> torch.device:
-    """TabPFN's reading of its `device` argument; the CPU when tabpfn is not installed."""
-    resolved = infer_device("auto" if device is None else device)
-    return resolved if isinstance(resolved, torch.device) else torch.device("cpu")
+    """Where the encoder runs, read from torch.
+
+    The encoder runs in this process even when TabPFN itself runs through the
+    client, so the device is not where TabPFN runs. `"auto"` follows TabPFN's own
+    rule: CUDA if available, else MPS, else the CPU, minus the kinds named in
+    `TABPFN_EXCLUDE_DEVICES`. Of several devices the encoder takes the first;
+    anything else is parsed as a torch device.
+    """
+    if device is None or (isinstance(device, str) and device == "auto"):
+        excluded = {
+            d.strip() for d in os.getenv("TABPFN_EXCLUDE_DEVICES", "").split(",")
+        }
+        if "cuda" not in excluded and torch.cuda.is_available():
+            return torch.device("cuda")
+        if "mps" not in excluded and torch.backends.mps.is_available():
+            return torch.device("mps")
+        return torch.device("cpu")
+    if isinstance(device, list | tuple):
+        device = device[0]
+    return torch.device(device)
 
 
 def _raise_if_no_encoder_dependencies() -> None:
