@@ -548,11 +548,7 @@ class TestTabPFNWithImages:
     def test__tabpfn__refuses_columns_in_another_order(
         self, tabpfn_classifier: Any
     ) -> None:
-        """The premise of the next test: TabPFN itself checks the feature names.
-
-        Local package only: the client has no feature-name check of its own, the
-        server gets the frame, so what it does with a swap is not pinned here.
-        """
+        """The premise of the next test: TabPFN itself checks the feature names."""
         X, y = _estimator_data(regression=False)
         X = pd.DataFrame({"num": X["num"], "more": X["num"] * 2})
 
