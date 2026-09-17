@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import functools
-import math
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, NamedTuple
 
@@ -100,14 +99,14 @@ def encode_images(
         device: Where the encoder runs, as TabPFN's `device` argument; `None`
             means `"auto"`. The encoder runs in this process even when TabPFN
             itself runs through the client.
-        batch_size: Images per forward pass, a power of two.
+        batch_size: Images per forward pass.
 
     Raises:
-        ValueError: When `batch_size` is not a power of two, or naming the row
-            whose bytes are not an image.
+        ValueError: When `batch_size` is not positive, or naming the row whose
+            bytes are not an image.
     """
-    if batch_size < 1 or not math.log2(batch_size).is_integer():
-        raise ValueError(f"`batch_size` must be a power of two, got {batch_size}.")
+    if batch_size < 1:
+        raise ValueError(f"`batch_size` must be positive, got {batch_size}.")
     torch_device = infer_torch_device("auto" if device is None else device)
     model, processor = get_dino_encoder(torch_device)
     chunks = []

@@ -100,11 +100,11 @@ class TestEncoderLoading:
         assert loaded == [IMAGE_ENCODER_MODEL, IMAGE_ENCODER_MODEL]
 
 
-@pytest.mark.parametrize("batch_size", [0, -1, 3, 48])
-def test__encode_images__rejects_a_batch_size_that_is_not_a_power_of_two(
+@pytest.mark.parametrize("batch_size", [0, -1])
+def test__encode_images__rejects_a_batch_size_that_is_not_positive(
     batch_size: int,
 ) -> None:
-    with pytest.raises(ValueError, match="power of two"):
+    with pytest.raises(ValueError, match="positive"):
         _embeddings.encode_images(
             [b"never decoded"], device="cpu", batch_size=batch_size
         )
@@ -154,11 +154,11 @@ def test__encode_images__decodes_one_batch_at_a_time(
     monkeypatch.setattr(_embeddings, "open_images", open_images)
     monkeypatch.setattr(_embeddings, "get_dino_encoder", _fake_encoder)
 
-    out = _embeddings.encode_images([b"image"] * 5, device="cpu", batch_size=2)
+    out = _embeddings.encode_images([b"image"] * 5, device="cpu", batch_size=3)
 
-    assert decoded == [(0, 2), (2, 2), (4, 1)]
+    assert decoded == [(0, 3), (3, 2)]
     assert (out.shape, out.dtype) == ((5, 3), np.float32)
-    np.testing.assert_array_equal(out[:, 0], [0, 1, 0, 1, 0])
+    np.testing.assert_array_equal(out[:, 0], [0, 1, 2, 0, 1])
     assert _embeddings.encode_images([], device="cpu").shape == (0, 3)
 
 
