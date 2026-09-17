@@ -9,6 +9,7 @@ except PackageNotFoundError:
 from tabpfn_common_utils.telemetry.interactive import opt_in
 
 from .embedding import TabPFNEmbedding
+from .hurdle import AutoHurdleRegressor
 from .many_class import ManyClassClassifier
 from .unsupervised import TabPFNUnsupervisedModel
 
@@ -16,6 +17,7 @@ from .unsupervised import TabPFNUnsupervisedModel
 from .utils import TabPFNClassifier, TabPFNRegressor, is_tabpfn
 
 __all__ = [
+    "AutoHurdleRegressor",
     "TabPFNClassifier",
     "TabPFNRegressor",
     "is_tabpfn",
