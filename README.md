@@ -37,7 +37,7 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 - **many_class**: Handle classification problems with more classes than your TabPFN checkpoint supports
 - **unsupervised**: Data generation and outlier detection
 - **embedding**: Get TabPFN's internal dense sample embeddings
-- **image**: Put pictures in the table: declared base64 image columns become frozen DINOv3 features before TabPFN sees them
+- **image**: Put pictures in the table: declared image columns, holding file paths, base64, bytes or PIL images, become frozen DINOv3 features before TabPFN sees them
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
 - **pval_crt**: Statistical feature relevance testing (p-values)
 - **bayesian_optimization**: Bayesian optimization with TabPFN as the surrogate model and differentiable Expected Improvement
