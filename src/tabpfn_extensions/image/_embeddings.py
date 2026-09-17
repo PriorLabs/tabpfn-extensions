@@ -98,7 +98,7 @@ def encode_images(
     """The CLS embedding of every image, as `(len(sources), hidden_size)` float32.
 
     Args:
-        sources: One image per row, as an image file's bytes or as a PIL image.
+        sources: One image per row, as an image file's bytes or path, or a PIL image.
         device: Where the encoder runs, as TabPFN's `device` argument.
         batch_size: Images per forward pass, a power of two.
 
