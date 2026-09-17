@@ -40,7 +40,7 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
         image_features_indices: Positions in `X` whose cells hold images.
         n_components: Features an image column is expanded into.
         device: Where the encoder runs, as TabPFN's `device` argument.
-        batch_size: Images per encoder forward pass, a power of two.
+        batch_size: Images per encoder forward pass.
 
     Attributes:
         reducers_: Input position -> the column's fitted scaler and PCA.

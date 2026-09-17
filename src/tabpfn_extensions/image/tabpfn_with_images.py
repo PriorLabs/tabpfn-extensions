@@ -56,7 +56,7 @@ class TabPFNWithImages(BaseEstimator):
         image_features_indices: Positions in `X` whose cells hold images, each as
             a base64 string, as the image file's path or bytes, or as a PIL image.
         n_components: Features an image column is expanded into.
-        batch_size: Images per encoder forward pass, a power of two.
+        batch_size: Images per encoder forward pass.
 
     Attributes:
         estimator_: The fitted clone of `estimator`.
