@@ -90,7 +90,9 @@ class TabPFNWithImages(BaseEstimator):
         estimator = clone(self.estimator)
         categorical = getattr(estimator, "categorical_features_indices", None)
         if categorical is not None:
-            estimator.categorical_features_indices = images.output_indices(categorical)
+            estimator.categorical_features_indices = images.output_indices(
+                categorical, n_columns=X.shape[1]
+            )
         X = images.fit_transform(X)
         estimator.fit(X, y, **fit_params)
         self.image_transformer_, self.estimator_ = images, estimator

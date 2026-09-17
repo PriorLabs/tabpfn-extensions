@@ -75,12 +75,7 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
     ) -> pd.DataFrame:
         """Fit every declared column and return the expanded frame."""
         del y, fit_params
-        positions = self._declared_positions()
-        if positions[-1] >= X.shape[1]:
-            raise ValueError(
-                f"`image_features_indices` names {positions}, but X has "
-                f"{X.shape[1]} columns."
-            )
+        positions = self._declared_positions(X.shape[1])
         reducers: dict[int, Pipeline] = {}
         blocks: dict[int, np.ndarray] = {}
         for position in positions:
@@ -117,15 +112,21 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
         kept = [name for i, name in enumerate(names) if i not in self.reducers_]
         return np.asarray([*kept, *self._image_feature_names()], dtype=object)
 
-    def output_indices(self, indices: Sequence[int] | None) -> list[int] | None:
+    def output_indices(
+        self, indices: Sequence[int] | None, *, n_columns: int
+    ) -> list[int] | None:
         """Where the input positions `indices` sit once the image columns moved.
+
+        Args:
+            indices: Positions in a frame of `n_columns` columns; `None` stays `None`.
+            n_columns: The width of that frame.
 
         Raises:
             ValueError: If one of them is a declared image column.
         """
         if indices is None:
             return None
-        declared = self._declared_positions()
+        declared = self._declared_positions(n_columns)
         if clash := sorted(set(indices) & set(declared)):
             raise ValueError(
                 f"Positions {clash} are declared image columns; they cannot also be "
@@ -133,15 +134,15 @@ class ImageTransformer(TransformerMixin, BaseEstimator):
             )
         return [i - sum(j < i for j in declared) for i in indices]
 
-    def _declared_positions(self) -> list[int]:
-        """The declared positions, sorted and unique."""
+    def _declared_positions(self, n_columns: int) -> list[int]:
+        """The declared positions, sorted and unique, all within `n_columns`."""
         if self.image_features_indices is None:
             raise ValueError("`image_features_indices` is required.")
         positions = sorted({int(i) for i in self.image_features_indices})
-        if not positions or positions[0] < 0:
+        if not positions or positions[0] < 0 or positions[-1] >= n_columns:
             raise ValueError(
-                "`image_features_indices` must name columns of X, got "
-                f"{list(self.image_features_indices)}."
+                f"`image_features_indices` must name columns of X, which has "
+                f"{n_columns}; got {list(self.image_features_indices)}."
             )
         return positions
 

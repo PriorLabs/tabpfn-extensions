@@ -132,12 +132,12 @@ class TestDeclaration:
         assert all(pd.api.types.is_float_dtype(dtype) for dtype in out.dtypes)
 
     def test__numpy_index_arrays__are_accepted(self) -> None:
-        assert ImageTransformer(np.array([1]))._declared_positions() == [1]
-        assert ImageTransformer(np.array([0]))._declared_positions() == [0]
-        assert ImageTransformer(np.array([1, 0]))._declared_positions() == [0, 1]
+        assert ImageTransformer(np.array([1]))._declared_positions(2) == [1]
+        assert ImageTransformer(np.array([0]))._declared_positions(2) == [0]
+        assert ImageTransformer(np.array([1, 0]))._declared_positions(2) == [0, 1]
 
     def test__index_out_of_range__is_refused(self) -> None:
-        with pytest.raises(ValueError, match="has 2 columns"):
+        with pytest.raises(ValueError, match=r"which has 2; got \[5\]"):
             ImageTransformer([5]).fit(_frame())
 
     def test__negative_index__is_refused(self) -> None:
@@ -260,13 +260,17 @@ class TestOutputIndices:
     def test__positions_after_an_image_column__shift_down(self) -> None:
         transformer = ImageTransformer([1, 3])
 
-        assert transformer.output_indices([0, 2, 4]) == [0, 1, 2]
-        assert transformer.output_indices([]) == []
-        assert transformer.output_indices(None) is None
+        assert transformer.output_indices([0, 2, 4], n_columns=5) == [0, 1, 2]
+        assert transformer.output_indices([], n_columns=5) == []
+        assert transformer.output_indices(None, n_columns=5) is None
 
     def test__a_declared_image_position__is_refused(self) -> None:
         with pytest.raises(ValueError, match=r"Positions \[1\] are declared image"):
-            ImageTransformer([1]).output_indices([0, 1])
+            ImageTransformer([1]).output_indices([0, 1], n_columns=2)
+
+    def test__a_declared_position_outside_the_frame__is_refused(self) -> None:
+        with pytest.raises(ValueError, match=r"which has 3; got \[1, 3\]"):
+            ImageTransformer([1, 3]).output_indices([0], n_columns=3)
 
 
 @pytest.mark.usefixtures("stub_encoder")
