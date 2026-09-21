@@ -35,7 +35,7 @@ def test_fit_clones_and_preserves_frame(
     assert not hasattr(model.classifier, "classes_")
     assert model.n_features_in_ == 2
     np.testing.assert_array_equal(model.feature_names_in_, X.columns)
-    assert clone(model).get_params()["zero_threshold"] == 0.5
+    assert clone(model).get_params()["zero_threshold"] == 0.25
     with pytest.raises(ValueError, match="feature names"):
         model.predict(X[["kind", "value"]])
 
@@ -63,6 +63,16 @@ def test_auto_gate(
     assert model.hurdle_ == expected
     if not expected:
         assert model.regressor_.constant_.item() == np.mean(y)
+
+
+@pytest.mark.parametrize(("n_zeros", "expected"), [(4, False), (5, False), (6, True)])
+def test_default_zero_threshold(
+    model: AutoHurdleRegressor, n_zeros: int, expected: bool
+) -> None:
+    y = np.ones(20)
+    y[:n_zeros] = 0
+    model.fit(np.ones((20, 2)), y)
+    assert model.hurdle_ == expected
 
 
 def test_mixture_predictions(

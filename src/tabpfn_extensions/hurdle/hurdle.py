@@ -46,6 +46,8 @@ class AutoHurdleRegressor(RegressorMixin, BaseEstimator):
             split for non-negative targets whose zero rate exceeds zero_threshold.
             Otherwise, all rows go to the regressor.
         zero_threshold: Training zero-rate threshold for automatic selection.
+            Defaults to 0.25, a heuristic rather than a tuned optimum. This controls
+            whether to fit two stages, independently of the prediction statistic.
         quantile_grid: Strictly increasing positive-stage quantile levels between
             0 and 1, with at least two entries. None uses the 21-point grid from
             0.01 to 0.99. Required levels outside the grid clamp to its endpoints.
@@ -68,7 +70,7 @@ class AutoHurdleRegressor(RegressorMixin, BaseEstimator):
         regressor: Any = None,
         *,
         hurdle: Literal["auto"] | bool = "auto",
-        zero_threshold: float = 0.5,
+        zero_threshold: float = 0.25,
         quantile_grid: list[float] | tuple[float, ...] | np.ndarray | None = None,
     ) -> None:
         self.classifier = classifier
