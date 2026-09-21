@@ -84,11 +84,17 @@ bayesian_optimization = [
     # Only needed for the benchmark objective in the example.
     "botorch>=0.12.0",
 ]
+# transformers for DINOv3, torchvision for its preprocessing, pillow for image decoding.
+image = [
+    "transformers>=4.57.1",
+    "torchvision>=0.20",
+    "pillow>=10.4",
+]
 
 # Meta-package that installs all extensions
 all = [
     # scikit-survival not included; install manually if you need SurvivalTabPFN.
-    "tabpfn-extensions[interpretability,survival,bayesian_optimization]",
+    "tabpfn-extensions[interpretability,survival,bayesian_optimization,image]",
 ]
 
 [dependency-groups]

@@ -10,6 +10,7 @@ from tabpfn_common_utils.telemetry.interactive import opt_in
 
 from .embedding import TabPFNEmbedding
 from .hurdle import AutoHurdleRegressor
+from .image import ImageTransformer, TabPFNWithImages
 from .many_class import ManyClassClassifier
 from .unsupervised import TabPFNUnsupervisedModel
 
@@ -22,6 +23,8 @@ __all__ = [
     "TabPFNRegressor",
     "is_tabpfn",
     "TabPFNEmbedding",
+    "ImageTransformer",
+    "TabPFNWithImages",
     "ManyClassClassifier",
     "TabPFNUnsupervisedModel",
 ]
