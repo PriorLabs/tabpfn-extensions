@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-09-21
+
+### Added
+
+- Add AutoHurdleRegressor for zero-inflated regression with configurable estimators and quantile grids, mean, median, and quantile predictions, and a Facebook Comment Volume example. ([#395](https://github.com/PriorLabs/tabpfn-extensions/pull/395))
+- Add an example that fits the Amazon Bestseller task of MulTaBench with `TabPFNWithImages`, on the numeric fields, on the picture and on both. ([#398](https://github.com/PriorLabs/tabpfn-extensions/pull/398))
+- Add the `image` extra: `pip install "tabpfn-extensions[image]"` installs transformers, torchvision and pillow, the dependencies of the image extension. ([#399](https://github.com/PriorLabs/tabpfn-extensions/pull/399))
+- Add the `image` extension: `TabPFNWithImages` and `ImageTransformer` turn declared image columns, file paths, base64 strings, bytes or PIL images, into frozen DINOv3 features before TabPFN sees them. ([#400](https://github.com/PriorLabs/tabpfn-extensions/pull/400))
+- Add the internals of the image extension: PIL decoding of image cells, given as base64, bytes, a file path or a PIL image, `image_to_bytes`, and the frozen DINOv3 encoder with its image processor. ([#401](https://github.com/PriorLabs/tabpfn-extensions/pull/401))
+
+
 ## [0.6.2] - 2026-09-03
 
 ### Fixed
