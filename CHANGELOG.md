@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- `bayesian_optimization.propose_next_point` now maximises EI with the gradient-free sampled optimiser validated on the continuous BoTorch suite (2048 uniform candidates, then three rounds of shrinking Gaussian refinement around the top 16) and works with an ordinary `TabPFNRegressor`, so the full ensemble runs in default precision. Gradient ascent on EI is still available via `n_refine_steps > 0` (needs `differentiable_input=True`) but is off by default. The example uses 8 estimators, a scrambled-Sobol initial design, and compares against BoTorch's GP-LogEI and random search on Michalewicz-2 from a shared init.
-
 ## [0.6.3] - 2026-09-21
 
 ### Added
