@@ -40,7 +40,7 @@ pip install "tabpfn-extensions[all] @ git+https://github.com/PriorLabs/tabpfn-ex
 - **image**: Put pictures in the table: declared image columns, holding file paths, base64, bytes or PIL images, become frozen DINOv3 features before TabPFN sees them
 - **tabebm**: Data augmentation using TabPFN-based Energy-Based Models
 - **pval_crt**: Statistical feature relevance testing (p-values)
-- **bayesian_optimization**: Bayesian optimization with TabPFN as the surrogate model and differentiable Expected Improvement
+- **bayesian_optimization**: Bayesian optimization with TabPFN as the surrogate model and exact Expected Improvement on its predicted distribution
 
 See the [Documentation](#documentation) section below for guides, examples, and per-extension READMEs.
 
@@ -70,7 +70,7 @@ Documentation for `tabpfn-extensions` is spread across several sources. If you a
 
 Runnable scripts and notebooks for extensions and general use cases live in the [`examples/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples) directory of this repository:
 
-- [`bayesian_optimization/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/bayesian_optimization) — Bayesian optimization with TabPFN as the surrogate and differentiable Expected Improvement
+- [`bayesian_optimization/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/bayesian_optimization) — Bayesian optimization with TabPFN as the surrogate and exact Expected Improvement, against a GP baseline
 - [`embedding/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/embedding) — access TabPFN's internal dense sample embeddings
 - [`image/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/image) — pictures as columns, embedded by a frozen DINOv3 and reduced by PCA
 - [`interpretability/`](https://github.com/PriorLabs/tabpfn-extensions/tree/main/examples/interpretability) — SHAP values, partial dependence plots, feature selection

@@ -70,7 +70,68 @@ def test_propose_next_point_stays_in_unit_cube(train_data):
         train_y,
         n_candidates=16,
         top_k=2,
-        n_refine_steps=1,
+        n_local_rounds=1,
+        n_local=4,
+    )
+
+    assert next_x.shape == (DIM,)
+    assert not next_x.requires_grad
+    assert torch.all(next_x >= 0)
+    assert torch.all(next_x <= 1)
+
+
+def test_propose_next_point_works_with_a_plain_regressor(train_data):
+    """The default sampled optimiser needs no differentiable input."""
+    train_x, train_y = train_data
+    reg = TabPFNRegressor(n_estimators=2, device=TEST_DEVICE, random_state=0)
+
+    next_x = bo.propose_next_point(
+        reg,
+        train_x,
+        train_y,
+        n_candidates=16,
+        top_k=2,
+        n_local_rounds=2,
+        n_local=4,
+    )
+
+    assert next_x.shape == (DIM,)
+    assert next_x.device.type == train_x.device.type
+    assert torch.all(next_x >= 0)
+    assert torch.all(next_x <= 1)
+
+    # The regressor must still be usable afterwards: the acquisition path may
+    # not move its bar-distribution module off the model's device in place.
+    pred = reg.predict(train_x.cpu().numpy())
+    assert pred.shape == (len(train_y),)
+
+    # Gradient refinement is the one thing a plain regressor cannot do.
+    with pytest.raises(ValueError, match="differentiable_input=True"):
+        bo.propose_next_point(
+            reg,
+            train_x,
+            train_y,
+            n_candidates=16,
+            top_k=2,
+            n_local_rounds=1,
+            n_local=4,
+            n_refine_steps=1,
+        )
+
+
+def test_propose_next_point_gradient_refinement(train_data):
+    train_x, train_y = train_data
+    reg = make_regressor()
+
+    next_x = bo.propose_next_point(
+        reg,
+        train_x,
+        train_y,
+        n_candidates=16,
+        top_k=2,
+        n_local_rounds=1,
+        n_local=4,
+        n_refine_steps=2,
     )
 
     assert next_x.shape == (DIM,)
