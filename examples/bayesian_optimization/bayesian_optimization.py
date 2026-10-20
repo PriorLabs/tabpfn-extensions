@@ -27,8 +27,8 @@ TabPFN is ahead at this budget on most initial designs, so the difference is
 visible in a single run. Do not read one seed as a benchmark; the cookbook
 repeats the experiment over seeds.
 
-For comparison the loop also runs BoTorch's GP with LogEI (the paper's
-configuration) and random search, all three from the same initial design.
+For comparison the loop also runs BoTorch's default GP with LogEI and random
+search, all three from the same initial design.
 
 NOTE: This example requires the extras of the bayesian_optimization
 extension: pip install "tabpfn-extensions[bayesian_optimization]". It needs
@@ -112,7 +112,7 @@ def run_tabpfn(init_x: torch.Tensor, init_y: torch.Tensor) -> torch.Tensor:
 
 
 def run_gp_logei(init_x: torch.Tensor, init_y: torch.Tensor) -> torch.Tensor:
-    """BoTorch's GP with LogEI, in the configuration of Ament et al. (2023)."""
+    """BoTorch's default GP with LogEI."""
     dim = init_x.shape[1]
     unit_bounds = torch.stack(
         [torch.zeros(dim, dtype=torch.double), torch.ones(dim, dtype=torch.double)],
@@ -120,7 +120,7 @@ def run_gp_logei(init_x: torch.Tensor, init_y: torch.Tensor) -> torch.Tensor:
     train_x = init_x.double().cpu()
     train_y = init_y.double().cpu().unsqueeze(-1)
     for _ in trange(N_BO_STEPS, desc="GP-LogEI "):
-        gp = SingleTaskGP(  # Matern-5/2 ARD kernel by default
+        gp = SingleTaskGP(  # RBF kernel with ARD by default
             train_x,
             train_y,
             input_transform=Normalize(d=dim),
