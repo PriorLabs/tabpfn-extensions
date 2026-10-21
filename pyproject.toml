@@ -135,7 +135,7 @@ examples = [
 # transitive copy. Worth revisiting once PyPI reports its MIT license again.
 constraint-dependencies = ["lightgbm<4.7.0"]
 exclude-newer = "7 days"
-exclude-newer-package = {torch = false, tabpfn = false}
+exclude-newer-package = {torch = false, tabpfn = false, certifi = "0 days", uv = "0 days"}
 
 [tool.licensecheck]
 only_licenses = ["APACHE", "MIT", "BSD", "ISC", "PYTHON", "UNLICENSE", "UNKNOWN"]
