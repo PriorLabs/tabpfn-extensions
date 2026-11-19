@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 import torch
@@ -89,3 +91,51 @@ def test_outliers_accepts_array_logits(monkeypatch):
 
     assert log_p.shape == (n_rows,)
     assert torch.isfinite(log_p).all()
+
+
+class _DeviceSpyTensor(torch.Tensor):
+    """Tensor that records the keyword arguments of `.to`, to test device handling."""
+
+    to_kwargs: ClassVar[dict] = {}
+
+    def to(self, *args, **kwargs):
+        type(self).to_kwargs = dict(kwargs)
+        return torch.Tensor.to(torch.as_tensor(self), *args, **kwargs)
+
+
+@pytest.mark.client_compatible
+@pytest.mark.local_compatible
+def test_impute_single_permutation_moves_samples_to_input_device(monkeypatch):
+    """Sampled values must be moved to the device of the table they fill.
+
+    With tabpfn>=9.1 the regressor returns its samples on the model device (e.g.
+    CUDA) while the table being imputed lives on the CPU. Assigning them without
+    a device move raised "Expected all tensors to be on the same device".
+    """
+    monkeypatch.setenv("FAST_TEST_MODE", "1")
+    X = torch.randn(20, 2)
+    model = unsupervised.TabPFNUnsupervisedModel(
+        TabPFNClassifier(n_estimators=1), TabPFNRegressor(n_estimators=1)
+    )
+    # Bypass fit and density_: this test needs no model weights.
+    model.X_ = X
+
+    def fake_density(_self, X_nan, *_args):
+        return None, X_nan, None
+
+    monkeypatch.setattr(unsupervised.TabPFNUnsupervisedModel, "density_", fake_density)
+
+    def fake_sample(self, column_idx, X_fit, model_, X_predict, t):
+        sampled = torch.zeros(X_predict.shape[0]).as_subclass(_DeviceSpyTensor)
+        return torch.zeros(X_predict.shape[0], 1), sampled
+
+    monkeypatch.setattr(
+        unsupervised.TabPFNUnsupervisedModel,
+        "sample_from_model_prediction_",
+        fake_sample,
+    )
+    X_missing = X.clone()
+    X_missing[0, 0] = float("nan")
+    _DeviceSpyTensor.to_kwargs = {}
+    model.impute_single_permutation_(X_missing, [0, 1])
+    assert _DeviceSpyTensor.to_kwargs.get("device") == X_missing.device
