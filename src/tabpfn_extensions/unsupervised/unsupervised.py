@@ -435,7 +435,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
                 )
 
             impute_X[torch.isnan(y_predict), column_idx] = pred_sampled.to(
-                y_predict.dtype
+                device=impute_X.device, dtype=y_predict.dtype
             )
 
         return impute_X
@@ -488,7 +488,7 @@ class TabPFNUnsupervisedModel(BaseEstimator):
             )
 
             impute_X[torch.isnan(y_predict), column_idx] = pred_sampled.to(
-                y_predict.dtype
+                device=impute_X.device, dtype=y_predict.dtype
             )
 
         return impute_X, pred
