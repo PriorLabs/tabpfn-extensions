@@ -40,7 +40,8 @@ def test_generate_synthetic_data_categorical(monkeypatch):
     """Test generating synthetic data with categorical features."""
     monkeypatch.setenv("FAST_TEST_MODE", "1")
 
-    X = np.random.randint(5, size=(5, 2))
+    # Fixed seed: a constant column 0 leaves the column-1 model no usable feature.
+    X = np.random.default_rng(0).integers(5, size=(5, 2))
     X_tensor = torch.tensor(X)
 
     tabpfn_clf = TabPFNClassifier(n_estimators=1)
