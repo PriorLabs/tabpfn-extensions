@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import torch
+from torch._subclasses.fake_tensor import FakeTensorMode
 
 from tabpfn_extensions import TabPFNClassifier, TabPFNRegressor, unsupervised
 
@@ -39,7 +40,8 @@ def test_generate_synthetic_data_categorical(monkeypatch):
     """Test generating synthetic data with categorical features."""
     monkeypatch.setenv("FAST_TEST_MODE", "1")
 
-    X = np.random.randint(5, size=(5, 2))
+    # Fixed seed: a constant column 0 leaves the column-1 model no usable feature.
+    X = np.random.default_rng(0).integers(5, size=(5, 2))
     X_tensor = torch.tensor(X)
 
     tabpfn_clf = TabPFNClassifier(n_estimators=1)
@@ -89,3 +91,32 @@ def test_outliers_accepts_array_logits(monkeypatch):
 
     assert log_p.shape == (n_rows,)
     assert torch.isfinite(log_p).all()
+
+
+@pytest.mark.client_compatible
+@pytest.mark.local_compatible
+def test_impute_single_permutation_moves_samples_to_input_device(monkeypatch):
+    """Samples on another device than the imputed table must not raise."""
+    # A fake CUDA tensor fails the device check like a real one, without a GPU.
+    with FakeTensorMode(allow_non_fake_inputs=True):
+        sample_on_cuda = torch.zeros(2, device="cuda")
+    X = torch.randn(20, 2)
+    model = unsupervised.TabPFNUnsupervisedModel(
+        TabPFNClassifier(n_estimators=1), TabPFNRegressor(n_estimators=1)
+    )
+    model.X_ = X
+    monkeypatch.setattr(
+        unsupervised.TabPFNUnsupervisedModel,
+        "density_",
+        lambda _self, X_nan, *_: (None, X_nan, None),
+    )
+    monkeypatch.setattr(
+        unsupervised.TabPFNUnsupervisedModel,
+        "sample_from_model_prediction_",
+        lambda *_: (None, sample_on_cuda),
+    )
+    X_missing = X.clone()
+    # Two NaNs: a one-element value on another device does not raise.
+    X_missing[:2, 0] = float("nan")
+
+    model.impute_single_permutation_(X_missing, [0, 1])
